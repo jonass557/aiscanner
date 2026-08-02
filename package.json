@@ -1,0 +1,17 @@
+{
+  "name": "ai-chart-scanner",
+  "version": "1.0.0",
+  "description": "AI-powered trading chart analysis SaaS platform",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "seed:admin": "npm --prefix server run seed:admin",
+    "test:server": "npm --prefix server test",
+    "test:client": "npm --prefix client test",
+    "build": "npm --prefix client run build"
+  },
+  "keywords": ["trading", "ai", "chart-analysis", "saas", "smc", "forex", "crypto"],
+  "license": "MIT"
+}

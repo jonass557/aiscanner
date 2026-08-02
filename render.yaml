@@ -1,0 +1,62 @@
+# Render blueprint — deploy the API with `render.yaml` from the Render dashboard
+# ("New +" → "Blueprint" → point at this repo).
+#
+# Alternative manual setup: create a "Web Service" pointing at the /server folder,
+# build: npm install, start: npm start, and paste the env vars from .env.example.
+services:
+  - type: web
+    name: ai-chart-scanner-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false # set in Render dashboard (MongoDB Atlas connection string)
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false # your Vercel URL, e.g. https://your-app.vercel.app
+      # AI providers — at least one for real analyses (fallback = mock)
+      - key: AI_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # Media storage
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Market data (optional — crypto works via Binance without a key)
+      - key: TWELVEDATA_API_KEY
+        sync: false
+      # SebPay (optional — without it, payments run in demo mode)
+      - key: SEBPAY_PUBLIC_KEY
+        sync: false
+      - key: SEBPAY_SECRET_KEY
+        sync: false
+      - key: SEBPAY_CALLBACK_URL
+        sync: false
+      # Email (optional — without it, verification emails print to the console)
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Admin bootstrap
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
