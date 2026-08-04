@@ -60,10 +60,6 @@ export default function Scanner() {
 
   const scan = async () => {
     if (!file) return;
-    if (!user?.isVerified) {
-      toast.error('Please verify your email before scanning.');
-      return;
-    }
     setScanning(true);
     const form = new FormData();
     form.append('image', file);

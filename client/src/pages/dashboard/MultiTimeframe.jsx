@@ -72,10 +72,6 @@ export default function MultiTimeframe() {
       toast.error('Every selected timeframe needs a chart (or deselect it).');
       return;
     }
-    if (!user?.isVerified) {
-      toast.error('Please verify your email before scanning.');
-      return;
-    }
 
     setScanning(true);
     const form = new FormData();

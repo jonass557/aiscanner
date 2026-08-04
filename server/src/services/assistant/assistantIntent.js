@@ -1,8 +1,9 @@
+import { resolveSymbol } from '../marketData/symbolCatalog.js';
+
 /**
  * AI Trading Assistant intent engine.
  *
  * Maps a natural-language message (FR/EN) to a structured intent:
- *   { action, params, requiresAnalysis, requiresData }
  *
  * Rule-based on purpose: fast, deterministic, zero AI cost for routing. Only
  * the *analysis itself* (and open-ended "explain/coach" questions) calls the LLM.
@@ -95,6 +96,21 @@ export const parseAssistantIntent = (text) => {
   }
   if (has(t, ['conseil', 'advice', 'erreur', 'error', 'fomo', 'revenge', 'overtrading', 'discipline', 'emotion', 'mental'])) {
     return { action: 'coach', params, requiresAnalysis: false, requiresData: false };
+  }
+
+  // Bare-symbol shortcut: the whole message is (or contains only) a tradable
+  // symbol — "euraud", "eur/aud", "gold", "btc h4". No action verb, but the user
+  // clearly wants that market analyzed. Route to `analyze` instead of falling
+  // through to the mentor (which would answer off-topic).
+  const bareTokens = t.split(/[\s,;?!.]+/).filter((w) => w.length >= 2);
+  const symbolTokens = bareTokens.filter((w) => resolveSymbol(w, { fuzzy: false }));
+  // Also try the message as a single mention (handles "eur/aud" kept intact).
+  const wholeMatch = resolveSymbol(t.replace(/\s+/g, ''), { fuzzy: false });
+  const onlySymbolsAndTf = bareTokens.every(
+    (w) => resolveSymbol(w, { fuzzy: false }) || TIMEFRAMES.includes(w.toUpperCase())
+  );
+  if ((symbolTokens.length || wholeMatch) && onlySymbolsAndTf) {
+    return { action: 'analyze', params, requiresAnalysis: true, requiresData: true };
   }
 
   // Default: open-ended mentor question (educational / chit-chat).

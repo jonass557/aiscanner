@@ -63,7 +63,6 @@ export default function TradeValidator() {
   const validate = async () => {
     if (mode === 'screenshot' && !file) { toast.error('Ajoutez une capture avant de valider.'); return; }
     if (mode === 'parameters' && (!params.entry || !params.stopLoss)) { toast.error('Entry et Stop Loss sont obligatoires.'); return; }
-    if (!user?.isVerified) { toast.error('Vérifiez votre email avant de valider un trade.'); return; }
 
     setValidating(true);
     try {
