@@ -11,6 +11,9 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Effective runtime flag from the backend: when false, verification gates
+  // are hidden everywhere (admin can toggle it on from the dashboard).
+  const [requireEmailVerification, setRequireEmailVerification] = useState(false);
 
   const loadUser = useCallback(async () => {
     if (!tokenStore.getAccess()) {
@@ -20,6 +23,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await authApi.me();
       setUser(data.data.user);
+      setRequireEmailVerification(Boolean(data.data.requireEmailVerification));
     } catch {
       tokenStore.clear();
     } finally {
@@ -35,6 +39,7 @@ export const AuthProvider = ({ children }) => {
     const { data } = await authApi.login(credentials);
     tokenStore.set(data.data.accessToken, data.data.refreshToken);
     setUser(data.data.user);
+    setRequireEmailVerification(Boolean(data.data.requireEmailVerification));
     return data.data.user;
   };
 
@@ -42,6 +47,7 @@ export const AuthProvider = ({ children }) => {
     const { data } = await authApi.register(payload);
     tokenStore.set(data.data.accessToken, data.data.refreshToken);
     setUser(data.data.user);
+    setRequireEmailVerification(Boolean(data.data.requireEmailVerification));
     return data.data.user;
   };
 
@@ -60,6 +66,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     refreshUser,
+    requireEmailVerification,
     isAuthenticated: Boolean(user),
     isAdmin: user?.role === 'admin',
   };

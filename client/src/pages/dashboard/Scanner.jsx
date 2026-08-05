@@ -13,7 +13,8 @@ const MAX_SIZE = 10 * 1024 * 1024;
 
 /** The AI Scanner: upload (drag/drop/paste/select), preview, scan, show result. */
 export default function Scanner() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, requireEmailVerification } = useAuth();
+  const needsVerification = requireEmailVerification && !user?.isVerified;
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [dragging, setDragging] = useState(false);
@@ -61,7 +62,7 @@ export default function Scanner() {
 
   const scan = async () => {
     if (!file) return;
-    if (!user?.isVerified) {
+    if (needsVerification) {
       toast.error("Veuillez vérifier votre email avant de scanner.");
       return;
     }
@@ -102,7 +103,7 @@ export default function Scanner() {
         </p>
       </div>
 
-      {!user?.isVerified && (
+      {needsVerification && (
         <EmailVerification
           onVerified={refreshUser}
           description={
@@ -114,7 +115,7 @@ export default function Scanner() {
         />
       )}
 
-      {user?.isVerified && !result && (
+      {!needsVerification && !result && (
         <div className="card p-6">
           {!preview ? (
             <div

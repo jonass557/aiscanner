@@ -34,12 +34,18 @@ const FIELD_META = {
   'payments.sebpay.secretKey': { label: 'SebPay secret key', secret: true },
   'payments.sebpay.baseUrl': { label: 'SebPay base URL', hint: 'https://new.sebpay.bj/api' },
   'payments.sebpay.callbackUrl': { label: 'SebPay callback URL' },
+  'features.requireEmailVerification': {
+    label: 'Vérification email obligatoire',
+    hint: "Exige un code OTP par email avant de scanner. Désactivé, l'accès est immédiat.",
+    toggle: true,
+  },
 };
 
 const CATEGORY_TITLES = {
   ai: 'AI Providers (OpenAI · Claude · Gemini · NVIDIA)',
   vision: 'Computer Vision Engine',
   payments: 'Payments (SebPay)',
+  features: 'Fonctionnalités',
 };
 
 const TESTABLE = ['openai', 'claude', 'gemini', 'nvidia'];
@@ -174,6 +180,29 @@ export default function AdminAIConfig() {
           <div className="grid gap-4 md:grid-cols-2">
             {fields.map((f) => {
               const meta = FIELD_META[f.key] || { label: f.key };
+              if (meta.toggle) {
+                const on = values[f.key] === true || values[f.key] === 'true';
+                return (
+                  <div key={f.key} className="md:col-span-2 flex items-center justify-between gap-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                    <div>
+                      <p className="font-medium">{meta.label}</p>
+                      {meta.hint && <p className="mt-0.5 text-sm text-gray-500">{meta.hint}</p>}
+                      <p className={`mt-1 text-xs font-semibold ${on ? 'text-green-600' : 'text-gray-400'}`}>
+                        {on ? 'Activée' : 'Désactivée'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={on}
+                      onClick={() => onChange(f.key, !on)}
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${on ? 'bg-brand-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${on ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                );
+              }
               return (
                 <Input
                   key={f.key}

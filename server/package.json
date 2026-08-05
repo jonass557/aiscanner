@@ -12,7 +12,13 @@
     "lint": "eslint src --ext .js",
     "seed:admin": "node src/scripts/seedAdmin.js"
   },
-  "keywords": ["trading", "ai", "chart-analysis", "saas", "smc"],
+  "keywords": [
+    "trading",
+    "ai",
+    "chart-analysis",
+    "saas",
+    "smc"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -31,6 +37,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "pdfkit": "^0.15.1",
+    "resend": "^6.18.1",
     "winston": "^3.17.0"
   },
   "devDependencies": {

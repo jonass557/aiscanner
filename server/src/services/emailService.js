@@ -4,11 +4,30 @@ import logger from '../config/logger.js';
 
 /**
  * Email service for verification and password-reset messages.
- * If SMTP credentials are not configured, emails are logged to the console
- * instead of sent — so development flows work without a mail server.
+ *
+ * Priority: Resend HTTP API (works on hosts that block outbound SMTP, e.g. Render).
+ * Fallback: SMTP (Gmail) when Resend is not configured.
+ * Dev mode: logs emails to console when neither is configured.
  */
 
 let transporter = null;
+let resend = null;
+
+// Lazy-init Resend client when RESEND_API_KEY is set.
+const getResend = async () => {
+  if (resend) return resend;
+  if (!config.email.resendApiKey) return null;
+
+  try {
+    const { Resend } = await import('resend');
+    resend = new Resend(config.email.resendApiKey);
+    logger.info('[email] Resend API ready (HTTP)');
+    return resend;
+  } catch (err) {
+    logger.error(`[email] Resend init failed: ${err.message}`);
+    return null;
+  }
+};
 
 const getTransporter = () => {
   if (transporter) return transporter;
@@ -19,18 +38,13 @@ const getTransporter = () => {
     port: config.email.port,
     secure: config.email.port === 465,
     auth: { user: config.email.user, pass: config.email.password },
-    // Keep a warm connection open so subsequent sends are near-instant
-    // (no TLS handshake / auth per message).
     pool: true,
     maxConnections: 3,
-    // Generous timeouts: on cloud hosts (Render) the TLS handshake + auth to
-    // Gmail can take well over 6 s; too-short a timeout aborts the send.
     connectionTimeout: 20000,
     greetingTimeout: 20000,
     socketTimeout: 20000,
   });
 
-  // Warm the pool up front so the first real send doesn't pay the handshake.
   transporter.verify().then(
     () => logger.info(`[email] SMTP ready (${config.email.host}:${config.email.port})`),
     (err) => logger.error(`[email] SMTP verify failed: ${err.message}`)
@@ -40,22 +54,41 @@ const getTransporter = () => {
 };
 
 const send = async ({ to, subject, html }) => {
+  // Priority 1: Resend HTTP API (bypasses SMTP firewall).
+  const rs = await getResend();
+  if (rs) {
+    try {
+      const { data } = await rs.emails.send({
+        from: config.email.from,
+        to,
+        subject,
+        html,
+      });
+      logger.info(`[email:resend] Sent "${subject}" to ${to} (id: ${data.id})`);
+      return { id: data.id };
+    } catch (err) {
+      logger.error(`[email:resend] FAILED to send "${subject}" to ${to}: ${err.message}`);
+      return { error: err.message };
+    }
+  }
+
+  // Fallback 2: SMTP (Gmail pooled transporter).
   const tx = getTransporter();
-  if (!tx) {
-    logger.info(`[email:mock] To: ${to} | Subject: ${subject}`);
-    logger.debug(`[email:mock] Body: ${html}`);
-    return { mocked: true };
+  if (tx) {
+    try {
+      const info = await tx.sendMail({ from: config.email.from, to, subject, html });
+      logger.info(`[email:smtp] Sent "${subject}" to ${to} (id: ${info.messageId})`);
+      return info;
+    } catch (err) {
+      logger.error(`[email:smtp] FAILED to send "${subject}" to ${to}: ${err.message}`);
+      return { error: err.message };
+    }
   }
-  try {
-    const info = await tx.sendMail({ from: config.email.from, to, subject, html });
-    logger.info(`[email] Sent "${subject}" to ${to} (id: ${info.messageId})`);
-    return info;
-  } catch (err) {
-    // Log loudly so the cause is visible in the host logs. Callers decide
-    // whether an email failure should surface to the user.
-    logger.error(`[email] FAILED to send "${subject}" to ${to}: ${err.message}`);
-    return { error: err.message };
-  }
+
+  // Fallback 3: mock mode (dev, no config).
+  logger.info(`[email:mock] To: ${to} | Subject: ${subject}`);
+  logger.debug(`[email:mock] Body: ${html}`);
+  return { mocked: true };
 };
 
 const baseTemplate = (title, body, ctaText, ctaUrl) => `

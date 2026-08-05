@@ -109,6 +109,9 @@ const config = {
     user: process.env.EMAIL_USER,
     password: process.env.EMAIL_PASSWORD,
     from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@aichartscanner.com',
+    // Resend HTTP API (recommended on hosts that block outbound SMTP, e.g.
+    // Render). When RESEND_API_KEY is set, it is used before falling back to SMTP.
+    resendApiKey: process.env.RESEND_API_KEY,
   },
 
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -131,8 +134,9 @@ const config = {
   // Feature flags — toggle product behaviors without code changes.
   features: {
     // Gate sensitive actions (scan, multi-timeframe, trade validator) behind a
-    // verified email. Default OFF so the product is usable without an email
-    // provider configured. Set REQUIRE_EMAIL_VERIFICATION=true to re-enable.
+    // verified email. Default OFF so the product is usable without a working
+    // email provider. Togglable at runtime from the admin dashboard
+    // (features.requireEmailVerification setting), which overrides this env.
     requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
   },
 };

@@ -67,8 +67,15 @@ services:
         sync: false
       # Require a verified email before scanning / multi-timeframe / trade validator.
       # Emails are configured above, so keep this ON in production.
+      # Require a verified email before scanning. Default OFF — this is a
+      # bootstrap fallback only; the effective value is controlled at runtime
+      # from the admin dashboard (Fonctionnalités → Vérification email).
       - key: REQUIRE_EMAIL_VERIFICATION
-        value: "true"
+        value: "false"
+      # Resend HTTP API — reliable email on hosts that block outbound SMTP
+      # (Render). Set the key from resend.com; without it, falls back to SMTP.
+      - key: RESEND_API_KEY
+        sync: false
       # Admin bootstrap
       - key: ADMIN_EMAIL
         sync: false

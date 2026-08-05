@@ -19,7 +19,8 @@ const TIMEFRAMES = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1', 'MN'];
  * and get a top-down alignment/confluence verdict.
  */
 export default function MultiTimeframe() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, requireEmailVerification } = useAuth();
+  const needsVerification = requireEmailVerification && !user?.isVerified;
   // Map of timeframe -> { file, preview }
   const [charts, setCharts] = useState({});
   const [scanning, setScanning] = useState(false);
@@ -65,7 +66,7 @@ export default function MultiTimeframe() {
   const readyCount = selected.filter((tf) => charts[tf]?.file).length;
 
   const scan = async () => {
-    if (!user?.isVerified) {
+    if (needsVerification) {
       toast.error("Veuillez vérifier votre email avant de scanner.");
       return;
     }
@@ -111,7 +112,7 @@ export default function MultiTimeframe() {
         </p>
       </div>
 
-      {!user?.isVerified && (
+      {needsVerification && (
         <EmailVerification
           onVerified={refreshUser}
           description={
@@ -123,7 +124,7 @@ export default function MultiTimeframe() {
         />
       )}
 
-      {user?.isVerified && !result && (
+      {!needsVerification && !result && (
         <>
           {/* Timeframe selector */}
           <div className="card p-6">

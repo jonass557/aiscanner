@@ -50,9 +50,24 @@ export const SETTING_DEFS = [
   { key: 'payments.sebpay.secretKey', path: 'payments.sebpay.secretKey', category: 'payments', secret: true },
   { key: 'payments.sebpay.baseUrl', path: 'payments.sebpay.baseUrl', category: 'payments', secret: false },
   { key: 'payments.sebpay.callbackUrl', path: 'payments.sebpay.callbackUrl', category: 'payments', secret: false },
+
+  // --- Features: behavioral toggles -----------------------------------------
+  { key: 'features.requireEmailVerification', path: 'features.requireEmailVerification', category: 'features', secret: false, type: 'boolean' },
 ];
 
 const DEF_BY_KEY = new Map(SETTING_DEFS.map((d) => [d.key, d]));
+
+/**
+ * Coerce a stored/plaintext value to the type declared by its def before it is
+ * written onto `config`. Settings persist as strings, but consumers read typed
+ * values (e.g. a boolean flag) — without this, the string "false" is truthy.
+ */
+const coerce = (def, value) => {
+  if (!def || value == null) return value;
+  if (def.type === 'boolean') return value === true || value === 'true';
+  if (def.type === 'number') return Number(value);
+  return value;
+};
 
 // In-memory cache of decrypted plaintext values, keyed by setting key.
 // Invalidated on every write; rebuilt on hydrate.
@@ -87,8 +102,9 @@ export const hydrate = async () => {
       if (!def) continue; // ignore unknown/legacy keys
       const plain = def.secret ? decrypt(row.value) : row.value;
       if (plain === '' || plain === null || plain === undefined) continue; // don't clobber env with empty
-      cache.set(def.key, plain);
-      setConfigPath(def.path, plain);
+      const typed = coerce(def, plain);
+      cache.set(def.key, typed);
+      setConfigPath(def.path, typed);
       applied += 1;
     }
     if (applied) logger.info(`Applied ${applied} runtime setting(s) from the database.`);
@@ -132,8 +148,9 @@ export const setValue = async (key, value, updatedBy = null) => {
   if (plain === '') {
     cache.delete(def.key);
   } else {
-    cache.set(def.key, plain);
-    setConfigPath(def.path, plain);
+    const typed = coerce(def, plain);
+    cache.set(def.key, typed);
+    setConfigPath(def.path, typed);
   }
   return def;
 };

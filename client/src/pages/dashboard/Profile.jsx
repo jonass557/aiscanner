@@ -12,7 +12,7 @@ const passwordValid = (p) => p.length >= 8 && /[a-z]/.test(p) && /[A-Z]/.test(p)
 
 /** Profile management: personal info, email status, password change. */
 export default function Profile() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, requireEmailVerification } = useAuth();
   const [info, setInfo] = useState({ firstName: user?.firstName || '', lastName: user?.lastName || '' });
   const [savingInfo, setSavingInfo] = useState(false);
 
@@ -84,7 +84,7 @@ export default function Profile() {
             )}
           </div>
         </div>
-        {!user?.isVerified && (
+        {requireEmailVerification && !user?.isVerified && (
           <Button variant="secondary" loading={resending} onClick={resendVerification}>
             Resend email
           </Button>

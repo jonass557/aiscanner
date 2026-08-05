@@ -26,9 +26,13 @@ const start = async () => {
     const server = app.listen(config.port, () => {
       logger.info(`Server running in ${config.env} mode on port ${config.port}`);
       // Surface email/verification config so misconfig is obvious in host logs.
-      const emailReady = Boolean(config.email.user && config.email.password);
+      const emailMode = config.email.resendApiKey
+        ? 'Resend API (HTTP)'
+        : config.email.user && config.email.password
+          ? `SMTP (${config.email.host}:${config.email.port} as ${config.email.user})`
+          : 'DISABLED (mock — OTP printed to console)';
       logger.info(
-        `Email: ${emailReady ? `ENABLED (${config.email.host}:${config.email.port} as ${config.email.user})` : 'DISABLED (mock — OTP printed to console)'} | ` +
+        `Email: ${emailMode} | from: ${config.email.from} | ` +
         `Email verification required: ${config.features.requireEmailVerification}`
       );
     });

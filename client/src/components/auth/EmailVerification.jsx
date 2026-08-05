@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { MailCheck, ShieldCheck } from 'lucide-react';
 import Button from '../ui/Button.jsx';
@@ -11,12 +11,40 @@ import { useAuth } from '../../context/AuthContext.jsx';
  * Email-verification card shown to users whose email isn't verified yet.
  * They paste the 6-digit OTP received by email and confirm; "Renvoyer le code"
  * issues a fresh one. On success the auth user is refreshed and onVerified fires.
+ *
+ * On mount it auto-sends a fresh code once (autoSend), so the OTP arrives
+ * without an extra click — important when verification was just turned on by
+ * an admin and no code was sent at registration.
  */
-export default function EmailVerification({ onVerified, title, description }) {
+export default function EmailVerification({ onVerified, title, description, autoSend = true }) {
   const { user, refreshUser } = useAuth();
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
+  const [sentOnce, setSentOnce] = useState(false);
+  const autoSent = useRef(false);
+
+  const resend = async (silent = false) => {
+    setResending(true);
+    try {
+      await authApi.resendVerification();
+      setSentOnce(true);
+      if (!silent) toast.success('Un nouveau code a été envoyé à votre email.');
+    } catch (err) {
+      if (!silent) toast.error(getErrorMessage(err));
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Auto-send a code once when the card first appears.
+  useEffect(() => {
+    if (autoSend && !autoSent.current) {
+      autoSent.current = true;
+      resend(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSend]);
 
   const verify = async (e) => {
     e.preventDefault();
@@ -34,18 +62,6 @@ export default function EmailVerification({ onVerified, title, description }) {
       toast.error(getErrorMessage(err));
     } finally {
       setVerifying(false);
-    }
-  };
-
-  const resend = async () => {
-    setResending(true);
-    try {
-      await authApi.resendVerification();
-      toast.success('Un nouveau code a été envoyé à votre email.');
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setResending(false);
     }
   };
 
@@ -84,7 +100,7 @@ export default function EmailVerification({ onVerified, title, description }) {
         Vous n'avez pas reçu le code ?{' '}
         <button
           type="button"
-          onClick={resend}
+          onClick={() => resend(false)}
           disabled={resending}
           className="font-semibold text-brand-600 hover:underline disabled:opacity-50"
         >

@@ -1,6 +1,7 @@
 import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import User from '../models/User.js';
+import config from '../config/index.js';
 import { getPlan } from '../config/plans.js';
 import {
   generateAccessToken,
@@ -45,9 +46,12 @@ export const register = asyncHandler(async (req, res) => {
     },
   });
 
-  // Fire-and-forget: don't block the HTTP response on SMTP. The pooled
-  // transporter sends in the background; failures are logged in emailService.
-  sendVerificationEmail(user, code).catch(() => {});
+  // Only send an OTP when verification is actually required (admin toggle).
+  // Fire-and-forget: don't block the HTTP response on SMTP; failures are
+  // logged in emailService.
+  if (config.features.requireEmailVerification) {
+    sendVerificationEmail(user, code).catch(() => {});
+  }
   await logAuth('register', { message: 'New account created', userId: user._id, ip: req.ip });
 
   const accessToken = generateAccessToken(user);
@@ -56,7 +60,7 @@ export const register = asyncHandler(async (req, res) => {
   return sendSuccess(res, {
     statusCode: 201,
     message: 'Account created. Please check your email to verify your account.',
-    data: { user, accessToken, refreshToken },
+    data: { user, accessToken, refreshToken, requireEmailVerification: config.features.requireEmailVerification },
   });
 });
 
@@ -79,7 +83,7 @@ export const login = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, {
     message: 'Logged in successfully.',
-    data: { user, accessToken, refreshToken },
+    data: { user, accessToken, refreshToken, requireEmailVerification: config.features.requireEmailVerification },
   });
 });
 
@@ -208,5 +212,9 @@ export const getMe = asyncHandler(async (req, res) => {
   user.checkAndResetMonthlyScans();
   await user.save();
 
-  return sendSuccess(res, { data: { user } });
+  // Surface the effective verification requirement so the client can decide
+  // whether to show the "verify your email" gate. Reflects the runtime toggle.
+  return sendSuccess(res, {
+    data: { user, requireEmailVerification: config.features.requireEmailVerification },
+  });
 });

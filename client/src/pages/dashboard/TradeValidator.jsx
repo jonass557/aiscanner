@@ -34,7 +34,8 @@ function InputField({ label, name, type = 'text', required, value, onChange }) {
 
 /** Trade Validator: screenshot or parameters mode. */
 export default function TradeValidator() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, requireEmailVerification } = useAuth();
+  const needsVerification = requireEmailVerification && !user?.isVerified;
   const [mode, setMode] = useState('screenshot'); // 'screenshot' | 'parameters'
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -62,7 +63,7 @@ export default function TradeValidator() {
   );
 
   const validate = async () => {
-    if (!user?.isVerified) { toast.error("Veuillez vérifier votre email avant de valider un trade."); return; }
+    if (needsVerification) { toast.error("Veuillez vérifier votre email avant de valider un trade."); return; }
     if (mode === 'screenshot' && !file) { toast.error('Ajoutez une capture avant de valider.'); return; }
     if (mode === 'parameters' && (!params.entry || !params.stopLoss)) { toast.error('Entry et Stop Loss sont obligatoires.'); return; }
 
@@ -99,7 +100,7 @@ export default function TradeValidator() {
         </p>
       </div>
 
-      {!user?.isVerified && (
+      {needsVerification && (
         <EmailVerification
           onVerified={refreshUser}
           description={
@@ -111,7 +112,7 @@ export default function TradeValidator() {
         />
       )}
 
-      {user?.isVerified && !result && (
+      {!needsVerification && !result && (
         <>
           {/* Mode switch */}
           <div className="card p-4">
