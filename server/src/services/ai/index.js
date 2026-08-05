@@ -40,30 +40,52 @@ export const getProvider = (providerName = config.ai.provider) => {
   if (factory) {
     const provider = factory(config);
     if (provider.isConfigured()) return provider;
-    logger.warn(`AI provider "${providerName}" is not configured; falling back to mock provider.`);
+    logger.warn(`AI provider "${providerName}" is not configured; trying any other configured provider.`);
   } else if (providerName !== 'mock') {
-    logger.warn(`Unknown AI provider "${providerName}"; falling back to mock provider.`);
+    logger.warn(`Unknown AI provider "${providerName}"; trying any other configured provider.`);
   }
+
+  // Resilient fallback: if the requested provider has no key (e.g. a stale DB
+  // override points at "openai" but only GEMINI_API_KEY is set), use ANY other
+  // real provider that IS configured before dropping to the mock. This keeps
+  // scanning alive whenever at least one valid key exists, regardless of which
+  // provider AI_PROVIDER / the admin DB happens to name.
+  const configured = findConfiguredProvider();
+  if (configured) {
+    logger.warn(`Using configured provider "${configured.name}" instead of "${providerName}".`);
+    return configured;
+  }
+
   return new MockProvider(config.ai);
+};
+
+/**
+ * Return the first REAL provider (in registry order) that has a valid key, or
+ * null if none is configured. Skips the requested provider's own failure.
+ */
+const findConfiguredProvider = () => {
+  for (const factory of Object.values(PROVIDER_REGISTRY)) {
+    const provider = factory(config);
+    if (provider.isConfigured()) return provider;
+  }
+  return null;
 };
 
 /**
  * True when a REAL vision/text provider is configured (not the mock fallback).
  * Used to block silent mock analyses in production — returning a fabricated
  * result (always "EURUSD") for a real user's chart is worse than a clear error.
+ * Checks ANY provider, so a valid key on a non-default provider still counts.
  */
-export const isRealProviderConfigured = (providerName = config.ai.provider) => {
-  const factory = PROVIDER_REGISTRY[providerName];
-  return Boolean(factory && factory(config).isConfigured());
-};
+export const isRealProviderConfigured = () => Boolean(findConfiguredProvider());
 
 /**
  * Guard: in production, refuse to run image analysis with the mock provider.
  * Throws a clear Error the controller surfaces to the user. No-op in dev/test,
  * where the deterministic mock is intentionally used for offline flows.
  */
-export const assertVisionReady = (providerName = config.ai.provider) => {
-  if (config.isProduction && !isRealProviderConfigured(providerName)) {
+export const assertVisionReady = () => {
+  if (config.isProduction && !isRealProviderConfigured()) {
     throw new Error(
       "L'analyse IA n'est pas configurée sur le serveur (aucune clé de vision valide). " +
       "Configurez une clé OpenAI, Claude ou Gemini avant de scanner."

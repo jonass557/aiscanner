@@ -6,6 +6,7 @@ import { startScanner, stopScanner } from './services/opportunityScanner.js';
 import { startCalendarRefresh, stopCalendarRefresh } from './services/economicCalendarService.js';
 import { seedPlans } from './services/planService.js';
 import { hydrate as hydrateSettings } from './services/settings/settingsService.js';
+import { isRealProviderConfigured } from './services/ai/index.js';
 
 /**
  * Server bootstrap: connect to the database, start listening, and wire up
@@ -34,6 +35,17 @@ const start = async () => {
       logger.info(
         `Email: ${emailMode} | from: ${config.email.from} | ` +
         `Email verification required: ${config.features.requireEmailVerification}`
+      );
+      // Surface the EFFECTIVE AI provider so a missing/overridden key is obvious.
+      const keyPresent = {
+        openai: Boolean(config.ai.openai.apiKey),
+        claude: Boolean(config.ai.claude.apiKey),
+        gemini: Boolean(config.ai.gemini.apiKey),
+      };
+      logger.info(
+        `AI: provider=${config.ai.provider} | keys{openai:${keyPresent.openai} ` +
+        `claude:${keyPresent.claude} gemini:${keyPresent.gemini}} | ` +
+        `vision-ready:${isRealProviderConfigured()}`
       );
     });
 
