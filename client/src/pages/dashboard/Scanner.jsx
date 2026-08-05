@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { UploadCloud, Image as ImageIcon, X, ScanLine, Clipboard } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import AnalysisResult from '../../components/analysis/AnalysisResult.jsx';
+import EmailVerification from '../../components/auth/EmailVerification.jsx';
 import { scanApi, analysisApi, downloadBlob } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -60,6 +61,10 @@ export default function Scanner() {
 
   const scan = async () => {
     if (!file) return;
+    if (!user?.isVerified) {
+      toast.error("Veuillez vérifier votre email avant de scanner.");
+      return;
+    }
     setScanning(true);
     const form = new FormData();
     form.append('image', file);
@@ -97,7 +102,19 @@ export default function Scanner() {
         </p>
       </div>
 
-      {!result && (
+      {!user?.isVerified && (
+        <EmailVerification
+          onVerified={refreshUser}
+          description={
+            <>
+              Vérifiez votre email pour débloquer le scan. Un code à 6 chiffres a été envoyé à votre
+              adresse — collez-le ci-dessous puis cliquez sur « Vérifier l'email ».
+            </>
+          }
+        />
+      )}
+
+      {user?.isVerified && !result && (
         <div className="card p-6">
           {!preview ? (
             <div

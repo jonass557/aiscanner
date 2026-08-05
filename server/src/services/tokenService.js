@@ -32,3 +32,13 @@ export const generateHashedToken = () => {
 };
 
 export const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+/**
+ * Generates a 6-digit numeric OTP for email verification, plus its SHA-256 hash.
+ * The plain code is emailed to the user; only the hash is stored in the DB.
+ */
+export const generateOtp = () => {
+  const code = String(crypto.randomInt(100000, 1000000)); // always 6 digits
+  const hashed = crypto.createHash('sha256').update(code).digest('hex');
+  return { code, hashed };
+};

@@ -1,6 +1,7 @@
 import { ApiError, asyncHandler } from '../utils/ApiError.js';
 import { verifyAccessToken } from '../services/tokenService.js';
 import User from '../models/User.js';
+import config from '../config/index.js';
 
 /**
  * Auth guard. Extracts the Bearer token, verifies it, loads the user, and
@@ -40,8 +41,11 @@ export const authorize = (...roles) =>
 
 /**
  * Requires a verified email. Use after `protect` on sensitive actions.
+ * No-op when email verification is disabled (config.features.requireEmailVerification),
+ * so the product works without an email provider configured.
  */
 export const requireVerified = (req, res, next) => {
+  if (!config.features.requireEmailVerification) return next();
   if (!req.user?.isVerified) {
     return next(ApiError.forbidden('Please verify your email to continue.'));
   }

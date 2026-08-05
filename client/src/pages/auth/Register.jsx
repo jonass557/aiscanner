@@ -31,8 +31,8 @@ export default function Register() {
     setLoading(true);
     try {
       await register(form);
-      toast.success('Account created! Check your email to verify.');
-      navigate('/dashboard', { replace: true });
+      toast.success('Compte créé ! Saisissez le code envoyé par email pour le vérifier.');
+      navigate('/verify-email', { replace: true });
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {

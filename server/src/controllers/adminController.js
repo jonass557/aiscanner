@@ -7,6 +7,7 @@ import Plan from '../models/Plan.js';
 import { PLANS } from '../config/plans.js';
 import { logAdmin } from '../services/logService.js';
 import config from '../config/index.js';
+import * as settingsService from '../services/settings/settingsService.js';
 
 /**
  * GET /admin/stats
@@ -192,18 +193,113 @@ export const listLogs = asyncHandler(async (req, res) => {
 
 /**
  * GET /admin/ai-config
- * Returns current AI provider configuration (keys masked).
+ * Returns current AI/vision/payment provider configuration (keys masked).
+ * Reflects EFFECTIVE values (DB overrides via settingsService, else env).
  */
 export const getAIConfig = asyncHandler(async (req, res) => {
   const mask = (key) => (key ? `${'*'.repeat(8)}${key.slice(-4)}` : null);
+  const val = (k) => settingsService.getValue(k);
   return sendSuccess(res, {
     data: {
-      activeProvider: config.ai.provider,
+      activeProvider: val('ai.provider') || config.ai.provider,
+      activeVisionProvider: val('vision.provider') || config.vision.provider,
+      activePaymentProvider: val('payments.provider') || config.payments.provider,
       providers: {
-        openai: { model: config.ai.openai.model, configured: Boolean(config.ai.openai.apiKey), keyPreview: mask(config.ai.openai.apiKey) },
-        claude: { model: config.ai.claude.model, configured: Boolean(config.ai.claude.apiKey), keyPreview: mask(config.ai.claude.apiKey) },
-        gemini: { model: config.ai.gemini.model, configured: Boolean(config.ai.gemini.apiKey), keyPreview: mask(config.ai.gemini.apiKey) },
+        openai: { model: val('ai.openai.model'), configured: Boolean(val('ai.openai.apiKey')), keyPreview: mask(val('ai.openai.apiKey')) },
+        claude: { model: val('ai.claude.model'), configured: Boolean(val('ai.claude.apiKey')), keyPreview: mask(val('ai.claude.apiKey')) },
+        gemini: { model: val('ai.gemini.model'), configured: Boolean(val('ai.gemini.apiKey')), keyPreview: mask(val('ai.gemini.apiKey')) },
+        nvidia: { model: val('ai.nvidia.model'), configured: Boolean(val('ai.nvidia.apiKey')), keyPreview: mask(val('ai.nvidia.apiKey')) },
+      },
+      payments: {
+        sebpay: { configured: Boolean(val('payments.sebpay.secretKey')), keyPreview: mask(val('payments.sebpay.secretKey')) },
       },
     },
   });
+});
+
+/**
+ * GET /admin/settings
+ * Grouped, client-safe view of all editable settings. Secrets are masked and
+ * never returned in clear.
+ */
+export const getSettings = asyncHandler(async (req, res) => {
+  return sendSuccess(res, { data: { settings: settingsService.getPublicSettings() } });
+});
+
+/**
+ * PUT /admin/settings
+ * Upsert a batch of settings: body = { settings: [{ key, value }, ...] }.
+ * Only whitelisted keys (settingsService.SETTING_DEFS) are accepted; unknown
+ * keys are rejected. Secrets are encrypted at rest by the service.
+ */
+export const updateSettings = asyncHandler(async (req, res) => {
+  const entries = Array.isArray(req.body.settings) ? req.body.settings : [];
+  if (!entries.length) throw ApiError.badRequest('No settings provided.');
+
+  const allowed = new Set(settingsService.SETTING_DEFS.map((d) => d.key));
+  const invalid = entries.filter((e) => !e || !allowed.has(e.key));
+  if (invalid.length) {
+    throw ApiError.badRequest(`Unknown setting key(s): ${invalid.map((e) => e?.key).join(', ')}`);
+  }
+
+  await settingsService.setMany(entries, req.user._id);
+
+  await logAdmin('update_settings', {
+    message: `Admin updated ${entries.length} setting(s)`,
+    userId: req.user._id,
+    // Never log secret values — only which keys changed.
+    metadata: { keys: entries.map((e) => e.key) },
+    ip: req.ip,
+  });
+
+  return sendSuccess(res, {
+    message: 'Settings updated.',
+    data: { settings: settingsService.getPublicSettings() },
+  });
+});
+
+/**
+ * POST /admin/settings/test-provider
+ * Best-effort connectivity check for a provider using its EFFECTIVE key.
+ * body = { provider: 'openai'|'claude'|'gemini'|'nvidia' }.
+ * Returns { ok, message } without exposing the key.
+ */
+export const testProvider = asyncHandler(async (req, res) => {
+  const provider = String(req.body.provider || '').toLowerCase();
+  const apiKey = settingsService.getValue(`ai.${provider}.apiKey`);
+  if (!apiKey) {
+    return sendSuccess(res, { data: { ok: false, message: 'No API key configured for this provider.' } });
+  }
+
+  let ok = false;
+  let message = '';
+  try {
+    if (provider === 'openai' || provider === 'nvidia') {
+      const baseUrl = provider === 'nvidia' ? settingsService.getValue('ai.nvidia.baseUrl') : 'https://api.openai.com/v1';
+      const r = await fetch(`${baseUrl}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
+      ok = r.ok;
+      message = r.ok ? 'Connection successful.' : `Provider returned HTTP ${r.status}.`;
+    } else if (provider === 'claude') {
+      // Minimal Messages call; 200 or a 400 "credit"/validation still proves the key is accepted vs 401.
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: settingsService.getValue('ai.claude.model') || 'claude-3-haiku-20240307', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+      });
+      ok = r.status !== 401 && r.status !== 403;
+      message = ok ? 'Connection successful.' : 'Authentication failed (invalid key).';
+    } else if (provider === 'gemini') {
+      const model = settingsService.getValue('ai.gemini.model') || 'gemini-1.5-pro';
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${apiKey}`);
+      ok = r.ok;
+      message = r.ok ? 'Connection successful.' : `Provider returned HTTP ${r.status}.`;
+    } else {
+      throw ApiError.badRequest('Unknown provider.');
+    }
+  } catch (err) {
+    ok = false;
+    message = `Connection failed: ${err.message}`;
+  }
+
+  return sendSuccess(res, { data: { ok, message } });
 });

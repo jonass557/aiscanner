@@ -51,16 +51,22 @@ const baseTemplate = (title, body, ctaText, ctaUrl) => `
     <p style="color:#9ca3af; font-size:12px; text-align:center; margin-top:16px;">© ${new Date().getFullYear()} AI Chart Scanner. All rights reserved.</p>
   </div>`;
 
-export const sendVerificationEmail = async (user, token) => {
-  const url = `${config.frontendUrl}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`;
+export const sendVerificationEmail = async (user, code) => {
+  const codeBlock = `
+    <div style="margin:24px 0; text-align:center;">
+      <div style="display:inline-block; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:10px; padding:16px 28px;">
+        <span style="font-size:34px; font-weight:700; letter-spacing:10px; color:#111827; font-family:'Courier New',monospace;">${code}</span>
+      </div>
+      <p style="color:#9ca3af; font-size:12px; margin-top:12px;">Ce code expire dans 15 minutes.</p>
+    </div>`;
   return send({
     to: user.email,
-    subject: 'Verify your email — AI Chart Scanner',
+    subject: 'Votre code de vérification — AI Chart Scanner',
     html: baseTemplate(
-      'Confirm your email',
-      'Welcome aboard! Please confirm your email address to activate your account and start analyzing charts.',
-      'Verify Email',
-      url
+      'Confirmez votre email',
+      `Bienvenue ! Saisissez le code ci-dessous dans l'application pour activer votre compte et commencer à analyser vos graphiques.${codeBlock}`,
+      null,
+      null
     ),
   });
 };

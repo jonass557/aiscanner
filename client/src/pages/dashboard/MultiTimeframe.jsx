@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { Layers, UploadCloud, X, ScanLine } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import MultiTimeframeResult from '../../components/analysis/MultiTimeframeResult.jsx';
+import EmailVerification from '../../components/auth/EmailVerification.jsx';
 import { multiTimeframeApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -64,6 +65,10 @@ export default function MultiTimeframe() {
   const readyCount = selected.filter((tf) => charts[tf]?.file).length;
 
   const scan = async () => {
+    if (!user?.isVerified) {
+      toast.error("Veuillez vérifier votre email avant de scanner.");
+      return;
+    }
     if (readyCount < 2) {
       toast.error('Please attach a chart to at least 2 timeframes.');
       return;
@@ -106,7 +111,19 @@ export default function MultiTimeframe() {
         </p>
       </div>
 
-      {!result && (
+      {!user?.isVerified && (
+        <EmailVerification
+          onVerified={refreshUser}
+          description={
+            <>
+              Vérifiez votre email pour utiliser l'analyse multi-timeframe. Un code à 6 chiffres a
+              été envoyé à votre adresse — collez-le ci-dessous puis cliquez sur « Vérifier l'email ».
+            </>
+          }
+        />
+      )}
+
+      {user?.isVerified && !result && (
         <>
           {/* Timeframe selector */}
           <div className="card p-6">

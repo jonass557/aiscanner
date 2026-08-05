@@ -31,6 +31,16 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # NVIDIA AI — open-source vision/text models (optional; editable from admin)
+      - key: NVIDIA_API_KEY
+        sync: false
+      # Computer Vision engine provider (defaults to AI_PROVIDER when unset)
+      - key: VISION_PROVIDER
+        value: openai
+      # Encryption key for admin-managed API keys stored in the DB.
+      # MUST be a stable 32-byte secret. Generate: openssl rand -hex 16
+      - key: SETTINGS_ENC_KEY
+        sync: false
       # Media storage
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
@@ -55,6 +65,10 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      # Require a verified email before scanning / multi-timeframe / trade validator.
+      # Emails are configured above, so keep this ON in production.
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "true"
       # Admin bootstrap
       - key: ADMIN_EMAIL
         sync: false

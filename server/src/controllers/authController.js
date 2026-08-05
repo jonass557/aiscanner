@@ -8,6 +8,7 @@ import {
   verifyRefreshToken,
   generateHashedToken,
   hashToken,
+  generateOtp,
 } from '../services/tokenService.js';
 import {
   sendVerificationEmail,
@@ -27,14 +28,15 @@ export const register = asyncHandler(async (req, res) => {
   if (existing) throw ApiError.conflict('An account with this email already exists.');
 
   const freePlan = getPlan('free');
-  const { token, hashed } = generateHashedToken();
+  const { code, hashed } = generateOtp();
 
   const user = await User.create({
     email,
     password,
     firstName,
     lastName,
-    verificationToken: hashed,
+    verificationCode: hashed,
+    verificationCodeExpires: Date.now() + 15 * 60 * 1000, // 15 minutes
     subscription: {
       plan: 'free',
       status: 'active',
@@ -43,7 +45,7 @@ export const register = asyncHandler(async (req, res) => {
     },
   });
 
-  await sendVerificationEmail(user, token);
+  await sendVerificationEmail(user, code);
   await logAuth('register', { message: 'New account created', userId: user._id, ip: req.ip });
 
   const accessToken = generateAccessToken(user);
@@ -97,17 +99,31 @@ export const refresh = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /auth/verify-email
+ * POST /auth/verify-email  (authenticated)
+ * The logged-in user submits the 6-digit OTP they received by email.
  */
 export const verifyEmail = asyncHandler(async (req, res) => {
-  const { token } = req.body;
-  if (!token) throw ApiError.badRequest('Verification token is required.');
+  const { code } = req.body;
+  if (!code) throw ApiError.badRequest('Verification code is required.');
 
-  const hashed = hashToken(token);
-  const user = await User.findOne({ verificationToken: hashed });
-  if (!user) throw ApiError.badRequest('Invalid or expired verification token.');
+  const user = req.user;
+  if (user.isVerified) {
+    return sendSuccess(res, { message: 'Email already verified.', data: { user } });
+  }
+
+  if (!user.verificationCode || !user.verificationCodeExpires) {
+    throw ApiError.badRequest('No verification code pending. Please request a new one.');
+  }
+  if (user.verificationCodeExpires.getTime() < Date.now()) {
+    throw ApiError.badRequest('This code has expired. Please request a new one.');
+  }
+  if (user.verificationCode !== hashToken(String(code).trim())) {
+    throw ApiError.badRequest('Invalid verification code.');
+  }
 
   user.isVerified = true;
+  user.verificationCode = undefined;
+  user.verificationCodeExpires = undefined;
   user.verificationToken = undefined;
   await user.save();
 
@@ -118,18 +134,20 @@ export const verifyEmail = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /auth/resend-verification
+ * POST /auth/resend-verification  (authenticated)
+ * Issues a fresh OTP and emails it.
  */
 export const resendVerification = asyncHandler(async (req, res) => {
   const user = req.user;
   if (user.isVerified) throw ApiError.badRequest('Email is already verified.');
 
-  const { token, hashed } = generateHashedToken();
-  user.verificationToken = hashed;
+  const { code, hashed } = generateOtp();
+  user.verificationCode = hashed;
+  user.verificationCodeExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
   await user.save();
-  await sendVerificationEmail(user, token);
+  await sendVerificationEmail(user, code);
 
-  return sendSuccess(res, { message: 'Verification email sent.' });
+  return sendSuccess(res, { message: 'A new verification code has been sent to your email.' });
 });
 
 /**

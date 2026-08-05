@@ -37,7 +37,12 @@ export const resetPasswordSchema = Joi.object({
 });
 
 export const verifyEmailSchema = Joi.object({
-  body: Joi.object({ token: Joi.string().required() }),
+  body: Joi.object({
+    // 6-digit numeric OTP the user received by email.
+    code: Joi.string().trim().pattern(/^\d{6}$/).required().messages({
+      'string.pattern.base': 'The verification code must be 6 digits.',
+    }),
+  }),
   query: Joi.object(),
   params: Joi.object(),
 });

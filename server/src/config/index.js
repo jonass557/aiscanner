@@ -45,6 +45,26 @@ const config = {
       apiKey: process.env.GEMINI_API_KEY,
       model: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
     },
+    // NVIDIA AI — open-source vision/text models served via NVIDIA NIM
+    // (build.nvidia.com), OpenAI-compatible chat/completions API.
+    nvidia: {
+      apiKey: process.env.NVIDIA_API_KEY,
+      model: process.env.NVIDIA_MODEL || 'meta/llama-3.2-90b-vision-instruct',
+      baseUrl: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+    },
+  },
+
+  // Vision engine: which provider performs chart PERCEPTION (Computer Vision).
+  // Independent from ai.provider (which drives reasoning/chat) so the two can
+  // be swapped separately from the admin dashboard.
+  vision: {
+    provider: process.env.VISION_PROVIDER || process.env.AI_PROVIDER || 'openai',
+  },
+
+  // Encryption key for settings secrets (API keys) stored in the database.
+  // Must be a stable 32-byte string in production (see services/settings/crypto.js).
+  settings: {
+    encKey: process.env.SETTINGS_ENC_KEY || '',
   },
   voice: {
     // 'web-speech' (default, client-side, zero-config) or 'openai' (server-side Whisper/TTS).
@@ -106,6 +126,14 @@ const config = {
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@aichartscanner.com',
     password: process.env.ADMIN_PASSWORD || 'Admin123!ChangeThis',
+  },
+
+  // Feature flags — toggle product behaviors without code changes.
+  features: {
+    // Gate sensitive actions (scan, multi-timeframe, trade validator) behind a
+    // verified email. Default OFF so the product is usable without an email
+    // provider configured. Set REQUIRE_EMAIL_VERIFICATION=true to re-enable.
+    requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
   },
 };
 

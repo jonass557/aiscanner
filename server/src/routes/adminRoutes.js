@@ -16,6 +16,11 @@ router.delete('/users/:id', adminController.deleteUser);
 router.get('/logs', adminController.listLogs);
 router.get('/ai-config', adminController.getAIConfig);
 
+// Runtime settings (API keys, active providers) — editable from the dashboard.
+router.get('/settings', adminController.getSettings);
+router.put('/settings', adminController.updateSettings);
+router.post('/settings/test-provider', adminController.testProvider);
+
 // Plan management (CRUD + enable/disable + free trial).
 router.get('/plans', adminPlanController.listPlans);
 router.post('/plans', adminPlanController.createPlan);

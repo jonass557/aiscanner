@@ -1,3 +1,4 @@
+
 # Déploiement & variables d'environnement — AI Chart Scanner
 
 Guide complet : quelles variables il faut, où les obtenir, et comment déployer
@@ -19,14 +20,18 @@ Guide complet : quelles variables il faut, où les obtenir, et comment déployer
 | `FRONTEND_URL` | ✅ prod | URL du site (CORS + liens email) | Ton URL Vercel, ex `https://mon-app.vercel.app` |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | ✅ | Crée le compte admin (`npm run seed:admin`) | Toi |
 | `OPENAI_API_KEY` | selon IA | Analyse d'images + assistant | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (option : clé Claude ou Gemini à la place) |
-| `AI_PROVIDER` | | `openai` \| `claude` \| `gemini` | — |
+| `AI_PROVIDER` | | `openai` \| `claude` \| `gemini` \| `nvidia` | — |
+| `NVIDIA_API_KEY` | optionnel | Modèles open source NVIDIA (NIM) | [build.nvidia.com](https://build.nvidia.com) → *Get API Key* |
+| `VISION_PROVIDER` | optionnel | Provider du moteur de Vision (défaut = `AI_PROVIDER`) | — |
+| `SETTINGS_ENC_KEY` | ✅ prod | Chiffre les clés API gérées depuis le dashboard admin (32 octets, STABLE) | `openssl rand -hex 16` |
 | `CLOUDINARY_CLOUD_NAME` / `API_KEY` / `API_SECRET` | selon usage | Stocke les images uploadées | [console.cloudinary.com](https://console.cloudinary.com) → dashboard (sinon fallback data-URL) |
 | `TWELVEDATA_API_KEY` | optionnel | Données forex/indices/commodities temps réel (assistant) | [twelvedata.com](https://twelvedata.com) → *Sign up* (gratuit) (sinon mock ; **crypto déjà réelle via Binance sans clé**) |
 | `SEBPAY_PUBLIC_KEY` / `SEBPAY_SECRET_KEY` | pour paiements | Mobile Money réel | [new.sebpay.bj](https://new.sebpay.bj) → créer un compte marchand → clés `pk_` / `sk_` |
 | `SEBPAY_BASE_URL` | pour paiements | URL API SebPay | `https://new.sebpay.bj/api` (confirmer dans ta doc SebPay) |
 | `SEBPAY_CALLBACK_URL` | pour paiements | URL publique du webhook | `https://<ton-backend-render>/api/v1/payments/webhook/sebpay` |
-| `EMAIL_USER` / `EMAIL_PASSWORD` | optionnel | Emails (vérification, reset) | Gmail → *Mot de passe d'application* (sinon emails affichés en console) |
+| `EMAIL_USER` / `EMAIL_PASSWORD` | ✅ prod | Emails (OTP de vérification, reset) | Gmail → *Mot de passe d'application* (sinon emails affichés en console) |
 | `EMAIL_FROM` | optionnel | Expéditeur | — |
+| `REQUIRE_EMAIL_VERIFICATION` | ✅ prod | Exige un email vérifié (OTP 6 chiffres) avant de scanner | `true` en production (défaut `false`) |
 | `NODE_ENV` / `PORT` | | `production` / `5000` | — |
 
 ### Frontend (`client/.env` en local, → variables Vercel)
@@ -70,11 +75,18 @@ Guide complet : quelles variables il faut, où les obtenir, et comment déployer
    - ton **URL de callback** (`SEBPAY_CALLBACK_URL`) — SebPay y POST le webhook signé HMAC-SHA256 (header `X-SebPay-Signature`).
 4. Le webhook vérifie la signature avec `sk_`, met à jour la transaction, et active le plan.
 
-### Email (Gmail)
+### Email (Gmail) — requis en production
 1. Gmail → Compte → *Sécurité* → *Vérification en 2 étapes* **ON**.
 2. *Mots de passe des applications* → générer → 16 caractères.
 3. `EMAIL_USER` = ton adresse Gmail, `EMAIL_PASSWORD` = le mot de passe d'app.
+4. Mettre `REQUIRE_EMAIL_VERIFICATION=true` pour activer la vérification.
    > Sans cela : les emails de vérification s'affichent dans la console du serveur (démo).
+
+**Fonctionnement** : après l'inscription, un code OTP à 6 chiffres est envoyé par
+email (valable 15 min). L'utilisateur le colle dans l'app (Scanner / page de
+vérification / Profil) puis clique sur « Vérifier l'email ». Le Scanner, le
+Multi-Timeframe et le Trade Validator sont bloqués tant que l'email n'est pas
+vérifié. Le bouton « Renvoyer le code » génère un nouvel OTP.
 
 ---
 

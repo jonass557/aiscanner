@@ -5,6 +5,7 @@ import { connectDB, disconnectDB } from './config/database.js';
 import { startScanner, stopScanner } from './services/opportunityScanner.js';
 import { startCalendarRefresh, stopCalendarRefresh } from './services/economicCalendarService.js';
 import { seedPlans } from './services/planService.js';
+import { hydrate as hydrateSettings } from './services/settings/settingsService.js';
 
 /**
  * Server bootstrap: connect to the database, start listening, and wire up
@@ -16,6 +17,10 @@ const start = async () => {
 
     // Seed subscription plans into the DB on first boot (idempotent).
     await seedPlans();
+
+    // Overlay admin-edited runtime settings (API keys, active providers) onto
+    // config. Env remains the fallback; DB values override when present.
+    await hydrateSettings();
 
     const app = createApp();
     const server = app.listen(config.port, () => {

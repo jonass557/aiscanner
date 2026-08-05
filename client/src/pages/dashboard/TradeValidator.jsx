@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { Shield, UploadCloud, X, ScanLine, Image as ImageIcon, SlidersHorizontal } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import TradeValidationResult from '../../components/analysis/TradeValidationResult.jsx';
+import EmailVerification from '../../components/auth/EmailVerification.jsx';
 import { tradeValidatorApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -61,6 +62,7 @@ export default function TradeValidator() {
   );
 
   const validate = async () => {
+    if (!user?.isVerified) { toast.error("Veuillez vérifier votre email avant de valider un trade."); return; }
     if (mode === 'screenshot' && !file) { toast.error('Ajoutez une capture avant de valider.'); return; }
     if (mode === 'parameters' && (!params.entry || !params.stopLoss)) { toast.error('Entry et Stop Loss sont obligatoires.'); return; }
 
@@ -97,7 +99,19 @@ export default function TradeValidator() {
         </p>
       </div>
 
-      {!result && (
+      {!user?.isVerified && (
+        <EmailVerification
+          onVerified={refreshUser}
+          description={
+            <>
+              Vérifiez votre email pour utiliser le Trade Validator. Un code à 6 chiffres a été
+              envoyé à votre adresse — collez-le ci-dessous puis cliquez sur « Vérifier l'email ».
+            </>
+          }
+        />
+      )}
+
+      {user?.isVerified && !result && (
         <>
           {/* Mode switch */}
           <div className="card p-4">
