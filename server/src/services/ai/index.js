@@ -48,6 +48,30 @@ export const getProvider = (providerName = config.ai.provider) => {
 };
 
 /**
+ * True when a REAL vision/text provider is configured (not the mock fallback).
+ * Used to block silent mock analyses in production — returning a fabricated
+ * result (always "EURUSD") for a real user's chart is worse than a clear error.
+ */
+export const isRealProviderConfigured = (providerName = config.ai.provider) => {
+  const factory = PROVIDER_REGISTRY[providerName];
+  return Boolean(factory && factory(config).isConfigured());
+};
+
+/**
+ * Guard: in production, refuse to run image analysis with the mock provider.
+ * Throws a clear Error the controller surfaces to the user. No-op in dev/test,
+ * where the deterministic mock is intentionally used for offline flows.
+ */
+export const assertVisionReady = (providerName = config.ai.provider) => {
+  if (config.isProduction && !isRealProviderConfigured(providerName)) {
+    throw new Error(
+      "L'analyse IA n'est pas configurée sur le serveur (aucune clé de vision valide). " +
+      "Configurez une clé OpenAI, Claude ou Gemini avant de scanner."
+    );
+  }
+};
+
+/**
  * Analyze a chart image end-to-end.
  * @param {Object} params
  * @param {string} params.imageUrl

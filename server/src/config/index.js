@@ -43,7 +43,7 @@ const config = {
     },
     gemini: {
       apiKey: process.env.GEMINI_API_KEY,
-      model: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
+      model: process.env.GEMINI_MODEL || 'gemini-flash-latest',
     },
     // NVIDIA AI — open-source vision/text models served via NVIDIA NIM
     // (build.nvidia.com), OpenAI-compatible chat/completions API.

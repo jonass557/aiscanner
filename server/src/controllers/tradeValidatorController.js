@@ -2,7 +2,7 @@ import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import TradeValidation from '../models/TradeValidation.js';
 import { uploadImage, deleteImage } from '../services/uploadService.js';
-import { getProvider } from '../services/ai/index.js';
+import { getProvider, assertVisionReady } from '../services/ai/index.js';
 import { TV_SYSTEM_PROMPT, buildTradeValidatorPrompt, TV_OUTPUT_SCHEMA } from '../services/ai/tradeValidatorPrompt.js';
 import { parseTradeValidationResponse } from '../services/ai/tradeValidatorParser.js';
 import { logScan } from '../services/logService.js';
@@ -19,6 +19,13 @@ export const validateTrade = asyncHandler(async (req, res) => {
   const user = req.user;
   if (!user.canScan()) {
     throw ApiError.forbidden('No scans remaining. Please upgrade your plan.');
+  }
+
+  // Guard: never run a mock analysis in production (fabricated results).
+  try {
+    assertVisionReady();
+  } catch (err) {
+    throw ApiError.serviceUnavailable(err.message);
   }
 
   let inputMode = 'screenshot';

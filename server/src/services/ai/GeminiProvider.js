@@ -10,7 +10,7 @@ export class GeminiProvider extends BaseProvider {
     super(config);
     this.name = 'gemini';
     this.apiKey = config?.apiKey;
-    this.model = config?.model || 'gemini-1.5-pro';
+    this.model = config?.model || 'gemini-flash-latest';
   }
 
   isConfigured() {

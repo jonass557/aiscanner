@@ -2,7 +2,7 @@ import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import MultiTimeframeAnalysis from '../models/MultiTimeframeAnalysis.js';
 import { uploadImage, deleteImage } from '../services/uploadService.js';
-import { analyzeMultiTimeframe } from '../services/ai/index.js';
+import { analyzeMultiTimeframe, assertVisionReady } from '../services/ai/index.js';
 import { logScan } from '../services/logService.js';
 import logger from '../config/logger.js';
 
@@ -46,6 +46,13 @@ export const scanMultiTimeframe = asyncHandler(async (req, res) => {
     throw ApiError.forbidden(
       'You have no scans remaining this month. Please upgrade your plan or wait for your monthly reset.'
     );
+  }
+
+  // Guard: never run a mock analysis in production (fabricated results).
+  try {
+    assertVisionReady();
+  } catch (err) {
+    throw ApiError.serviceUnavailable(err.message);
   }
 
   // 1. Upload every image, keeping its timeframe label. Sort low -> high.

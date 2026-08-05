@@ -22,9 +22,13 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false # your Vercel URL, e.g. https://your-app.vercel.app
-      # AI providers — at least one for real analyses (fallback = mock)
+      # AI providers — at least one for real analyses (fallback = mock).
+      # In production the mock is BLOCKED: an unconfigured provider returns a
+      # clear 503 instead of a fabricated analysis.
       - key: AI_PROVIDER
-        value: openai
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
@@ -36,7 +40,7 @@ services:
         sync: false
       # Computer Vision engine provider (defaults to AI_PROVIDER when unset)
       - key: VISION_PROVIDER
-        value: openai
+        value: gemini
       # Encryption key for admin-managed API keys stored in the DB.
       # MUST be a stable 32-byte secret. Generate: openssl rand -hex 16
       - key: SETTINGS_ENC_KEY

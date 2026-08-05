@@ -2,7 +2,7 @@ import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import Analysis from '../models/Analysis.js';
 import { uploadImage, deleteImage } from '../services/uploadService.js';
-import { analyzeChart } from '../services/ai/index.js';
+import { analyzeChart, assertVisionReady } from '../services/ai/index.js';
 import { logScan } from '../services/logService.js';
 import logger from '../config/logger.js';
 
@@ -25,6 +25,15 @@ export const scanChart = asyncHandler(async (req, res) => {
     throw ApiError.forbidden(
       'You have no scans remaining this month. Please upgrade your plan or wait for your monthly reset.'
     );
+  }
+
+  // Guard: never run a mock analysis in production. A fabricated result (the
+  // mock always returns "EURUSD") for a real user's chart is worse than a
+  // clear error. Checked before upload so we don't waste a Cloudinary call.
+  try {
+    assertVisionReady();
+  } catch (err) {
+    throw ApiError.serviceUnavailable(err.message);
   }
 
   // 1. Upload image
