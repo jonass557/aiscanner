@@ -108,7 +108,7 @@ const config = {
     port: parseInt(process.env.EMAIL_PORT, 10) || 587,
     user: process.env.EMAIL_USER,
     password: process.env.EMAIL_PASSWORD,
-    from: process.env.EMAIL_FROM || 'noreply@aichartscanner.com',
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@aichartscanner.com',
   },
 
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
