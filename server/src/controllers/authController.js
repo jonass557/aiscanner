@@ -45,7 +45,9 @@ export const register = asyncHandler(async (req, res) => {
     },
   });
 
-  await sendVerificationEmail(user, code);
+  // Fire-and-forget: don't block the HTTP response on SMTP. The pooled
+  // transporter sends in the background; failures are logged in emailService.
+  sendVerificationEmail(user, code).catch(() => {});
   await logAuth('register', { message: 'New account created', userId: user._id, ip: req.ip });
 
   const accessToken = generateAccessToken(user);
@@ -127,7 +129,7 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   user.verificationToken = undefined;
   await user.save();
 
-  await sendWelcomeEmail(user);
+  sendWelcomeEmail(user).catch(() => {});
   await logAuth('verify_email', { message: 'Email verified', userId: user._id });
 
   return sendSuccess(res, { message: 'Email verified successfully.', data: { user } });
@@ -145,7 +147,8 @@ export const resendVerification = asyncHandler(async (req, res) => {
   user.verificationCode = hashed;
   user.verificationCodeExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
   await user.save();
-  await sendVerificationEmail(user, code);
+  // Fire-and-forget so the response is instant; send happens in the background.
+  sendVerificationEmail(user, code).catch(() => {});
 
   return sendSuccess(res, { message: 'A new verification code has been sent to your email.' });
 });
@@ -163,7 +166,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     user.resetPasswordToken = hashed;
     user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
     await user.save();
-    await sendPasswordResetEmail(user, token);
+    sendPasswordResetEmail(user, token).catch(() => {});
     await logAuth('forgot_password', { message: 'Password reset requested', userId: user._id, ip: req.ip });
   }
 

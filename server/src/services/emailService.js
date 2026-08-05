@@ -19,11 +19,23 @@ const getTransporter = () => {
     port: config.email.port,
     secure: config.email.port === 465,
     auth: { user: config.email.user, pass: config.email.password },
-    // Timeouts (6 s) so a slow/blocked SMTP on the host never hangs the request.
-    connectionTimeout: 6000,
-    greetingTimeout: 6000,
-    socketTimeout: 6000,
+    // Keep a warm connection open so subsequent sends are near-instant
+    // (no TLS handshake / auth per message).
+    pool: true,
+    maxConnections: 3,
+    // Generous timeouts: on cloud hosts (Render) the TLS handshake + auth to
+    // Gmail can take well over 6 s; too-short a timeout aborts the send.
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
   });
+
+  // Warm the pool up front so the first real send doesn't pay the handshake.
+  transporter.verify().then(
+    () => logger.info(`[email] SMTP ready (${config.email.host}:${config.email.port})`),
+    (err) => logger.error(`[email] SMTP verify failed: ${err.message}`)
+  );
+
   return transporter;
 };
 
@@ -39,8 +51,8 @@ const send = async ({ to, subject, html }) => {
     logger.info(`[email] Sent "${subject}" to ${to} (id: ${info.messageId})`);
     return info;
   } catch (err) {
-    // Never let an email failure break the request (register/verify/reset).
-    // Log loudly so the cause is visible in the host logs.
+    // Log loudly so the cause is visible in the host logs. Callers decide
+    // whether an email failure should surface to the user.
     logger.error(`[email] FAILED to send "${subject}" to ${to}: ${err.message}`);
     return { error: err.message };
   }
