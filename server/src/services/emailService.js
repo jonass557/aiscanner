@@ -19,6 +19,10 @@ const getTransporter = () => {
     port: config.email.port,
     secure: config.email.port === 465,
     auth: { user: config.email.user, pass: config.email.password },
+    // Timeouts (6 s) so a slow/blocked SMTP on the host never hangs the request.
+    connectionTimeout: 6000,
+    greetingTimeout: 6000,
+    socketTimeout: 6000,
   });
   return transporter;
 };
@@ -30,7 +34,16 @@ const send = async ({ to, subject, html }) => {
     logger.debug(`[email:mock] Body: ${html}`);
     return { mocked: true };
   }
-  return tx.sendMail({ from: config.email.from, to, subject, html });
+  try {
+    const info = await tx.sendMail({ from: config.email.from, to, subject, html });
+    logger.info(`[email] Sent "${subject}" to ${to} (id: ${info.messageId})`);
+    return info;
+  } catch (err) {
+    // Never let an email failure break the request (register/verify/reset).
+    // Log loudly so the cause is visible in the host logs.
+    logger.error(`[email] FAILED to send "${subject}" to ${to}: ${err.message}`);
+    return { error: err.message };
+  }
 };
 
 const baseTemplate = (title, body, ctaText, ctaUrl) => `
