@@ -29,6 +29,7 @@ export const getAdminStats = asyncHandler(async (req, res) => {
     usersByPlan,
     scansByDecision,
     recentUsers,
+    qualityByProvider,
   ] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ isVerified: true }),
@@ -38,6 +39,21 @@ export const getAdminStats = asyncHandler(async (req, res) => {
     User.aggregate([{ $group: { _id: '$subscription.plan', count: { $sum: 1 } } }]),
     Analysis.aggregate([{ $group: { _id: '$decision', count: { $sum: 1 } } }]),
     User.find().sort({ createdAt: -1 }).limit(5).lean(),
+    // Quality feedback loop (Engine 5): 👍/👎 counts + avg confidence per
+    // vision provider / engine version, so admins can compare model quality.
+    Analysis.aggregate([
+      { $match: { visionProvider: { $ne: null } } },
+      {
+        $group: {
+          _id: { provider: '$visionProvider', model: '$visionModel', engineVersion: '$engineVersion' },
+          total: { $sum: 1 },
+          up: { $sum: { $cond: [{ $eq: ['$feedback.rating', 'up'] }, 1, 0] } },
+          down: { $sum: { $cond: [{ $eq: ['$feedback.rating', 'down'] }, 1, 0] } },
+          avgConfidence: { $avg: '$confidenceScore' },
+        },
+      },
+      { $sort: { total: -1 } },
+    ]),
   ]);
 
   // Estimated monthly revenue from active paid plans.
@@ -56,6 +72,17 @@ export const getAdminStats = asyncHandler(async (req, res) => {
       },
       revenue: { estimatedMonthly: estimatedRevenue, currency: 'USD' },
       recentUsers,
+      quality: qualityByProvider.map((q) => ({
+        provider: q._id.provider,
+        model: q._id.model,
+        engineVersion: q._id.engineVersion,
+        total: q.total,
+        up: q.up,
+        down: q.down,
+        rated: q.up + q.down,
+        satisfaction: q.up + q.down > 0 ? Math.round((q.up / (q.up + q.down)) * 100) : null,
+        avgConfidence: q.avgConfidence != null ? Math.round(q.avgConfidence) : null,
+      })),
     },
   });
 });

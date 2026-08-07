@@ -83,6 +83,52 @@ export default function AdminOverview() {
           </div>
         </div>
       </div>
+
+      {/* Vision-model quality (Engine 5 — continuous improvement). */}
+      {Array.isArray(stats.quality) && stats.quality.length > 0 && (
+        <div className="card p-6">
+          <h3 className="font-semibold">Vision model quality</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            User 👍/👎 feedback and average confidence per provider — a base for A/B comparison.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+                  <th className="py-2 pr-4">Provider</th>
+                  <th className="py-2 pr-4">Engine</th>
+                  <th className="py-2 pr-4 text-right">Scans</th>
+                  <th className="py-2 pr-4 text-right">👍</th>
+                  <th className="py-2 pr-4 text-right">👎</th>
+                  <th className="py-2 pr-4 text-right">Satisfaction</th>
+                  <th className="py-2 text-right">Avg conf.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.quality.map((q, i) => (
+                  <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50">
+                    <td className="py-2 pr-4 font-medium capitalize">{(q.provider || '—').replace('-vision', '')}</td>
+                    <td className="py-2 pr-4 font-mono text-xs text-gray-500">{q.engineVersion || '—'}</td>
+                    <td className="py-2 pr-4 text-right">{formatNumber(q.total)}</td>
+                    <td className="py-2 pr-4 text-right text-green-600">{q.up}</td>
+                    <td className="py-2 pr-4 text-right text-red-500">{q.down}</td>
+                    <td className="py-2 pr-4 text-right">
+                      {q.satisfaction == null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        <Badge tone={q.satisfaction >= 60 ? 'green' : q.satisfaction >= 40 ? 'yellow' : 'red'}>
+                          {q.satisfaction}%
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="py-2 text-right">{q.avgConfidence != null ? `${q.avgConfidence}%` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

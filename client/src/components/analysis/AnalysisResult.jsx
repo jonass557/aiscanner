@@ -3,6 +3,8 @@ import DecisionCard from './DecisionCard.jsx';
 import TradePlanCard from './TradePlanCard.jsx';
 import TechnicalAnalysis from './TechnicalAnalysis.jsx';
 import DetailedReport from './DetailedReport.jsx';
+import AnnotatedChart from './AnnotatedChart.jsx';
+import FeedbackButtons from './FeedbackButtons.jsx';
 import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
 import { marketLabel, formatPrice, formatDateTime } from '../../utils/format.js';
@@ -14,6 +16,8 @@ import { marketLabel, formatPrice, formatDateTime } from '../../utils/format.js'
 export default function AnalysisResult({ analysis, onExportPdf, exporting }) {
   if (!analysis) return null;
 
+  const hasAnnotations = Array.isArray(analysis.annotations) && analysis.annotations.length > 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -23,6 +27,9 @@ export default function AnalysisResult({ analysis, onExportPdf, exporting }) {
             <h2 className="text-xl font-bold">{analysis.symbol}</h2>
             <Badge tone="purple">{marketLabel(analysis.market)}</Badge>
             <Badge tone="gray">{analysis.timeframe}</Badge>
+            {analysis.visionProvider && (
+              <Badge tone="blue">CV · {analysis.visionProvider.replace('-vision', '')}</Badge>
+            )}
           </div>
           <p className="mt-1 text-sm text-gray-500">
             {analysis.broker && analysis.broker !== 'Unknown' ? `${analysis.broker} · ` : ''}
@@ -37,10 +44,20 @@ export default function AnalysisResult({ analysis, onExportPdf, exporting }) {
         )}
       </div>
 
+      {/* Annotated chart (CV overlay) full-width when available. */}
+      {analysis.imageUrl && hasAnnotations && (
+        <AnnotatedChart
+          imageUrl={analysis.imageUrl}
+          annotations={analysis.annotations}
+          symbol={analysis.symbol}
+        />
+      )}
+
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3 space-y-6">
           <DecisionCard decision={analysis.decision} confidenceScore={analysis.confidenceScore} />
-          {analysis.imageUrl && (
+          {/* Fallback raw image for legacy analyses without annotations. */}
+          {analysis.imageUrl && !hasAnnotations && (
             <div className="card overflow-hidden">
               <img src={analysis.imageUrl} alt={`${analysis.symbol} chart`} className="w-full" />
             </div>
@@ -53,6 +70,16 @@ export default function AnalysisResult({ analysis, onExportPdf, exporting }) {
 
       <TechnicalAnalysis ta={analysis.technicalAnalysis} />
       <DetailedReport report={analysis.report} />
+
+      {/* Quality feedback (persisted analyses only). */}
+      {(analysis._id || analysis.id) && (
+        <div className="card flex items-center justify-center p-4">
+          <FeedbackButtons
+            analysisId={analysis._id || analysis.id}
+            initialRating={analysis.feedback?.rating || null}
+          />
+        </div>
+      )}
 
       <p className="flex items-center justify-center gap-2 text-center text-xs text-gray-400">
         <FileText className="h-3.5 w-3.5" />

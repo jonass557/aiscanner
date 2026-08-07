@@ -4,6 +4,11 @@ import mongoose from 'mongoose';
  * Loose sub-document shape for detected technical elements.
  * Each detected element carries a label, an optional price/level, and a
  * short note. Kept flexible (Mixed) because the AI may return varying detail.
+ *
+ * Extended for the Computer-Vision pipeline: every detection can now carry a
+ * visual `confidence` (0-100), a normalized `bbox`, a `direction`, and
+ * `evidence` (references to the perceived elements that justify it). All are
+ * optional, so pre-CV records remain valid.
  */
 const detectedElementSchema = new mongoose.Schema(
   {
@@ -11,6 +16,26 @@ const detectedElementSchema = new mongoose.Schema(
     level: mongoose.Schema.Types.Mixed,
     note: String,
     type: String,
+    direction: String, // 'bullish' | 'bearish' | 'neutral'
+    confidence: Number, // 0-100 (visual/model confidence)
+    bbox: mongoose.Schema.Types.Mixed, // { x, y, w, h } normalized 0-1
+    evidence: [String], // perceived-element references
+  },
+  { _id: false }
+);
+
+/**
+ * A single overlay annotation (normalized coords) produced by the overlay
+ * builder. Rendered client-side on top of the chart image.
+ */
+const annotationSchema = new mongoose.Schema(
+  {
+    layer: String, // 'orderBlocks' | 'fvg' | 'liquidity' | 'entry' | ...
+    shape: String, // 'rect' | 'line' | 'zone' | 'label'
+    coords: mongoose.Schema.Types.Mixed, // { bbox } or { points: [{x,y}] }
+    color: String,
+    label: String,
+    confidence: Number,
   },
   { _id: false }
 );
@@ -32,7 +57,7 @@ const analysisSchema = new mongoose.Schema(
     symbol: { type: String, default: 'Unknown' },
     market: {
       type: String,
-      enum: ['forex', 'crypto', 'indices', 'commodities', 'synthetic', 'unknown'],
+      enum: ['forex', 'crypto', 'indices', 'commodities', 'stocks', 'synthetic', 'unknown'],
       default: 'unknown',
     },
     timeframe: { type: String, default: 'Unknown' },
@@ -62,6 +87,24 @@ const analysisSchema = new mongoose.Schema(
       volatility: String,
       premiumZones: [detectedElementSchema],
       discountZones: [detectedElementSchema],
+
+      // --- Advanced SMC/ICT families (Computer-Vision pipeline, Engine 2) ---
+      higherHighs: [detectedElementSchema],
+      higherLows: [detectedElementSchema],
+      lowerHighs: [detectedElementSchema],
+      lowerLows: [detectedElementSchema],
+      inverseFvg: [detectedElementSchema],
+      imbalances: [detectedElementSchema],
+      displacement: [detectedElementSchema],
+      oteZones: [detectedElementSchema],
+      liquiditySweeps: [detectedElementSchema],
+      stopHunts: [detectedElementSchema],
+      inducement: [detectedElementSchema],
+      retests: [detectedElementSchema],
+      channels: [detectedElementSchema],
+      fibonacci: [detectedElementSchema],
+      chartPatterns: [detectedElementSchema],
+      candlePatterns: [detectedElementSchema],
     },
 
     // Decision
@@ -101,10 +144,41 @@ const analysisSchema = new mongoose.Schema(
       reasoning: [String], // step-by-step explanation (assistant analyses)
     },
 
+    // --- Computer-Vision pipeline additions ---------------------------------
+    // Raw perception (Engine 1): everything the vision model reported as
+    // literally visible, with per-element confidence + normalized bboxes.
+    perception: {
+      context: mongoose.Schema.Types.Mixed,
+      candles: [mongoose.Schema.Types.Mixed],
+      indicators: [mongoose.Schema.Types.Mixed],
+      drawnObjects: [mongoose.Schema.Types.Mixed],
+      texts: [mongoose.Schema.Types.Mixed],
+      gaps: [mongoose.Schema.Types.Mixed],
+      psychLevels: [mongoose.Schema.Types.Mixed],
+      consolidations: [mongoose.Schema.Types.Mixed],
+      volumeVisible: Boolean,
+      meta: mongoose.Schema.Types.Mixed, // { imageWidth, imageHeight }
+    },
+
+    // Overlay annotations (Engine 4): drawable layers in normalized coords.
+    annotations: [annotationSchema],
+
+    // Pipeline provenance.
+    engineVersion: String,
+    visionProvider: String,
+    visionModel: String,
+
+    // User quality feedback (Engine 5 — continuous improvement).
+    feedback: {
+      rating: { type: String, enum: ['up', 'down', null], default: null },
+      comment: String,
+      ratedAt: Date,
+    },
+
     // Provenance: how this analysis was produced and where its data came from.
     source: {
       type: String,
-      enum: ['scanner', 'multi-timeframe', 'assistant'],
+      enum: ['scanner', 'multi-timeframe', 'assistant', 'vision'],
       default: 'scanner',
     },
     dataSource: String, // market-data provider: 'binance' | 'twelvedata' | 'mock'

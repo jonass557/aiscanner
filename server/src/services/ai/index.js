@@ -3,6 +3,7 @@ import logger from '../../config/logger.js';
 import { OpenAIProvider } from './OpenAIProvider.js';
 import { ClaudeProvider } from './ClaudeProvider.js';
 import { GeminiProvider } from './GeminiProvider.js';
+import { NvidiaProvider } from './NvidiaProvider.js';
 import { MockProvider } from './MockProvider.js';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompt.js';
 import { parseAnalysisResponse } from './responseParser.js';
@@ -15,7 +16,7 @@ import { ASSISTANT_SYSTEM_PROMPT, buildAssistantAnalysisPrompt, parseAssistantAn
  * AI service factory + orchestrator.
  *
  * This is the single seam the rest of the app talks to. It:
- *  1. Instantiates the configured provider (openai/claude/gemini).
+ *  1. Instantiates the configured provider (openai/claude/gemini/nvidia).
  *  2. Falls back to a deterministic mock when no key is configured, so the
  *     product works end-to-end in development without external costs.
  *  3. Runs the analysis, parses/validates the response, and returns a clean
@@ -29,6 +30,7 @@ const PROVIDER_REGISTRY = {
   openai: (cfg) => new OpenAIProvider(cfg.ai.openai),
   claude: (cfg) => new ClaudeProvider(cfg.ai.claude),
   gemini: (cfg) => new GeminiProvider(cfg.ai.gemini),
+  nvidia: (cfg) => new NvidiaProvider(cfg.ai.nvidia),
 };
 
 /**

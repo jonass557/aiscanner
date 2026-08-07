@@ -1,4 +1,4 @@
-import { CheckCircle2, Link2, AlertTriangle, TrendingDown, HelpCircle } from 'lucide-react';
+import { CheckCircle2, Link2, AlertTriangle, TrendingDown, HelpCircle, ListOrdered } from 'lucide-react';
 
 // Each report list rendered with a consistent icon + color.
 const SECTIONS = [
@@ -21,6 +21,22 @@ export default function DetailedReport({ report }) {
         <p className="mt-3 rounded-xl bg-brand-50 p-4 text-sm leading-relaxed text-gray-700 dark:bg-brand-950/30 dark:text-gray-300">
           {report.summary}
         </p>
+      )}
+
+      {/* Step-by-step reasoning chain (Explanation engine). */}
+      {Array.isArray(report.reasoning) && report.reasoning.length > 0 && (
+        <div className="mt-5">
+          <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
+            <ListOrdered className="h-4 w-4 text-brand-500" /> Raisonnement étape par étape
+          </p>
+          <ol className="space-y-2 border-l-2 border-brand-100 pl-4 dark:border-brand-900">
+            {report.reasoning.map((step, i) => (
+              <li key={i} className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       <div className="mt-5 grid gap-5 sm:grid-cols-2">

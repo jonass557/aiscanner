@@ -19,6 +19,7 @@ router.get('/analyses/export/csv', analysisController.exportCSV);
 router.get('/analyses', analysisController.listAnalyses);
 router.get('/analyses/:id', analysisController.getAnalysis);
 router.get('/analyses/:id/export/pdf', analysisController.exportPDF);
+router.post('/analyses/:id/feedback', analysisController.submitFeedback);
 router.delete('/analyses/:id', analysisController.deleteAnalysis);
 
 export default router;

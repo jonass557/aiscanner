@@ -2,9 +2,11 @@ import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import Analysis from '../models/Analysis.js';
 import { uploadImage, deleteImage } from '../services/uploadService.js';
-import { analyzeChart, assertVisionReady } from '../services/ai/index.js';
+import { run as runPipeline } from '../services/analysis-engine/pipeline.js';
+import { isVisionConfigured } from '../services/vision/index.js';
 import { logScan } from '../services/logService.js';
 import logger from '../config/logger.js';
+import config from '../config/index.js';
 
 /**
  * POST /scan
@@ -12,7 +14,8 @@ import logger from '../config/logger.js';
  *  1. Verify the user has scan credits (business rule enforced up-front).
  *  2. Upload the image to Cloudinary.
  *  3. Create a pending Analysis record.
- *  4. Run the AI analysis, parse it, and update the record.
+ *  4. Run the Computer-Vision pipeline (perception → technical → decision →
+ *     explanation + overlay), parse it, and update the record.
  *  5. Decrement the user's scan credit only on success.
  *
  * Credits are consumed only after a successful analysis, so a failed AI call
@@ -30,10 +33,11 @@ export const scanChart = asyncHandler(async (req, res) => {
   // Guard: never run a mock analysis in production. A fabricated result (the
   // mock always returns "EURUSD") for a real user's chart is worse than a
   // clear error. Checked before upload so we don't waste a Cloudinary call.
-  try {
-    assertVisionReady();
-  } catch (err) {
-    throw ApiError.serviceUnavailable(err.message);
+  if (config.isProduction && !isVisionConfigured()) {
+    throw ApiError.serviceUnavailable(
+      "L'analyse IA n'est pas configurée sur le serveur (aucune clé de vision valide). " +
+      "Configurez une clé OpenAI, Claude ou Gemini avant de scanner."
+    );
   }
 
   // 1. Upload image
@@ -48,8 +52,8 @@ export const scanChart = asyncHandler(async (req, res) => {
   });
 
   try {
-    // 3. Run AI analysis
-    const { analysis: result, meta } = await analyzeChart({ imageUrl: url });
+    // 3. Run the Computer-Vision pipeline (Engine 1→2→3→4 + overlay).
+    const { analysis: result, meta } = await runPipeline({ imageUrl: url });
 
     // 4. Persist result
     Object.assign(analysis, result, meta, { status: 'completed' });

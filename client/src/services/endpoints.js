@@ -94,6 +94,7 @@ export const analysisApi = {
   get: (id) => api.get(`/analyses/${id}`),
   remove: (id) => api.delete(`/analyses/${id}`),
   stats: () => api.get('/analyses/stats'),
+  feedback: (id, payload) => api.post(`/analyses/${id}/feedback`, payload),
   exportPdf: (id) => api.get(`/analyses/${id}/export/pdf`, { responseType: 'blob' }),
   exportCsv: (params) => api.get('/analyses/export/csv', { params, responseType: 'blob' }),
 };

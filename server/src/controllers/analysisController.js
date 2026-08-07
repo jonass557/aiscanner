@@ -75,6 +75,32 @@ export const deleteAnalysis = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /analyses/:id/feedback
+ * Quality feedback loop (Engine 5 — continuous improvement). The owner rates an
+ * analysis 👍/👎 with an optional comment; ratings are later aggregated per
+ * provider/engineVersion in the admin stats to compare model quality (A/B base).
+ * A null rating clears the feedback.
+ */
+export const submitFeedback = asyncHandler(async (req, res) => {
+  const { rating, comment } = req.body;
+  if (rating != null && !['up', 'down'].includes(rating)) {
+    throw ApiError.badRequest("Rating must be 'up', 'down', or null.");
+  }
+
+  const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.user._id });
+  if (!analysis) throw ApiError.notFound('Analysis not found.');
+
+  analysis.feedback = {
+    rating: rating ?? null,
+    comment: comment ? String(comment).slice(0, 1000) : undefined,
+    ratedAt: rating ? new Date() : undefined,
+  };
+  await analysis.save();
+
+  return sendSuccess(res, { message: 'Feedback saved.', data: { feedback: analysis.feedback } });
+});
+
+/**
  * GET /analyses/stats
  * Aggregated dashboard statistics for the current user.
  */
