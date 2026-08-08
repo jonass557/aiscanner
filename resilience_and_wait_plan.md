@@ -1,3 +1,4 @@
+
 # Plan : Amélioration robustesse + analyse pro sans NO_TRADE
 
 **Date** : 7 janvier 2026  
@@ -145,6 +146,14 @@ case 'WAIT':
 13. ✅ Smoke test backend : lancer un scan offline → vérifier WAIT + waitReason
 14. ✅ Smoke test frontend : afficher une analyse WAIT → vérifier UI orange + zone suggérée
 15. ✅ Commit + push
+
+### Phase D — Alignement Multi-Timeframe (ajout)
+16. ✅ `MultiTimeframeAnalysis` (modèle) : enum recommendation.decision + `WAIT`, champ `waitReason`
+17. ✅ `multiTimeframeParser.js` : conflicted / confluence < 70 ⇒ `WAIT` (zone suggérée conservée + `waitReason`), NO_TRADE hérité normalisé en WAIT
+18. ✅ `multiTimeframePrompt.js` : NO_TRADE interdit, WAIT + zone + waitReason exigés
+19. ✅ `MockProvider.analyzeMultiple` : recommandation WAIT au lieu de NO_TRADE
+20. ✅ Frontend `MultiTimeframeResult.jsx` : bloc « Zone à attendre » + waitReason pour WAIT
+21. ✅ Smoke test MTF offline (conflicted → WAIT + zone + waitReason, 0 NO_TRADE)
 
 ---
 

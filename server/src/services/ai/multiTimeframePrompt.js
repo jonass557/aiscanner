@@ -34,10 +34,10 @@ For EACH timeframe provided, determine:
 
 ## STEP 3 — TOP-DOWN RECOMMENDATION
 Provide one recommendation object:
-- decision: "BUY", "SELL", or "NO_TRADE"
-- CRITICAL: if alignmentStatus is "conflicted" OR confluenceScore < 70, decision MUST be "NO_TRADE".
-- entry, stopLoss, takeProfit1, takeProfit2: numbers consistent with the visible price, or null if NO_TRADE
-- riskRewardRatio: e.g. "1:3" or null
+- decision: "BUY", "SELL", or "WAIT". NEVER return "NO_TRADE".
+- CRITICAL: if alignmentStatus is "conflicted" OR confluenceScore < 70, decision MUST be "WAIT" (not a live BUY/SELL).
+- For BUY/SELL: entry, stopLoss, takeProfit1, takeProfit2 as numbers consistent with the visible price; riskRewardRatio e.g. "1:3".
+- For WAIT: set "entry" to the SUGGESTED zone to wait for (the nearest optimal level aligned with the dominant bias — e.g. a higher-timeframe order block / FVG / discount-premium); set stopLoss/takeProfit1/takeProfit2/riskRewardRatio to null; and set "waitReason" explaining, in top-down terms, WHY there is no confirmed entry yet (which timeframes disagree / weak confluence) and WHERE/WHY to wait.
 - reasoning: 2-4 sentences explaining, in top-down terms, why the trade is or isn't confirmed.
 
 ## STEP 4 — SUMMARY
@@ -66,13 +66,14 @@ Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this
   "dominantBias": "BUY|SELL",
   "conflicts": [{ "tf1": string, "tf2": string, "description": string }],
   "recommendation": {
-    "decision": "BUY|SELL|NO_TRADE",
+    "decision": "BUY|SELL|WAIT",
     "entry": number|null,
     "stopLoss": number|null,
     "takeProfit1": number|null,
     "takeProfit2": number|null,
     "riskRewardRatio": string|null,
-    "reasoning": string
+    "reasoning": string,
+    "waitReason": string|null
   },
   "summary": string
 }`;

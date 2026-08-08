@@ -67,13 +67,16 @@ const multiTimeframeSchema = new mongoose.Schema(
     conflicts: [conflictSchema],
 
     recommendation: {
-      decision: { type: String, enum: ['BUY', 'SELL', 'NO_TRADE'], default: 'NO_TRADE' },
+      // WAIT = no confirmed top-down entry, but a suggested zone + waitReason
+      // are provided. NO_TRADE kept only for legacy records.
+      decision: { type: String, enum: ['BUY', 'SELL', 'WAIT', 'NO_TRADE'], default: 'WAIT' },
       entry: Number,
       stopLoss: Number,
       takeProfit1: Number,
       takeProfit2: Number,
       riskRewardRatio: String,
       reasoning: String,
+      waitReason: String, // WAIT only: why wait + which zone to wait for
     },
 
     summary: String,

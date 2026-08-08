@@ -113,15 +113,20 @@ export class MockProvider extends BaseProvider {
         ? [{ tf1: timeframes.find((t) => t.trend === 'bullish')?.timeframe, tf2: timeframes.find((t) => t.trend === 'bearish')?.timeframe, description: 'Lower timeframe bullish momentum against higher timeframe bearish structure — wait for alignment.' }]
         : [],
       recommendation: {
-        decision: aligned ? 'BUY' : 'NO_TRADE',
-        entry: aligned ? 1.0848 : null,
+        decision: aligned ? 'BUY' : 'WAIT',
+        // On WAIT, keep a suggested zone (a higher-timeframe OB) to wait for.
+        entry: aligned ? 1.0848 : 1.0835,
         stopLoss: aligned ? 1.0825 : null,
         takeProfit1: aligned ? 1.089 : null,
         takeProfit2: aligned ? 1.0915 : null,
         riskRewardRatio: aligned ? '1:3' : null,
         reasoning: aligned
           ? 'All analyzed timeframes align bullish. Higher timeframe structure supports the lower timeframe entry, giving a high-probability long.'
-          : 'Timeframes are not aligned. Higher and lower timeframes disagree, so the signal is not confirmed. Stand aside until structure agrees.',
+          : 'Timeframes are not aligned. Higher and lower timeframes disagree, so the signal is not confirmed yet.',
+        waitReason: aligned
+          ? null
+          : `Les timeframes ne sont pas alignés (biais dominant ${bulls >= bears ? 'BUY' : 'SELL'}). ` +
+            'Attendre que la structure s\'aligne et que le prix rejoigne l\'order block H4 à 1.0835 avant d\'envisager une entrée.',
       },
       summary: aligned
         ? 'Strong multi-timeframe alignment favoring longs. All timeframes point the same direction with clean structure.'

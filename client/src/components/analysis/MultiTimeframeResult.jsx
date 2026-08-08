@@ -159,7 +159,17 @@ export default function MultiTimeframeResult({ analysis }) {
           <h3 className="font-semibold">Top-Down Recommendation</h3>
           <Badge tone={recMeta.tone}>{recMeta.label}</Badge>
         </div>
-        {rec.decision !== 'NO_TRADE' && (
+        {rec.decision === 'WAIT' ? (
+          <div className="mt-4">
+            <div className="flex items-center justify-between rounded-xl bg-amber-50 p-4 dark:bg-amber-900/20">
+              <span className="text-sm font-medium text-amber-800 dark:text-amber-300">Zone à attendre</span>
+              <span className="font-mono text-lg font-bold text-amber-700 dark:text-amber-300">{formatPrice(rec.entry)}</span>
+            </div>
+            {rec.waitReason && (
+              <p className="mt-4 text-sm leading-relaxed text-gray-600 dark:text-gray-300">{rec.waitReason}</p>
+            )}
+          </div>
+        ) : (
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
               ['Entry', rec.entry],

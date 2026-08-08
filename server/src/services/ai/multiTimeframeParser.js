@@ -9,7 +9,7 @@ import { extractJson } from './responseParser.js';
 const VALID_MARKETS = ['forex', 'crypto', 'indices', 'commodities', 'synthetic', 'unknown'];
 const VALID_TRENDS = ['bullish', 'bearish', 'ranging'];
 const VALID_BIAS = ['BUY', 'SELL', 'NEUTRAL'];
-const VALID_DECISIONS = ['BUY', 'SELL', 'NO_TRADE'];
+const VALID_DECISIONS = ['BUY', 'SELL', 'WAIT', 'NO_TRADE'];
 const VALID_ALIGNMENT = ['aligned', 'partial', 'conflicted'];
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
@@ -67,31 +67,50 @@ export const parseMultiTimeframeResponse = (raw) => {
       description: String(c.description || '').slice(0, 500),
     }));
 
-  // Enforce the business rule: conflicted or low confluence => NO_TRADE.
+  // Enforce the business rule: conflicted or low confluence => WAIT (never a
+  // dead-end NO_TRADE). A legacy NO_TRADE from the model is normalized to WAIT.
   const rec = data.recommendation || {};
-  let decision = VALID_DECISIONS.includes(rec.decision) ? rec.decision : 'NO_TRADE';
-  if (alignmentStatus === 'conflicted' || confluenceScore < 70) decision = 'NO_TRADE';
+  let decision = VALID_DECISIONS.includes(rec.decision) ? rec.decision : 'WAIT';
+  if (decision === 'NO_TRADE') decision = 'WAIT';
+  if (alignmentStatus === 'conflicted' || confluenceScore < 70) decision = 'WAIT';
 
-  const recommendation =
-    decision === 'NO_TRADE'
-      ? {
-          decision: 'NO_TRADE',
-          entry: null,
-          stopLoss: null,
-          takeProfit1: null,
-          takeProfit2: null,
-          riskRewardRatio: null,
-          reasoning: String(rec.reasoning || '').slice(0, 2000),
-        }
-      : {
-          decision,
-          entry: toNumberOrNull(rec.entry),
-          stopLoss: toNumberOrNull(rec.stopLoss),
-          takeProfit1: toNumberOrNull(rec.takeProfit1),
-          takeProfit2: toNumberOrNull(rec.takeProfit2),
-          riskRewardRatio: rec.riskRewardRatio ? String(rec.riskRewardRatio).slice(0, 20) : null,
-          reasoning: String(rec.reasoning || '').slice(0, 2000),
-        };
+  const isLive = decision === 'BUY' || decision === 'SELL';
+  const suggestedZone = toNumberOrNull(rec.entry);
+
+  // Build a top-down waitReason if the model didn't supply one.
+  const fallbackWaitReason = () => {
+    const why = alignmentStatus === 'conflicted'
+      ? `les timeframes se contredisent (confluence ${confluenceScore}%)`
+      : `la confluence multi-timeframe (${confluenceScore}%) est sous le seuil de 70%`;
+    const side = dominantBias === 'BUY' ? 'achat' : 'vente';
+    const zone = suggestedZone != null ? `la zone ${suggestedZone}` : `une zone alignée sur le biais ${dominantBias}`;
+    return `Pas d'entrée confirmée en top-down : ${why}. ` +
+      `Attendre que les timeframes s'alignent (biais dominant ${dominantBias}) et que le prix rejoigne ${zone} ` +
+      `avant d'envisager un ${side}.`;
+  };
+
+  const recommendation = isLive
+    ? {
+        decision,
+        entry: suggestedZone,
+        stopLoss: toNumberOrNull(rec.stopLoss),
+        takeProfit1: toNumberOrNull(rec.takeProfit1),
+        takeProfit2: toNumberOrNull(rec.takeProfit2),
+        riskRewardRatio: rec.riskRewardRatio ? String(rec.riskRewardRatio).slice(0, 20) : null,
+        reasoning: String(rec.reasoning || '').slice(0, 2000),
+        waitReason: null,
+      }
+    : {
+        // WAIT: keep entry as the SUGGESTED zone to wait for; null live levels.
+        decision: 'WAIT',
+        entry: suggestedZone,
+        stopLoss: null,
+        takeProfit1: null,
+        takeProfit2: null,
+        riskRewardRatio: null,
+        reasoning: String(rec.reasoning || '').slice(0, 2000),
+        waitReason: (rec.waitReason ? String(rec.waitReason).slice(0, 600) : '') || fallbackWaitReason(),
+      };
 
   const market = VALID_MARKETS.includes(data.market) ? data.market : 'unknown';
 
