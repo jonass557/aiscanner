@@ -156,7 +156,10 @@ export const RULES = [
     id: 'counter-trend',
     when: (r, dir) =>
       (dir === 'BUY' && r.bias === 'bearish') || (dir === 'SELL' && r.bias === 'bullish'),
-    weight: -20,
+    // Softened from -20: a counter-trend setup with strong local confluences
+    // (OB + FVG + discount/premium) still deserves a fair chance rather than
+    // being punished into WAIT by bias alone.
+    weight: -10,
     reason: 'Setup is counter to the dominant market bias',
   },
   {
@@ -169,8 +172,13 @@ export const RULES = [
   },
 ];
 
-/** Base score every setup starts from before confluences are applied. */
-export const BASE_SCORE = 40;
+/**
+ * Base score every setup starts from before confluences are applied. Raised
+ * from 40 to 50: with a candidate direction present, we start from an even
+ * footing so a couple of genuine confluences can carry a setup over the 70
+ * threshold — weak/contradictory readings still fall to WAIT.
+ */
+export const BASE_SCORE = 50;
 
 /**
  * Compute a deterministic confluence score for a reading + candidate direction.

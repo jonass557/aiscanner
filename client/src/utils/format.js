@@ -33,7 +33,10 @@ export const decisionMeta = (decision) => {
       return { label: 'BUY', tone: 'green', color: 'text-green-500', bg: 'bg-green-500' };
     case 'SELL':
       return { label: 'SELL', tone: 'red', color: 'text-red-500', bg: 'bg-red-500' };
+    case 'WAIT':
+      return { label: 'ATTENDRE', tone: 'yellow', color: 'text-yellow-600', bg: 'bg-yellow-500' };
     default:
+      // Legacy NO_TRADE records.
       return { label: 'NO TRADE', tone: 'gray', color: 'text-gray-500', bg: 'bg-gray-500' };
   }
 };

@@ -2,12 +2,31 @@ import { formatPrice } from '../../utils/format.js';
 
 /** Trade plan table: entry, SL, three TPs, R/R, duration, probability. */
 export default function TradePlanCard({ tradePlan, decision }) {
-  if (decision === 'NO_TRADE' || !tradePlan) {
+  if (!tradePlan || (decision === 'NO_TRADE')) {
     return (
       <div className="card p-6">
         <h3 className="font-semibold">Trade Plan</h3>
         <p className="mt-3 text-sm text-gray-500">
           No trade plan — the AI did not find a high-probability setup in this chart.
+        </p>
+      </div>
+    );
+  }
+
+  // WAIT: no live entry — show the SUGGESTED zone to wait for and the reason.
+  if (decision === 'WAIT') {
+    return (
+      <div className="card p-6">
+        <h3 className="font-semibold">Plan — Attendre</h3>
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-amber-50 p-4 dark:bg-amber-900/20">
+          <span className="text-sm font-medium text-amber-800 dark:text-amber-300">Zone à attendre</span>
+          <span className="text-lg font-bold text-amber-700 dark:text-amber-300">{formatPrice(tradePlan.entry)}</span>
+        </div>
+        {tradePlan.waitReason && (
+          <p className="mt-4 text-sm leading-relaxed text-gray-600 dark:text-gray-300">{tradePlan.waitReason}</p>
+        )}
+        <p className="mt-4 text-xs text-gray-400">
+          Stop et objectifs seront définis une fois le prix arrivé sur la zone et une réaction confirmée.
         </p>
       </div>
     );

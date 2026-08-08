@@ -107,11 +107,13 @@ const analysisSchema = new mongoose.Schema(
       candlePatterns: [detectedElementSchema],
     },
 
-    // Decision
+    // Decision. WAIT = no valid immediate entry, but a suggested zone + reason
+    // is provided (see tradePlan.waitReason). NO_TRADE is kept only for legacy
+    // records; new analyses use WAIT instead.
     decision: {
       type: String,
-      enum: ['BUY', 'SELL', 'NO_TRADE'],
-      default: 'NO_TRADE',
+      enum: ['BUY', 'SELL', 'WAIT', 'NO_TRADE'],
+      default: 'WAIT',
     },
     confidenceScore: {
       type: Number,
@@ -120,7 +122,9 @@ const analysisSchema = new mongoose.Schema(
       default: 0,
     },
 
-    // Trade plan
+    // Trade plan. On WAIT, `entry` holds the SUGGESTED zone to wait for (not a
+    // live entry), stop/targets stay null, and `waitReason` explains why the
+    // current price is unfavorable and where/why to wait instead.
     tradePlan: {
       entry: Number,
       stopLoss: Number,
@@ -131,6 +135,7 @@ const analysisSchema = new mongoose.Schema(
       estimatedDuration: String,
       estimatedProbability: Number,
       tradeType: String, // 'scalp' | 'intraday' | 'swing' (assistant analyses)
+      waitReason: String, // WAIT only: why wait + which zone to wait for
     },
 
     // Detailed report

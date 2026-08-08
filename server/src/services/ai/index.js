@@ -74,6 +74,55 @@ const findConfiguredProvider = () => {
 };
 
 /**
+ * Ordered list of DISTINCT configured providers to try, starting with the
+ * requested one. Used by runWithFallback so a provider outage (e.g. Gemini 503
+ * after all retries) transparently rolls over to the next configured provider
+ * instead of surfacing a raw error to the user.
+ * @param {string} [providerName]
+ * @returns {Array<BaseProvider>}
+ */
+const providerChain = (providerName) => {
+  const chain = [];
+  const seen = new Set();
+  const push = (p) => {
+    if (p && !seen.has(p.name)) { seen.add(p.name); chain.push(p); }
+  };
+  push(getProvider(providerName)); // requested (or its configured fallback)
+  for (const factory of Object.values(PROVIDER_REGISTRY)) {
+    const p = factory(config);
+    if (p.isConfigured()) push(p);
+  }
+  if (!chain.length) push(new MockProvider(config.ai));
+  return chain;
+};
+
+/**
+ * Run `op(provider)` across the provider chain, falling back to the next
+ * configured provider when one throws (all its internal retries already
+ * exhausted). Returns { result, provider } from the first that succeeds; throws
+ * a clear, user-facing error only if EVERY provider fails.
+ * @param {string} providerName
+ * @param {(provider: BaseProvider) => Promise<any>} op
+ */
+const runWithFallback = async (providerName, op) => {
+  const chain = providerChain(providerName);
+  let lastError;
+  for (const provider of chain) {
+    try {
+      const result = await op(provider);
+      return { result, provider };
+    } catch (err) {
+      lastError = err;
+      logger.warn(`AI provider "${provider.name}" failed (${err.message}); trying next provider.`);
+    }
+  }
+  throw new Error(
+    'Tous les fournisseurs IA sont indisponibles ou surchargés pour le moment. ' +
+    'Réessayez dans quelques minutes.' + (lastError ? ` (dernier échec : ${lastError.message})` : '')
+  );
+};
+
+/**
  * True when a REAL vision/text provider is configured (not the mock fallback).
  * Used to block silent mock analyses in production — returning a fabricated
  * result (always "EURUSD") for a real user's chart is worse than a clear error.
@@ -103,14 +152,15 @@ export const assertVisionReady = () => {
  * @returns {Promise<{ analysis: Object, meta: Object }>}
  */
 export const analyzeChart = async ({ imageUrl, providerName }) => {
-  const provider = getProvider(providerName);
   const startedAt = Date.now();
 
-  const raw = await provider.analyze({
-    imageUrl,
-    systemPrompt: SYSTEM_PROMPT,
-    userPrompt: buildUserPrompt(),
-  });
+  const { result: raw, provider } = await runWithFallback(providerName, (p) =>
+    p.analyze({
+      imageUrl,
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt: buildUserPrompt(),
+    })
+  );
 
   const analysis = parseAnalysisResponse(raw);
   const processingTime = Date.now() - startedAt;
@@ -135,14 +185,15 @@ export const analyzeChart = async ({ imageUrl, providerName }) => {
  * @returns {Promise<{ analysis: Object, meta: Object }>}
  */
 export const analyzeMultiTimeframe = async ({ images, timeframes, providerName }) => {
-  const provider = getProvider(providerName);
   const startedAt = Date.now();
 
-  const raw = await provider.analyzeMultiple({
-    images,
-    systemPrompt: MTF_SYSTEM_PROMPT,
-    userPrompt: buildMtfUserPrompt(timeframes || images.map((i) => i.label)),
-  });
+  const { result: raw, provider } = await runWithFallback(providerName, (p) =>
+    p.analyzeMultiple({
+      images,
+      systemPrompt: MTF_SYSTEM_PROMPT,
+      userPrompt: buildMtfUserPrompt(timeframes || images.map((i) => i.label)),
+    })
+  );
 
   const analysis = parseMultiTimeframeResponse(raw);
   const processingTime = Date.now() - startedAt;
@@ -166,13 +217,14 @@ export const analyzeMultiTimeframe = async ({ images, timeframes, providerName }
  * @returns {Promise<{ reply: string, meta: Object }>}
  */
 export const mentorReply = async ({ messages, level, providerName }) => {
-  const provider = getProvider(providerName);
   const startedAt = Date.now();
 
-  const reply = await provider.chat({
-    systemPrompt: buildMentorSystemPrompt(level),
-    messages,
-  });
+  const { result: reply, provider } = await runWithFallback(providerName, (p) =>
+    p.chat({
+      systemPrompt: buildMentorSystemPrompt(level),
+      messages,
+    })
+  );
 
   return {
     reply: (reply || '').trim(),
@@ -196,30 +248,45 @@ export const mentorReply = async ({ messages, level, providerName }) => {
  * @returns {Promise<{ analysis: Object, meta: Object }>}
  */
 export const analyzeMarketData = async ({ snapshot, preferences = {}, strategy, intentParams = {}, providerName }) => {
-  const provider = getProvider(providerName);
   const startedAt = Date.now();
 
-  const raw = await provider.analyzeData({
-    systemPrompt: ASSISTANT_SYSTEM_PROMPT,
-    userPrompt: buildAssistantAnalysisPrompt({ snapshot, preferences, strategy, params: intentParams }),
-  });
+  const { result: raw, provider } = await runWithFallback(providerName, (p) =>
+    p.analyzeData({
+      systemPrompt: ASSISTANT_SYSTEM_PROMPT,
+      userPrompt: buildAssistantAnalysisPrompt({ snapshot, preferences, strategy, params: intentParams }),
+    })
+  );
 
   const analysis = parseAssistantAnalysis(raw);
 
   // Post-parse constraint enforcement (defense in depth): the model may ignore
-  // minRR/minConfidence — enforce them so the assistant never overpromises.
-  if (analysis.decision !== 'NO_TRADE') {
+  // minRR/minConfidence — enforce them so the assistant never overpromises. A
+  // violation downgrades a live BUY/SELL to WAIT (keeping the entry as the
+  // suggested zone), never a dead-end NO_TRADE.
+  if (analysis.decision === 'BUY' || analysis.decision === 'SELL') {
+    let violated = null;
     const minRR = intentParams.minRR || preferences.minRiskReward;
     if (minRR) {
       const rr = parseFloat((analysis.tradePlan?.riskRewardRatio || '').replace(/^1\s*:\s*/, ''));
-      if (Number.isFinite(rr) && rr < minRR) analysis.decision = 'NO_TRADE';
+      if (Number.isFinite(rr) && rr < minRR) violated = `R:R 1:${rr} < minimum requis 1:${minRR}`;
     }
     const minConf = intentParams.minConfidence;
-    if (minConf && analysis.confidenceScore < minConf) analysis.decision = 'NO_TRADE';
-    if (analysis.decision === 'NO_TRADE') {
+    if (!violated && minConf && analysis.confidenceScore < minConf) {
+      violated = `confiance ${analysis.confidenceScore}% < minimum requis ${minConf}%`;
+    }
+    if (violated) {
+      const suggestedZone = analysis.tradePlan?.entry ?? null;
+      const side = analysis.decision === 'BUY' ? 'achat' : 'vente';
+      analysis.decision = 'WAIT';
       analysis.tradePlan = {
-        entry: null, stopLoss: null, takeProfit1: null, takeProfit2: null, takeProfit3: null,
-        riskRewardRatio: null, estimatedDuration: null, estimatedProbability: null, tradeType: null,
+        entry: suggestedZone, // keep the suggested zone to wait for
+        stopLoss: null, takeProfit1: null, takeProfit2: null, takeProfit3: null,
+        riskRewardRatio: null, estimatedDuration: null, estimatedProbability: analysis.confidenceScore,
+        tradeType: null,
+        waitReason: `Ne pas entrer maintenant en ${side} : ${violated}. ` +
+          (suggestedZone != null
+            ? `Attendre que le prix rejoigne la zone ${suggestedZone} et se confirme avant de réévaluer.`
+            : `Attendre une meilleure configuration avant de réévaluer.`),
       };
     }
   }

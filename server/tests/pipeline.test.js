@@ -4,9 +4,9 @@ import config from '../src/config/index.js';
 /**
  * Integration test: the full CV pipeline (perception → technical → decision →
  * explanation + overlay) with the deterministic mock, exercising the offline
- * path end-to-end. The mock is designed to produce NO_TRADE with weak
- * confluences OR a BUY/SELL when rectangles are present; this test verifies
- * both paths and asserts determinism (same URL → same result).
+ * path end-to-end. The mock produces WAIT with weak confluences OR a BUY/SELL
+ * when rectangles are present; this test verifies both paths and asserts
+ * determinism (same URL → same result). NO_TRADE is never emitted.
  */
 
 // Force mock by clearing keys (config is live, not env).
@@ -36,14 +36,18 @@ describe('CV pipeline integration (offline mock)', () => {
     expect(['forex', 'crypto', 'unknown']).toContain(analysis.market);
     expect(analysis.timeframe).toBeTruthy();
 
-    // Decision (may be NO_TRADE or BUY/SELL depending on seed)
-    expect(['BUY', 'SELL', 'NO_TRADE']).toContain(analysis.decision);
+    // Decision (WAIT or BUY/SELL depending on seed — never NO_TRADE)
+    expect(['BUY', 'SELL', 'WAIT']).toContain(analysis.decision);
+    expect(analysis.decision).not.toBe('NO_TRADE');
     expect(analysis.confidenceScore).toBeGreaterThanOrEqual(0);
     expect(analysis.confidenceScore).toBeLessThanOrEqual(100);
 
-    // TradePlan: if NO_TRADE, nulled; else populated.
-    if (analysis.decision === 'NO_TRADE') {
-      expect(analysis.tradePlan.entry).toBeNull();
+    // TradePlan: WAIT keeps a suggested zone (or null when no setup) with a
+    // reason and nulled live levels; a live trade is fully populated.
+    if (analysis.decision === 'WAIT') {
+      expect(analysis.tradePlan.stopLoss).toBeNull();
+      expect(analysis.tradePlan.riskRewardRatio).toBeNull();
+      expect(analysis.tradePlan.waitReason).toBeTruthy();
     } else {
       expect(analysis.tradePlan.entry).not.toBeNull();
       expect(analysis.tradePlan.riskRewardRatio).toBeTruthy();
@@ -76,19 +80,20 @@ describe('CV pipeline integration (offline mock)', () => {
     expect(a.analysis.annotations.length).toBe(b.analysis.annotations.length);
   }, 15000);
 
-  it('enforces confidence < 70 → NO_TRADE (mock weak setup)', async () => {
+  it('enforces confidence < 70 → WAIT (mock weak setup)', async () => {
     // A fresh URL with no strong confluences → score < 70.
     const { analysis } = await run({ imageUrl: 'https://example.com/weak.png' });
     if (analysis.confidenceScore < 70) {
-      expect(analysis.decision).toBe('NO_TRADE');
-      expect(analysis.tradePlan.entry).toBeNull();
+      expect(analysis.decision).toBe('WAIT');
+      expect(analysis.tradePlan.stopLoss).toBeNull();
+      expect(analysis.tradePlan.waitReason).toBeTruthy();
     }
   }, 15000);
 
   it('produces entry/SL/TP annotations when decision is BUY/SELL', async () => {
     // Mock is seeded to produce BUY or SELL for most URLs (rectangle → OB).
     const { analysis } = await run({ imageUrl: 'https://example.com/trade.png' });
-    if (analysis.decision !== 'NO_TRADE') {
+    if (analysis.decision === 'BUY' || analysis.decision === 'SELL') {
       const layers = analysis.annotations.map((a) => a.layer);
       expect(layers).toContain('entry');
       expect(layers).toContain('stopLoss');

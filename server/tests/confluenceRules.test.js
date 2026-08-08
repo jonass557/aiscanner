@@ -47,11 +47,11 @@ describe('scoreConfluences', () => {
     expect(score).toBe(BASE_SCORE); // no aligned rule fired
   });
 
-  it('applies the counter-trend penalty (-20)', () => {
+  it('applies the counter-trend penalty (-10)', () => {
     const r = reading({ bias: 'bearish', families: { ...emptyFamilies(), orderBlocks: [det('bullish')] } });
     const { score, matched } = scoreConfluences(r, 'BUY');
-    // +12 order-block aligned, -20 counter-trend → base - 8
-    expect(score).toBe(BASE_SCORE + 12 - 20);
+    // +12 order-block aligned, -10 counter-trend → base + 2
+    expect(score).toBe(BASE_SCORE + 12 - 10);
     expect(matched.map((m) => m.id)).toContain('counter-trend');
   });
 

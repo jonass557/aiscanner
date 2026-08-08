@@ -3,7 +3,8 @@ import { parseAnalysisResponse } from '../src/services/ai/responseParser.js';
 
 /**
  * Unit tests for the AI response parser. This is pure logic (no DB, no network)
- * and encodes the critical business rule: confidence < 70 => NO_TRADE.
+ * and encodes the critical business rule: confidence < 70 => WAIT (never a live
+ * BUY/SELL), with the suggested zone kept as `entry`.
  */
 describe('parseAnalysisResponse', () => {
   const validPayload = {
@@ -39,11 +40,20 @@ describe('parseAnalysisResponse', () => {
     expect(result.decision).toBe('BUY');
   });
 
-  it('forces NO_TRADE when confidence < 70', () => {
+  it('forces WAIT (keeping the suggested zone) when confidence < 70', () => {
     const low = { ...validPayload, decision: 'BUY', confidenceScore: 55 };
     const result = parseAnalysisResponse(JSON.stringify(low));
-    expect(result.decision).toBe('NO_TRADE');
-    expect(result.tradePlan.entry).toBeNull();
+    expect(result.decision).toBe('WAIT');
+    // Suggested zone preserved; live levels nulled.
+    expect(result.tradePlan.entry).toBe(1.084);
+    expect(result.tradePlan.stopLoss).toBeNull();
+    expect(result.tradePlan.riskRewardRatio).toBeNull();
+  });
+
+  it('normalizes a legacy NO_TRADE from the model to WAIT', () => {
+    const legacy = { ...validPayload, decision: 'NO_TRADE', confidenceScore: 80 };
+    const result = parseAnalysisResponse(JSON.stringify(legacy));
+    expect(result.decision).toBe('WAIT');
   });
 
   it('clamps confidence into 0-100', () => {

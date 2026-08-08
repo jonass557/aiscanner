@@ -1,4 +1,5 @@
 import { BaseProvider } from './BaseProvider.js';
+import { fetchWithRetry } from './fetchWithRetry.js';
 
 /**
  * NVIDIA AI provider — open-source vision/text models served via NVIDIA NIM
@@ -38,15 +39,19 @@ export class NvidiaProvider extends BaseProvider {
   }
 
   async _post(body) {
-    const res = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithRetry(
+      () =>
+        fetch(this.endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`,
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(body),
+        }),
+      'NVIDIA'
+    );
 
     if (!res.ok) {
       const errText = await res.text();

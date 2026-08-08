@@ -1,9 +1,14 @@
 import { BaseProvider } from './BaseProvider.js';
+import { fetchWithRetry } from './fetchWithRetry.js';
 
 /**
  * OpenAI vision provider (GPT-4o / GPT-4-vision family).
  * Uses the Chat Completions API with an image_url content part.
  * Implemented with native fetch (Node 18+) to avoid an SDK dependency.
+ *
+ * All calls go through _post() → fetchWithRetry, so transient 429/5xx errors
+ * are retried with exponential backoff before the ai/index.js layer falls back
+ * to another provider.
  */
 export class OpenAIProvider extends BaseProvider {
   constructor(config) {
@@ -18,8 +23,32 @@ export class OpenAIProvider extends BaseProvider {
     return Boolean(this.apiKey);
   }
 
+  /** POST a chat-completions body with retry; return the message content. */
+  async _post(body) {
+    const res = await fetchWithRetry(
+      () =>
+        fetch(this.endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify(body),
+        }),
+      'OpenAI'
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`OpenAI API error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+
   async analyze({ imageUrl, systemPrompt, userPrompt }) {
-    const body = {
+    return this._post({
       model: this.model,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -34,24 +63,7 @@ export class OpenAIProvider extends BaseProvider {
       max_tokens: 4096,
       temperature: 0.2,
       response_format: { type: 'json_object' },
-    };
-
-    const res = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`OpenAI API error (${res.status}): ${errText}`);
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
   }
 
   async analyzeMultiple({ images, systemPrompt, userPrompt }) {
@@ -63,7 +75,7 @@ export class OpenAIProvider extends BaseProvider {
       content.push({ type: 'image_url', image_url: { url: img.url, detail: 'high' } });
     }
 
-    const body = {
+    return this._post({
       model: this.model,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -72,49 +84,15 @@ export class OpenAIProvider extends BaseProvider {
       max_tokens: 4096,
       temperature: 0.2,
       response_format: { type: 'json_object' },
-    };
-
-    const res = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`OpenAI API error (${res.status}): ${errText}`);
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
   }
 
   async chat({ systemPrompt, messages }) {
-    const body = {
+    return this._post({
       model: this.model,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
       max_tokens: 2048,
       temperature: 0.5,
-    };
-
-    const res = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`OpenAI API error (${res.status}): ${errText}`);
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
   }
 }

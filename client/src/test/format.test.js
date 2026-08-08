@@ -7,7 +7,9 @@ describe('format utils', () => {
     expect(decisionMeta('BUY').label).toBe('BUY');
     expect(decisionMeta('BUY').tone).toBe('green');
     expect(decisionMeta('SELL').tone).toBe('red');
-    expect(decisionMeta('NO_TRADE').label).toBe('NO TRADE');
+    expect(decisionMeta('WAIT').label).toBe('ATTENDRE');
+    expect(decisionMeta('WAIT').tone).toBe('yellow');
+    expect(decisionMeta('NO_TRADE').label).toBe('NO TRADE'); // legacy records
   });
 
   it('maps confidence scores to tones', () => {

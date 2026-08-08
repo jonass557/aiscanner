@@ -31,10 +31,17 @@ export const explain = ({ perception, reading, decision }) => {
   const symbol = ctx.symbol || 'Unknown';
   const timeframe = ctx.timeframe || 'Unknown';
   const dirWord = verdict === 'BUY' ? 'haussier' : verdict === 'SELL' ? 'baissier' : 'neutre';
+  const waitReason = tradePlan?.waitReason || '';
 
   // --- Summary --------------------------------------------------------------
   let summary;
-  if (verdict === 'NO_TRADE') {
+  if (verdict === 'WAIT') {
+    summary = `Pas d'entrée immédiate sur ${symbol} ${timeframe} (confiance ${confidenceScore}%). ` +
+      (waitReason ||
+        `Le prix actuel n'est pas sur une zone optimale — attendre une meilleure configuration.`) +
+      (positives.length ? ` Confluences déjà en place : ${positives.map((p) => p.reason).join(' ; ')}.` : '');
+  } else if (verdict === 'NO_TRADE') {
+    // Legacy verdict (kept for old records that still carry it).
     summary = `Aucun trade sur ${symbol} ${timeframe}. La confiance (${confidenceScore}%) est ` +
       `insuffisante ou les confluences se contredisent — mieux vaut rester à l'écart. ` +
       (negatives.length ? `Facteurs défavorables : ${negatives.map((n) => n.reason).join(' ; ')}.` : '');
@@ -46,6 +53,12 @@ export const explain = ({ perception, reading, decision }) => {
   }
 
   // --- Step-by-step reasoning ----------------------------------------------
+  const decisionStep =
+    verdict === 'WAIT'
+      ? `Étape 5 — Décision : WAIT (${confidenceScore}%). Zone suggérée : ${fmt(tradePlan.entry)}. ${waitReason}`.trim()
+      : verdict === 'NO_TRADE'
+        ? `Étape 5 — Décision : NO_TRADE. Règle métier : confiance < 70 % ⇒ pas de trade (${confidenceScore}%).`
+        : `Étape 5 — Décision : ${verdict} à ${confidenceScore}% ; plan entrée ${fmt(tradePlan.entry)} / stop ${fmt(tradePlan.stopLoss)} / TP ${fmt(tradePlan.takeProfit1)}.`;
   const reasoning = [
     `Étape 1 — Perception : ${perception?.candles?.length || 0} bougie(s), ` +
       `${perception?.drawnObjects?.length || 0} objet(s) dessiné(s), ` +
@@ -57,19 +70,23 @@ export const explain = ({ perception, reading, decision }) => {
     negatives.length
       ? `Étape 4 — Contre-signaux : ${negatives.map((n) => `${n.reason} (${n.weight})`).join(' ; ')}.`
       : 'Étape 4 — Contre-signaux : aucun majeur.',
-    verdict === 'NO_TRADE'
-      ? `Étape 5 — Décision : NO_TRADE. Règle métier : confiance < 70 % ⇒ pas de trade (${confidenceScore}%).`
-      : `Étape 5 — Décision : ${verdict} à ${confidenceScore}% ; plan entrée ${fmt(tradePlan.entry)} / stop ${fmt(tradePlan.stopLoss)} / TP ${fmt(tradePlan.takeProfit1)}.`,
+    decisionStep,
   ];
 
   // --- Reasons / confluences / risks ---------------------------------------
-  const validationReasons = verdict === 'NO_TRADE' ? [] : positives.map((p) => p.reason);
+  // A live trade (BUY/SELL) is validated by its positive confluences; WAIT and
+  // legacy NO_TRADE carry no validation (there is no active entry yet).
+  const isLive = verdict === 'BUY' || verdict === 'SELL';
+  const validationReasons = isLive ? positives.map((p) => p.reason) : [];
   const confluences = reading?.confluences?.length
     ? reading.confluences
     : positives.map((p) => p.reason);
   const risks = [
     ...(reading?.risks || []),
     ...negatives.map((n) => n.reason),
+    ...(verdict === 'WAIT'
+      ? ['Entrer maintenant (hors zone optimale) expose à un stop-hunt / une liquidation']
+      : []),
   ];
   const weaknesses = reading?.weaknesses || [];
   const missingElements = reading?.missingElements?.length

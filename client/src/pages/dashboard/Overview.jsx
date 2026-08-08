@@ -13,7 +13,7 @@ import { analysisApi } from '../../services/endpoints.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { decisionMeta, formatDate, marketLabel } from '../../utils/format.js';
 
-const DECISION_COLORS = { BUY: '#22c55e', SELL: '#ef4444', NO_TRADE: '#9ca3af' };
+const DECISION_COLORS = { BUY: '#22c55e', SELL: '#ef4444', WAIT: '#f59e0b', NO_TRADE: '#9ca3af' };
 
 /** Dashboard overview: KPI cards, 7-day activity chart, decision split, recent. */
 export default function Overview() {

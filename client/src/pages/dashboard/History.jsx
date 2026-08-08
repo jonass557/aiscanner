@@ -11,7 +11,7 @@ import { getErrorMessage } from '../../services/api.js';
 import { decisionMeta, formatDateTime, marketLabel } from '../../utils/format.js';
 
 const MARKETS = ['forex', 'crypto', 'indices', 'commodities', 'synthetic'];
-const DECISIONS = ['BUY', 'SELL', 'NO_TRADE'];
+const DECISIONS = ['BUY', 'SELL', 'WAIT'];
 
 /** Paginated, filterable, searchable analysis history with exports. */
 export default function History() {

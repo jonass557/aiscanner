@@ -187,16 +187,24 @@ export class MockProvider extends BaseProvider {
     const range = swingHigh - swingLow;
     const mid = (swingHigh + swingLow) / 2;
 
-    const decision = atHigh ? 'SELL' : atLow ? 'BUY' : 'NO_TRADE';
+    const decision = atHigh ? 'SELL' : atLow ? 'BUY' : 'WAIT';
     const confidenceScore = atHigh || atLow ? Math.round(72 + Math.random() * 18) : Math.round(50 + Math.random() * 12);
 
     const spread = range * 0.02;
     const rr = 2 + Math.round(Math.random() * 2);
-    const entry = decision === 'BUY' ? +(price + spread * 0.2).toFixed(5) : decision === 'SELL' ? +(price - spread * 0.2).toFixed(5) : null;
+    // On WAIT, suggest the nearer range extreme as the zone to wait for.
+    const waitZone = +(Math.abs(price - swingLow) <= Math.abs(swingHigh - price) ? swingLow : swingHigh).toFixed(5);
+    const entry = decision === 'BUY' ? +(price + spread * 0.2).toFixed(5) : decision === 'SELL' ? +(price - spread * 0.2).toFixed(5) : waitZone;
     const stopLoss = decision === 'BUY' ? +(price - spread).toFixed(5) : decision === 'SELL' ? +(price + spread).toFixed(5) : null;
     const tp1 = decision === 'BUY' ? +(price + spread * rr * 0.6).toFixed(5) : decision === 'SELL' ? +(price - spread * rr * 0.6).toFixed(5) : null;
     const tp2 = decision === 'BUY' ? +(price + spread * rr).toFixed(5) : decision === 'SELL' ? +(price - spread * rr).toFixed(5) : null;
     const tp3 = decision === 'BUY' ? +(price + spread * rr * 1.4).toFixed(5) : decision === 'SELL' ? +(price - spread * rr * 1.4).toFixed(5) : null;
+    const waitSide = waitZone === swingLow ? 'achat' : 'vente';
+    const waitReason = decision === 'WAIT'
+      ? `Prix au milieu du range (${swingLow}–${swingHigh}), pas de bord clair. ` +
+        `Attendre que le prix atteigne ${waitZone} (${waitZone === swingLow ? 'support/discount' : 'résistance/premium'}) ` +
+        `et y réagisse avant d'envisager une ${waitSide}.`
+      : null;
 
     const direction = trend === 'bullish' ? 'Bullish' : 'Bearish';
     const structureDesc = `Price shows a ${trend} structure on ${timeframe}, currently ${
@@ -242,8 +250,8 @@ export class MockProvider extends BaseProvider {
       decision,
       confidenceScore,
       tradePlan:
-        decision === 'NO_TRADE'
-          ? { entry: null, stopLoss: null, takeProfit1: null, takeProfit2: null, takeProfit3: null, riskRewardRatio: null, estimatedDuration: null, estimatedProbability: null, tradeType: null }
+        decision === 'WAIT'
+          ? { entry, stopLoss: null, takeProfit1: null, takeProfit2: null, takeProfit3: null, riskRewardRatio: null, estimatedDuration: null, estimatedProbability: confidenceScore, tradeType: null, waitReason }
           : {
               entry,
               stopLoss,
@@ -256,21 +264,21 @@ export class MockProvider extends BaseProvider {
               tradeType: timeframe === 'M15' ? 'scalp' : timeframe === 'H1' ? 'intraday' : 'swing',
             },
       report: {
-        summary: `${direction} bias on ${symbol} ${timeframe}${simulated ? ' (données simulées — démonstration)' : ''}. ${structureDesc} ${atHigh ? 'Price is stretched into resistance/sell-side liquidity — a short with a tight stop is defensible.' : atLow ? 'Price is at support/discount — a long from the demand zone is defensible.' : 'No edge — wait for a cleaner reaction at the range extremes.'}`,
-        validationReasons: decision === 'NO_TRADE' ? [] : [
+        summary: `${direction} bias on ${symbol} ${timeframe}${simulated ? ' (données simulées — démonstration)' : ''}. ${structureDesc} ${atHigh ? 'Price is stretched into resistance/sell-side liquidity — a short with a tight stop is defensible.' : atLow ? 'Price is at support/discount — a long from the demand zone is defensible.' : waitReason}`,
+        validationReasons: decision === 'WAIT' ? [] : [
           `${direction} market structure on ${timeframe}`,
           `Reaction at the range ${atHigh ? 'high' : 'low'}`,
           'Defined stop behind the swing point',
         ],
-        confluences: decision === 'NO_TRADE' ? [] : ['Range extreme + liquidity', 'Defined structure', `R:R 1:${rr}`],
-        risks: atHigh ? ['Possible break of the swing high (liquidity run)'] : atLow ? ['Possible breakdown of the swing low'] : ['Ranging, choppy conditions'],
-        weaknesses: decision === 'NO_TRADE' ? ['No clear edge at current price — price sits mid-range'] : ['No higher-timeframe confirmation embedded'],
+        confluences: decision === 'WAIT' ? [] : ['Range extreme + liquidity', 'Defined structure', `R:R 1:${rr}`],
+        risks: atHigh ? ['Possible break of the swing high (liquidity run)'] : atLow ? ['Possible breakdown of the swing low'] : ['Entrer maintenant (milieu de range) = risque de faux signal / choppy'],
+        weaknesses: decision === 'WAIT' ? ['No clear edge at current price — price sits mid-range'] : ['No higher-timeframe confirmation embedded'],
         missingElements: ['Volume profile', 'Higher-timeframe context'],
         reasoning: [
           `Étape 1 — Lire la structure : les ${candles.length} bougies montrent une structure ${trend} sur ${timeframe} (dernières clôtures ${last10[0]} → ${last10[last10.length - 1]}).`,
           `Étape 2 — Position dans le range : le prix ${atHigh ? `teste le sommet ${swingHigh} (zone de liquidité acheteur, premium)` : atLow ? `teste le creux ${swingLow} (zone de liquidité vendeur, discount)` : `est au milieu du range (${swingLow}–${swingHigh}), au point d'équilibre`}.`,
-          `Étape 3 — Décision : ${decision === 'BUY' ? 'achat car le prix est en discount sur support' : decision === 'SELL' ? 'vente car le prix est en premium sur résistance' : 'aucun trade : pas de bord clair, attente d\'une réaction aux extrêmes'} (confiance ${confidenceScore}%).`,
-          `Étape 4 — Plan : ${decision === 'NO_TRADE' ? 'pas de plan tant que le prix ne réagit pas' : `entrée ${entry}, stop ${stopLoss} (derrière la structure), cibles ${tp1}/${tp2}/${tp3}, R:R 1:${rr}`}.`,
+          `Étape 3 — Décision : ${decision === 'BUY' ? 'achat car le prix est en discount sur support' : decision === 'SELL' ? 'vente car le prix est en premium sur résistance' : `WAIT — pas de bord clair, zone suggérée ${entry}`} (confiance ${confidenceScore}%).`,
+          `Étape 4 — Plan : ${decision === 'WAIT' ? `attendre le prix en ${entry} avant toute entrée` : `entrée ${entry}, stop ${stopLoss} (derrière la structure), cibles ${tp1}/${tp2}/${tp3}, R:R 1:${rr}`}.`,
         ],
       },
     };

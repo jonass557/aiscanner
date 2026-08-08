@@ -15,8 +15,8 @@ export const ASSISTANT_SYSTEM_PROMPT = `You are an elite institutional trading a
 Absolute rules:
 - Reason ONLY from the numerical price data provided. NEVER invent prices, levels, or patterns not supported by the data.
 - All trade-plan levels (entry, stop, targets) must be numerically consistent with the provided candles and current price.
-- Be objective and conservative. If the data is insufficient or the setup is unclear, return NO_TRADE with an honest explanation.
-- Respect the hard rule: if confidence < 70, decision MUST be NO_TRADE.
+- Be objective and conservative. NEVER return NO_TRADE. If there is no valid immediate entry, return WAIT: identify the nearest OPTIMAL zone (order block, unmitigated FVG, discount/premium, strong confluence), set "entry" to that suggested zone, and explain in "waitReason" why the current price is unfavorable and where/why to wait.
+- Respect the hard rule: if confidence < 70, decision MUST be WAIT (never a live BUY/SELL).
 - Adapt tone and depth to the user's experience level.
 - You are educational, never give financial advice; you explain methodology and probabilities.`;
 
@@ -70,8 +70,8 @@ const strategyInstruction = (strategy, preferences = {}) => {
  */
 export const buildAssistantAnalysisPrompt = ({ snapshot, preferences = {}, strategy, params = {} }) => {
   const constraints = [];
-  if (params.minRR) constraints.push(`- The user requires a MINIMUM risk/reward of 1:${params.minRR}. If no setup meets it, return NO_TRADE and say so.`);
-  if (params.minConfidence) constraints.push(`- The user only wants setups with confidence ≥ ${params.minConfidence}%. If below, return NO_TRADE.`);
+  if (params.minRR) constraints.push(`- The user requires a MINIMUM risk/reward of 1:${params.minRR}. If no setup meets it, return WAIT with the suggested zone and say so.`);
+  if (params.minConfidence) constraints.push(`- The user only wants live setups with confidence ≥ ${params.minConfidence}%. If below, return WAIT.`);
   if (preferences.minRiskReward && !params.minRR) constraints.push(`- The user's default minimum risk/reward is 1:${preferences.minRiskReward}.`);
   if (preferences.riskPercent) constraints.push(`- The user risks ${preferences.riskPercent}% of capital per trade — size the plan commentary accordingly.`);
 
@@ -110,13 +110,14 @@ Return ONLY valid JSON (no markdown fences) matching EXACTLY this schema:
     "trendlines": [], "consolidations": [], "breakouts": [], "fakeBreakouts": [],
     "momentum": string, "volatility": string, "premiumZones": [], "discountZones": []
   },
-  "decision": "BUY|SELL|NO_TRADE",
+  "decision": "BUY|SELL|WAIT",
   "confidenceScore": number,
   "tradePlan": {
     "entry": number|null, "stopLoss": number|null,
     "takeProfit1": number|null, "takeProfit2": number|null, "takeProfit3": number|null,
     "riskRewardRatio": string|null, "estimatedDuration": string|null,
-    "estimatedProbability": number|null, "tradeType": "scalp|intraday|swing"|null
+    "estimatedProbability": number|null, "tradeType": "scalp|intraday|swing"|null,
+    "waitReason": string|null
   },
   "report": {
     "summary": string,
@@ -146,8 +147,8 @@ export const parseAssistantAnalysis = (raw) => {
   }
 
   const tt = extra.tradePlan?.tradeType;
-  base.tradePlan.tradeType =
-    base.decision === 'NO_TRADE' ? null : VALID_TRADE_TYPES.includes(tt) ? tt : 'intraday';
+  const isLive = base.decision === 'BUY' || base.decision === 'SELL';
+  base.tradePlan.tradeType = isLive ? (VALID_TRADE_TYPES.includes(tt) ? tt : 'intraday') : null;
 
   const reasoning = Array.isArray(extra.report?.reasoning)
     ? extra.report.reasoning.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim().slice(0, 600))

@@ -6,7 +6,7 @@
  */
 
 const VALID_MARKETS = ['forex', 'crypto', 'indices', 'commodities', 'synthetic', 'unknown'];
-const VALID_DECISIONS = ['BUY', 'SELL', 'NO_TRADE'];
+const VALID_DECISIONS = ['BUY', 'SELL', 'WAIT', 'NO_TRADE'];
 const ELEMENT_KEYS = [
   'bos', 'choch', 'mss', 'orderBlocks', 'fairValueGaps', 'breakerBlocks',
   'mitigationBlocks', 'liquidityZones', 'equalHighs', 'equalLows',
@@ -80,28 +80,37 @@ export const parseAnalysisResponse = (raw) => {
   }
 
   // Decision + confidence with the hard business rule enforced here too:
-  // confidence < 70 must be NO_TRADE.
-  let decision = VALID_DECISIONS.includes(data.decision) ? data.decision : 'NO_TRADE';
+  // confidence < 70 can never be a live BUY/SELL — it becomes WAIT (a suggested
+  // zone + reason) rather than a dead-end NO_TRADE. A legacy NO_TRADE from the
+  // model is normalized to WAIT so new analyses never surface NO_TRADE.
+  let decision = VALID_DECISIONS.includes(data.decision) ? data.decision : 'WAIT';
+  if (decision === 'NO_TRADE') decision = 'WAIT';
   let confidenceScore = clamp(Math.round(toNumberOrNull(data.confidenceScore) ?? 0), 0, 100);
-  if (confidenceScore < 70) decision = 'NO_TRADE';
+  if (confidenceScore < 70 && (decision === 'BUY' || decision === 'SELL')) decision = 'WAIT';
 
   const tp = data.tradePlan || {};
-  const tradePlan =
-    decision === 'NO_TRADE'
-      ? {
-          entry: null, stopLoss: null, takeProfit1: null, takeProfit2: null,
-          takeProfit3: null, riskRewardRatio: null, estimatedDuration: null, estimatedProbability: null,
-        }
-      : {
-          entry: toNumberOrNull(tp.entry),
-          stopLoss: toNumberOrNull(tp.stopLoss),
-          takeProfit1: toNumberOrNull(tp.takeProfit1),
-          takeProfit2: toNumberOrNull(tp.takeProfit2),
-          takeProfit3: toNumberOrNull(tp.takeProfit3),
-          riskRewardRatio: tp.riskRewardRatio ? String(tp.riskRewardRatio).slice(0, 20) : null,
-          estimatedDuration: tp.estimatedDuration ? String(tp.estimatedDuration).slice(0, 100) : null,
-          estimatedProbability: toNumberOrNull(tp.estimatedProbability),
-        };
+  const isLive = decision === 'BUY' || decision === 'SELL';
+  const tradePlan = isLive
+    ? {
+        entry: toNumberOrNull(tp.entry),
+        stopLoss: toNumberOrNull(tp.stopLoss),
+        takeProfit1: toNumberOrNull(tp.takeProfit1),
+        takeProfit2: toNumberOrNull(tp.takeProfit2),
+        takeProfit3: toNumberOrNull(tp.takeProfit3),
+        riskRewardRatio: tp.riskRewardRatio ? String(tp.riskRewardRatio).slice(0, 20) : null,
+        estimatedDuration: tp.estimatedDuration ? String(tp.estimatedDuration).slice(0, 100) : null,
+        estimatedProbability: toNumberOrNull(tp.estimatedProbability),
+        waitReason: null,
+      }
+    : {
+        // WAIT: keep `entry` as the SUGGESTED zone if the model provided one,
+        // null the live levels, and carry the model's waitReason if present.
+        entry: toNumberOrNull(tp.entry),
+        stopLoss: null, takeProfit1: null, takeProfit2: null, takeProfit3: null,
+        riskRewardRatio: null, estimatedDuration: null,
+        estimatedProbability: toNumberOrNull(tp.estimatedProbability),
+        waitReason: tp.waitReason ? String(tp.waitReason).slice(0, 600) : null,
+      };
 
   const rep = data.report || {};
   const report = {

@@ -51,11 +51,12 @@ Detect ONLY what is visibly present. For each concept return an array of detecte
 Each detected element is an object: { "label": string, "level": number|string|null, "note": string, "type": string }
 
 ## STEP 3 — DECISION
-Produce EXACTLY one decision: "BUY", "SELL", or "NO_TRADE". No ambiguity.
+Produce EXACTLY one decision: "BUY", "SELL", or "WAIT". No ambiguity.
+NEVER return "NO_TRADE". If there is no valid IMMEDIATE entry, return "WAIT" — a professional trader never just says "no trade", they say WHERE to wait and WHY.
 
 ## STEP 4 — CONFIDENCE SCORE (0-100)
 Compute confidence based ONLY on genuinely detected confluences. More independent, aligned confluences = higher score. Weak/conflicting signals = lower score.
-CRITICAL RULE: If confidence < 70, the decision MUST be "NO_TRADE".
+CRITICAL RULE: If confidence < 70, the decision MUST be "WAIT" (not a live BUY/SELL).
 
 ## STEP 5 — TRADE PLAN
 If decision is BUY or SELL, provide numeric levels consistent with the visible price:
@@ -63,7 +64,10 @@ If decision is BUY or SELL, provide numeric levels consistent with the visible p
 - riskRewardRatio (e.g., "1:3")
 - estimatedDuration (e.g., "4-12 hours")
 - estimatedProbability (0-100)
-If NO_TRADE, set all trade plan numbers to null.
+If decision is WAIT: the current price is NOT on a good zone. Identify the NEAREST OPTIMAL zone to wait for (order block, unmitigated FVG, discount for a buy / premium for a sell, strong confluence) and:
+- set "entry" to that SUGGESTED zone price (where the user should wait for price to arrive)
+- set stopLoss / takeProfit1/2/3 / riskRewardRatio to null
+- set "waitReason": a clear, pedagogical explanation of WHY the current price is unfavorable (e.g. in liquidity, premium for a buy, far from any OB) and WHY the suggested zone is better (name the confluences).
 
 ## STEP 6 — DETAILED REPORT
 - summary: 2-4 sentence executive summary
@@ -90,12 +94,13 @@ Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this
     "trendlines": [], "consolidations": [], "breakouts": [], "fakeBreakouts": [],
     "momentum": string, "volatility": string, "premiumZones": [], "discountZones": []
   },
-  "decision": "BUY|SELL|NO_TRADE",
+  "decision": "BUY|SELL|WAIT",
   "confidenceScore": number,
   "tradePlan": {
     "entry": number|null, "stopLoss": number|null,
     "takeProfit1": number|null, "takeProfit2": number|null, "takeProfit3": number|null,
-    "riskRewardRatio": string|null, "estimatedDuration": string|null, "estimatedProbability": number|null
+    "riskRewardRatio": string|null, "estimatedDuration": string|null, "estimatedProbability": number|null,
+    "waitReason": string|null
   },
   "report": {
     "summary": string,

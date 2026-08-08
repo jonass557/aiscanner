@@ -1,17 +1,20 @@
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, MinusCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, MinusCircle } from 'lucide-react';
 import { decisionMeta } from '../../utils/format.js';
 
 /** Big, unambiguous decision banner with confidence. */
 export default function DecisionCard({ decision, confidenceScore }) {
   const meta = decisionMeta(decision);
-  const Icon = decision === 'BUY' ? TrendingUp : decision === 'SELL' ? TrendingDown : MinusCircle;
+  const Icon =
+    decision === 'BUY' ? TrendingUp : decision === 'SELL' ? TrendingDown : decision === 'WAIT' ? Clock : MinusCircle;
 
   const bg =
     decision === 'BUY'
       ? 'from-green-500 to-emerald-600'
       : decision === 'SELL'
       ? 'from-red-500 to-rose-600'
+      : decision === 'WAIT'
+      ? 'from-amber-500 to-yellow-600'
       : 'from-gray-500 to-gray-600';
 
   return (
@@ -44,9 +47,9 @@ export default function DecisionCard({ decision, confidenceScore }) {
           transition={{ duration: 0.8, ease: 'easeOut' }}
         />
       </div>
-      {confidenceScore < 70 && (
+      {decision === 'WAIT' && (
         <p className="relative mt-3 text-sm text-white/90">
-          Confidence below 70% — the AI recommends staying out of this trade.
+          Pas d'entrée immédiate — attendre que le prix atteigne la zone optimale (voir le plan ci-dessous).
         </p>
       )}
     </motion.div>

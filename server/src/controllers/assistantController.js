@@ -16,7 +16,8 @@ const ANALYSIS_ACTIONS = ['analyze', 'find_setups', 'should_i_trade', 'show_risk
 /**
  * Humanize a decision for the chat reply.
  */
-const decisionLabel = (d) => (d === 'BUY' ? 'ACHAT' : d === 'SELL' ? 'VENTE' : 'AUCUN TRADE');
+const decisionLabel = (d) =>
+  d === 'BUY' ? 'ACHAT' : d === 'SELL' ? 'VENTE' : d === 'WAIT' ? 'ATTENDRE' : 'AUCUN TRADE';
 
 /**
  * Build a spoken/chat summary for an assistant analysis message.
@@ -26,6 +27,10 @@ const analysisToText = (analysis, snapshot) => {
   const rep = analysis.report || {};
   const real = snapshot?.isRealData ? `données temps réel (${snapshot.source})` : 'données simulées (démo)';
   const head = `${analysis.symbol} ${analysis.timeframe} · ${decisionLabel(analysis.decision)} · confiance ${analysis.confidenceScore}% · ${real}.`;
+  if (analysis.decision === 'WAIT') {
+    const zone = tp.entry != null ? `\n\nZone à attendre : ${tp.entry}` : '';
+    return `${head}${zone}\n\n${tp.waitReason || rep.summary || 'Attendre une meilleure configuration.'}`;
+  }
   if (analysis.decision === 'NO_TRADE') {
     return `${head}\n\n${rep.summary || 'Pas de setup exploitable.'}`;
   }

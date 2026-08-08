@@ -51,7 +51,7 @@ describe('Scan API', () => {
     expect(res.status).toBe(201);
     const { analysis } = res.body.data;
     expect(analysis.symbol).toBeDefined();
-    expect(['BUY', 'SELL', 'NO_TRADE']).toContain(analysis.decision);
+    expect(['BUY', 'SELL', 'WAIT']).toContain(analysis.decision);
     expect(analysis.confidenceScore).toBeGreaterThanOrEqual(0);
     expect(analysis.confidenceScore).toBeLessThanOrEqual(100);
     expect(analysis.status).toBe('completed');

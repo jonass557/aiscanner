@@ -1,9 +1,14 @@
 import { BaseProvider } from './BaseProvider.js';
+import { fetchWithRetry } from './fetchWithRetry.js';
 
 /**
  * Anthropic Claude vision provider.
  * Fetches the image, base64-encodes it, and sends it as an image content
  * block to the Messages API. Uses native fetch (Node 18+).
+ *
+ * All model calls go through _post() → fetchWithRetry, so transient 429/5xx
+ * errors are retried with exponential backoff before the ai/index.js layer
+ * falls back to another provider.
  */
 export class ClaudeProvider extends BaseProvider {
   constructor(config) {
@@ -18,6 +23,31 @@ export class ClaudeProvider extends BaseProvider {
     return Boolean(this.apiKey);
   }
 
+  /** POST a Messages body with retry; return the text content. */
+  async _post(body) {
+    const res = await fetchWithRetry(
+      () =>
+        fetch(this.endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify(body),
+        }),
+      'Claude'
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Claude API error (${res.status}): ${errText}`);
+    }
+
+    const result = await res.json();
+    return result.content?.[0]?.text || '';
+  }
+
   async fetchImageAsBase64(imageUrl) {
     const res = await fetch(imageUrl);
     if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
@@ -29,7 +59,7 @@ export class ClaudeProvider extends BaseProvider {
   async analyze({ imageUrl, systemPrompt, userPrompt }) {
     const { data, mediaType } = await this.fetchImageAsBase64(imageUrl);
 
-    const body = {
+    return this._post({
       model: this.model,
       max_tokens: 4096,
       temperature: 0.2,
@@ -46,25 +76,7 @@ export class ClaudeProvider extends BaseProvider {
           ],
         },
       ],
-    };
-
-    const res = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(body),
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Claude API error (${res.status}): ${errText}`);
-    }
-
-    const result = await res.json();
-    return result.content?.[0]?.text || '';
   }
 
   async analyzeMultiple({ images, systemPrompt, userPrompt }) {
@@ -75,58 +87,22 @@ export class ClaudeProvider extends BaseProvider {
       content.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data } });
     }
 
-    const body = {
+    return this._post({
       model: this.model,
       max_tokens: 4096,
       temperature: 0.2,
       system: systemPrompt,
       messages: [{ role: 'user', content }],
-    };
-
-    const res = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(body),
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Claude API error (${res.status}): ${errText}`);
-    }
-
-    const result = await res.json();
-    return result.content?.[0]?.text || '';
   }
 
   async chat({ systemPrompt, messages }) {
-    const body = {
+    return this._post({
       model: this.model,
       max_tokens: 2048,
       temperature: 0.5,
       system: systemPrompt,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    };
-
-    const res = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(body),
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Claude API error (${res.status}): ${errText}`);
-    }
-
-    const result = await res.json();
-    return result.content?.[0]?.text || '';
   }
 }

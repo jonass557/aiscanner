@@ -1,9 +1,15 @@
 import { BaseProvider } from './BaseProvider.js';
+import { fetchWithRetry } from './fetchWithRetry.js';
 
 /**
  * Google Gemini vision provider.
  * Fetches the image, base64-encodes it as inline_data, and calls the
  * generateContent endpoint. Uses native fetch (Node 18+).
+ *
+ * All model calls go through fetchWithRetry: Gemini frequently returns 503
+ * ("high demand") during peak hours, so we retry transient errors with
+ * exponential backoff before giving up (the ai/index.js layer then falls back
+ * to another provider if all retries fail).
  */
 export class GeminiProvider extends BaseProvider {
   constructor(config) {
@@ -44,11 +50,15 @@ export class GeminiProvider extends BaseProvider {
       },
     };
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithRetry(
+      () =>
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      'Gemini'
+    );
 
     if (!res.ok) {
       const errText = await res.text();
@@ -78,11 +88,15 @@ export class GeminiProvider extends BaseProvider {
       },
     };
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithRetry(
+      () =>
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      'Gemini'
+    );
 
     if (!res.ok) {
       const errText = await res.text();
@@ -107,11 +121,15 @@ export class GeminiProvider extends BaseProvider {
       generationConfig: { temperature: 0.5, maxOutputTokens: 2048 },
     };
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithRetry(
+      () =>
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      'Gemini'
+    );
 
     if (!res.ok) {
       const errText = await res.text();
