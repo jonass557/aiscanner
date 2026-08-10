@@ -4,6 +4,10 @@ import { decide } from './decisionEngine.js';
 import { explain } from './explanationEngine.js';
 import { build as buildOverlay } from '../annotation/overlayBuilder.js';
 import { FAMILY_KEYS } from './technicalParser.js';
+import { getMarketSnapshot, resolveSymbol } from '../marketData/index.js';
+import { normalizeTimeframe } from '../marketData/timeframe.js';
+import logger from '../../config/logger.js';
+import config from '../../config/index.js';
 
 /**
  * The two-pass Computer-Vision pipeline (Engines 1→2→3→4 + overlay).
@@ -35,11 +39,35 @@ const toTechnicalAnalysis = (reading) => {
 };
 
 /**
+ * Fetch a live market snapshot for the perceived symbol + timeframe. Returns
+ * null when the symbol can't be resolved (unknown pair) — the analysis then
+ * proceeds on the screenshot alone. Never throws: a market-data failure must not
+ * break a scan.
+ */
+const fetchLiveMarket = async (perception) => {
+  // Never hit the network in the test env — keeps the suite hermetic/offline.
+  if (config.isTest) return null;
+  const rawSymbol = perception?.context?.symbol;
+  const entry = rawSymbol ? resolveSymbol(rawSymbol) : null;
+  if (!entry) {
+    logger.warn(`Scan: symbol "${rawSymbol || '∅'}" not resolvable; skipping live market data.`);
+    return null;
+  }
+  const tf = normalizeTimeframe(perception?.context?.timeframe);
+  try {
+    return await getMarketSnapshot(entry, tf, 150);
+  } catch (err) {
+    logger.warn(`Scan: live market fetch failed for ${entry.symbol} (${err.message}).`);
+    return null;
+  }
+};
+
+/**
  * Run the full pipeline for one image.
  * @param {Object} params
  * @param {string} params.imageUrl
  * @param {string} [params.providerName] - override vision provider
- * @returns {Promise<{ analysis: Object, meta: Object }>}
+ * @returns {Promise<{ analysis: Object, meta: Object, market: Object|null }>}
  */
 export const run = async ({ imageUrl, providerName }) => {
   const startedAt = Date.now();
@@ -48,14 +76,19 @@ export const run = async ({ imageUrl, providerName }) => {
   //    (and the controller won't charge a credit).
   const { perception, meta: visionMeta } = await perceive({ imageUrl, providerName });
 
+  // 1b. Connect to the live market feed for the perceived symbol + timeframe.
+  //     This anchors the decision on the REAL price and powers the live chart.
+  const market = await fetchLiveMarket(perception);
+
   // 2. Technical reading (SMC/ICT) over the perception JSON.
   const { reading, meta: techMeta } = await readTechnical({ perception });
 
-  // 3. Decision (deterministic confluences + guardrails).
-  const decision = decide({ reading, perception });
+  // 3. Decision (deterministic confluences + always-directional verdict,
+  //    anchored on the live price when a market snapshot is available).
+  const decision = decide({ reading, perception, market });
 
   // 4. Explanation (report + reasoning) and header fields.
-  const { header, report } = explain({ perception, reading, decision });
+  const { header, report } = explain({ perception, reading, decision, market });
 
   // Overlay annotations (normalized coords for the client to draw).
   const annotations = buildOverlay({ perception, reading, decision });
@@ -65,6 +98,7 @@ export const run = async ({ imageUrl, providerName }) => {
     technicalAnalysis: toTechnicalAnalysis(reading),
     decision: decision.decision,
     confidenceScore: decision.confidenceScore,
+    confidenceLabel: decision.confidenceLabel,
     tradePlan: decision.tradePlan,
     report,
     perception,
@@ -73,6 +107,9 @@ export const run = async ({ imageUrl, providerName }) => {
     engineVersion: ENGINE_VERSION,
     visionProvider: visionMeta.visionProvider,
     visionModel: visionMeta.visionModel,
+    // Live market provenance (null-safe when no snapshot was fetched).
+    dataSource: market?.source ?? null,
+    isRealData: market ? Boolean(market.isRealData) : null,
   };
 
   const meta = {
@@ -83,7 +120,7 @@ export const run = async ({ imageUrl, providerName }) => {
     processingTime: Date.now() - startedAt,
   };
 
-  return { analysis, meta };
+  return { analysis, meta, market };
 };
 
 export default { run, ENGINE_VERSION };

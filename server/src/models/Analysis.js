@@ -121,6 +121,10 @@ const analysisSchema = new mongoose.Schema(
       max: 100,
       default: 0,
     },
+    // Human label for the confidence score ('Élevée' | 'Moyenne' | 'Faible').
+    // The scanner is always directional, so this replaces the old WAIT gate as
+    // the honesty signal about how strong the confluence is.
+    confidenceLabel: { type: String, default: null },
 
     // Trade plan. On WAIT, `entry` holds the SUGGESTED zone to wait for (not a
     // live entry), stop/targets stay null, and `waitReason` explains why the

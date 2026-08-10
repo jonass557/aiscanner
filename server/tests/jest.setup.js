@@ -16,6 +16,7 @@ for (const key of [
   'GEMINI_API_KEY',
   'NVIDIA_API_KEY',
   'VOICE_OPENAI_API_KEY',
+  'TWELVEDATA_API_KEY',
 ]) {
   process.env[key] = '';
 }

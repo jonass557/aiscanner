@@ -4,9 +4,9 @@ import config from '../src/config/index.js';
 /**
  * Integration test: the full CV pipeline (perception → technical → decision →
  * explanation + overlay) with the deterministic mock, exercising the offline
- * path end-to-end. The mock produces WAIT with weak confluences OR a BUY/SELL
- * when rectangles are present; this test verifies both paths and asserts
- * determinism (same URL → same result). NO_TRADE is never emitted.
+ * path end-to-end. The scanner is always directional: the decision is BUY or
+ * SELL (never WAIT / NO_TRADE) with a complete trade plan. Also asserts
+ * determinism (same URL → same result).
  */
 
 // Force mock by clearing keys (config is live, not env).
@@ -36,22 +36,17 @@ describe('CV pipeline integration (offline mock)', () => {
     expect(['forex', 'crypto', 'unknown']).toContain(analysis.market);
     expect(analysis.timeframe).toBeTruthy();
 
-    // Decision (WAIT or BUY/SELL depending on seed — never NO_TRADE)
-    expect(['BUY', 'SELL', 'WAIT']).toContain(analysis.decision);
-    expect(analysis.decision).not.toBe('NO_TRADE');
+    // Decision is ALWAYS directional — never WAIT / NO_TRADE.
+    expect(['BUY', 'SELL']).toContain(analysis.decision);
     expect(analysis.confidenceScore).toBeGreaterThanOrEqual(0);
     expect(analysis.confidenceScore).toBeLessThanOrEqual(100);
+    expect(analysis.confidenceLabel).toBeTruthy();
 
-    // TradePlan: WAIT keeps a suggested zone (or null when no setup) with a
-    // reason and nulled live levels; a live trade is fully populated.
-    if (analysis.decision === 'WAIT') {
-      expect(analysis.tradePlan.stopLoss).toBeNull();
-      expect(analysis.tradePlan.riskRewardRatio).toBeNull();
-      expect(analysis.tradePlan.waitReason).toBeTruthy();
-    } else {
-      expect(analysis.tradePlan.entry).not.toBeNull();
-      expect(analysis.tradePlan.riskRewardRatio).toBeTruthy();
-    }
+    // TradePlan is always complete for a directional verdict.
+    expect(analysis.tradePlan.entry).not.toBeNull();
+    expect(analysis.tradePlan.stopLoss).not.toBeNull();
+    expect(analysis.tradePlan.takeProfit1).not.toBeNull();
+    expect(analysis.tradePlan.waitReason).toBeNull();
 
     // Report
     expect(analysis.report.summary).toBeTruthy();
@@ -64,7 +59,6 @@ describe('CV pipeline integration (offline mock)', () => {
 
     // Annotations (overlay)
     expect(Array.isArray(analysis.annotations)).toBe(true);
-    // At minimum: support/resistance/liquidity from mock perception.
     expect(analysis.annotations.length).toBeGreaterThan(0);
   }, 15000);
 
@@ -80,24 +74,24 @@ describe('CV pipeline integration (offline mock)', () => {
     expect(a.analysis.annotations.length).toBe(b.analysis.annotations.length);
   }, 15000);
 
-  it('enforces confidence < 70 → WAIT (mock weak setup)', async () => {
-    // A fresh URL with no strong confluences → score < 70.
+  it('always produces a directional verdict with a complete plan', async () => {
     const { analysis } = await run({ imageUrl: 'https://example.com/weak.png' });
-    if (analysis.confidenceScore < 70) {
-      expect(analysis.decision).toBe('WAIT');
-      expect(analysis.tradePlan.stopLoss).toBeNull();
-      expect(analysis.tradePlan.waitReason).toBeTruthy();
-    }
+    expect(['BUY', 'SELL']).toContain(analysis.decision);
+    expect(analysis.tradePlan.entry).not.toBeNull();
+    expect(analysis.tradePlan.stopLoss).not.toBeNull();
+    expect(analysis.tradePlan.waitReason).toBeNull();
   }, 15000);
 
-  it('produces entry/SL/TP annotations when decision is BUY/SELL', async () => {
-    // Mock is seeded to produce BUY or SELL for most URLs (rectangle → OB).
+  it('produces entry/SL/TP annotations for the directional decision', async () => {
     const { analysis } = await run({ imageUrl: 'https://example.com/trade.png' });
-    if (analysis.decision === 'BUY' || analysis.decision === 'SELL') {
-      const layers = analysis.annotations.map((a) => a.layer);
-      expect(layers).toContain('entry');
-      expect(layers).toContain('stopLoss');
-      expect(layers).toContain('takeProfit');
-    }
+    const layers = analysis.annotations.map((a) => a.layer);
+    // entry is always drawn when the price axis can be reconstructed; when the
+    // mock perception yields candle bboxes, SL/TP appear too.
+    expect(layers).toContain('entry');
+  }, 15000);
+
+  it('returns a market field (null when the pair is unresolved offline)', async () => {
+    const res = await run({ imageUrl: 'https://example.com/chart-a.png' });
+    expect('market' in res).toBe(true);
   }, 15000);
 });

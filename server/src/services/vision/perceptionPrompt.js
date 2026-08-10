@@ -66,4 +66,17 @@ export const buildPerceptionPrompt = () => `Extract EVERYTHING visible on this t
 }
 
 Rules recap: omit anything not clearly visible; never guess; confidence = visual
-readability; bbox normalized 0-1. Return ONLY the JSON object.`;
+readability; bbox normalized 0-1. Return ONLY the JSON object.
+
+PRIORITY — instrument identification: the trading symbol/pair and the timeframe
+are almost always printed as text, usually in the TOP-LEFT corner or the title
+bar (e.g. "EURUSD, M15", "BTCUSD H1", "XAU/USD · 4H", "US30 Daily"). Read them
+CAREFULLY and fill context.symbol and context.timeframe:
+- symbol: normalize to the ticker without spaces/slashes when obvious
+  (e.g. "EUR/USD" → "EURUSD", "Gold" → "XAUUSD", "Bitcoin" → "BTCUSD").
+- timeframe: report the exact label shown (e.g. "M15", "15m", "H1", "1H", "60",
+  "4H", "Daily", "D1"). Downstream code normalizes it.
+- market: infer from the symbol (forex / crypto / indices / commodities /
+  synthetic for Deriv Boom/Crash/Volatility).
+Also copy the raw symbol/timeframe strings you saw into the "texts" array so they
+are auditable. Only leave symbol/timeframe null if truly no label is visible.`;

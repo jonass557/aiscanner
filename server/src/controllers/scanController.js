@@ -52,8 +52,9 @@ export const scanChart = asyncHandler(async (req, res) => {
   });
 
   try {
-    // 3. Run the Computer-Vision pipeline (Engine 1→2→3→4 + overlay).
-    const { analysis: result, meta } = await runPipeline({ imageUrl: url });
+    // 3. Run the Computer-Vision pipeline (Engine 1→2→3→4 + overlay). This also
+    //    connects to the live market feed for the perceived symbol + timeframe.
+    const { analysis: result, meta, market } = await runPipeline({ imageUrl: url });
 
     // 4. Persist result
     Object.assign(analysis, result, meta, { status: 'completed' });
@@ -71,7 +72,26 @@ export const scanChart = asyncHandler(async (req, res) => {
     return sendSuccess(res, {
       statusCode: 201,
       message: 'Chart analyzed successfully.',
-      data: { analysis, scansRemaining: user.subscription.scansRemaining },
+      data: {
+        analysis,
+        scansRemaining: user.subscription.scansRemaining,
+        // Live market snapshot (candles + quote) for the real-time chart. Not
+        // persisted on the Analysis (kept lean); the client re-fetches it on
+        // demand via GET /market/snapshot. null when the pair was unresolved.
+        market: market
+          ? {
+              symbol: market.symbol,
+              market: market.market,
+              marketLabel: market.marketLabel,
+              timeframe: market.timeframe,
+              quote: market.quote,
+              candles: market.candles,
+              source: market.source,
+              isRealData: market.isRealData,
+              note: market.note ?? null,
+            }
+          : null,
+      },
     });
   } catch (err) {
     // Mark record failed; keep it for debugging/history but don't charge a credit.

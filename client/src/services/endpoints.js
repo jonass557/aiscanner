@@ -23,6 +23,12 @@ export const scanApi = {
     }),
 };
 
+export const marketApi = {
+  // Live snapshot (quote + candles) for a detected pair + timeframe.
+  snapshot: (symbol, timeframe) =>
+    api.get('/market/snapshot', { params: { symbol, timeframe } }),
+};
+
 export const multiTimeframeApi = {
   scan: (formData, onUploadProgress) =>
     api.post('/multi-timeframe-scan', formData, {

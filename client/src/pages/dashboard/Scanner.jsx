@@ -20,6 +20,7 @@ export default function Scanner() {
   const [dragging, setDragging] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState(null);
+  const [market, setMarket] = useState(null);
   const [exporting, setExporting] = useState(false);
   const inputRef = useRef(null);
 
@@ -58,6 +59,7 @@ export default function Scanner() {
     setFile(null);
     setPreview(null);
     setResult(null);
+    setMarket(null);
   };
 
   const scan = async () => {
@@ -72,6 +74,7 @@ export default function Scanner() {
     try {
       const { data } = await scanApi.scan(form);
       setResult(data.data.analysis);
+      setMarket(data.data.market || null);
       await refreshUser();
       toast.success('Analysis complete!');
     } catch (err) {
@@ -191,7 +194,7 @@ export default function Scanner() {
           <Button variant="secondary" onClick={clear}>
             ← Scan another chart
           </Button>
-          <AnalysisResult analysis={result} onExportPdf={exportPdf} exporting={exporting} />
+          <AnalysisResult analysis={result} market={market} onExportPdf={exportPdf} exporting={exporting} />
         </div>
       )}
     </div>

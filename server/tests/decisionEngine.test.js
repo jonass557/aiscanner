@@ -1,9 +1,13 @@
-import { decide, MIN_CONFIDENCE, MIN_RR } from '../src/services/analysis-engine/decisionEngine.js';
+import { decide, confidenceLabelFor } from '../src/services/analysis-engine/decisionEngine.js';
 
 /**
- * Unit tests for the decision engine (Engine 3). Encodes the product's absolute
- * business rule: no LIVE entry below 70 confidence (or below the RR floor) — but
- * instead of a dead-end NO_TRADE we emit WAIT with a suggested zone + reason.
+ * Unit tests for the decision engine (Engine 3).
+ *
+ * New product rule: the scanner is ALWAYS directional — it returns BUY or SELL
+ * with a complete trade plan, never WAIT or NO_TRADE. The confidence score is
+ * informative (it no longer gates the verdict). Levels are anchored on the live
+ * price when a market snapshot is provided, and synthesized from volatility
+ * (ATR) otherwise.
  */
 
 const emptyFamilies = () => ({
@@ -17,10 +21,8 @@ const emptyFamilies = () => ({
 });
 
 const det = (direction) => ({ label: 'x', direction, confidence: 60 });
-const perception = { context: { timeframe: 'H1' } };
+const perception = { context: { timeframe: 'H1', currentPrice: 100 } };
 
-// A strong bullish reading (base 50 + 15 BOS + 12 OB + 10 discount = 87 ≥ 70)
-// with a healthy RR.
 const strongBuyReading = (setup = {}) => ({
   bias: 'bullish',
   modelConfidence: 90,
@@ -29,73 +31,111 @@ const strongBuyReading = (setup = {}) => ({
 });
 
 describe('decisionEngine.decide', () => {
-  it('returns a BUY with a plan when confidence ≥ 70 and RR ok', () => {
+  it('returns a BUY with a complete plan when the setup is bullish', () => {
     const d = decide({ reading: strongBuyReading(), perception });
     expect(d.decision).toBe('BUY');
-    expect(d.confidenceScore).toBeGreaterThanOrEqual(MIN_CONFIDENCE);
+    expect(d.confidenceScore).toBeGreaterThanOrEqual(70);
     expect(d.tradePlan.entry).toBe(100);
     expect(d.tradePlan.riskRewardRatio).toBe('1:3.0');
     expect(d.tradePlan.tradeType).toBe('intraday');
     expect(d.tradePlan.waitReason).toBeNull();
   });
 
-  it('forces WAIT (keeping the suggested zone) when confidence < 70', () => {
+  it('stays directional (BUY) with a full plan even on low confidence', () => {
     const weak = {
       bias: 'bullish', modelConfidence: 99, families: emptyFamilies(),
       candidateSetup: { direction: 'BUY', entry: 100, stopLoss: 98, takeProfit1: 106 },
     };
     const d = decide({ reading: weak, perception });
-    expect(d.confidenceScore).toBeLessThan(MIN_CONFIDENCE);
-    expect(d.decision).toBe('WAIT');
-    // WAIT keeps entry as the SUGGESTED zone; live levels are nulled.
+    expect(d.confidenceScore).toBeLessThan(70);
+    expect(d.decision).toBe('BUY');
     expect(d.tradePlan.entry).toBe(100);
-    expect(d.tradePlan.stopLoss).toBeNull();
-    expect(d.tradePlan.riskRewardRatio).toBeNull();
-    expect(d.tradePlan.waitReason).toBeTruthy();
+    expect(d.tradePlan.stopLoss).toBe(98);
+    expect(d.tradePlan.takeProfit1).toBe(106);
+    expect(d.tradePlan.waitReason).toBeNull();
   });
 
-  it('forces WAIT when RR is below the minimum even if confidence is high', () => {
-    // tp1 barely above entry → RR ≈ 0.25 < MIN_RR
+  it('keeps a low-RR setup directional (RR no longer gates)', () => {
     const d = decide({ reading: strongBuyReading({ takeProfit1: 100.5 }), perception });
-    expect(d.confidenceScore).toBeGreaterThanOrEqual(MIN_CONFIDENCE);
-    expect(d.decision).toBe('WAIT');
-    expect(d.tradePlan.entry).toBe(100); // suggested zone preserved
-    expect(d.tradePlan.waitReason).toMatch(/risque\/rendement|R:R/i);
+    expect(d.decision).toBe('BUY');
+    expect(d.tradePlan.entry).toBe(100);
+    expect(d.tradePlan.riskRewardRatio).toBeTruthy();
   });
 
-  it('returns WAIT with no zone when there is no candidate setup', () => {
+  it('derives a direction from bias when there is no candidate setup', () => {
     const d = decide({
-      reading: { bias: 'neutral', families: emptyFamilies(), candidateSetup: null },
+      reading: { bias: 'bearish', families: emptyFamilies(), candidateSetup: null },
       perception,
     });
-    expect(d.decision).toBe('WAIT');
-    expect(d.confidenceScore).toBe(0);
-    expect(d.tradePlan.entry).toBeNull();
-    expect(d.tradePlan.waitReason).toBeTruthy();
+    expect(d.decision).toBe('SELL');
+    expect(d.tradePlan.entry).toBe(100);
+    expect(d.tradePlan.stopLoss).not.toBeNull();
+    expect(d.tradePlan.takeProfit1).not.toBeNull();
   });
 
-  it('never returns NO_TRADE (WAIT replaces it)', () => {
-    const weak = { bias: 'bullish', families: emptyFamilies(), candidateSetup: { direction: 'BUY', entry: 100, stopLoss: 98, takeProfit1: 106 } };
-    expect(decide({ reading: weak, perception }).decision).not.toBe('NO_TRADE');
-    expect(decide({ reading: { families: emptyFamilies(), candidateSetup: null }, perception }).decision).not.toBe('NO_TRADE');
+  it('derives a direction from live candles when bias is neutral', () => {
+    const candles = [
+      { open: 90, high: 91, low: 89, close: 90 },
+      { open: 92, high: 96, low: 91, close: 95 },
+      { open: 95, high: 99, low: 94, close: 98 },
+    ];
+    const d = decide({
+      reading: { bias: 'neutral', families: emptyFamilies(), candidateSetup: null },
+      perception: { context: { timeframe: 'H1' } },
+      market: { quote: { price: 98 }, candles, isRealData: true, source: 'binance' },
+    });
+    expect(d.decision).toBe('BUY');
+    expect(d.tradePlan.entry).toBe(98);
+    expect(d.tradePlan.stopLoss).not.toBeNull();
   });
 
-  it('confidence is the pure confluence score (no model blend)', () => {
-    // modelConfidence is deliberately ignored; score = 50+15+12+10 = 87.
+  it('NEVER returns WAIT or NO_TRADE (always BUY or SELL)', () => {
+    const cases = [
+      { bias: 'bullish', families: emptyFamilies(), candidateSetup: { direction: 'BUY', entry: 100, stopLoss: 98, takeProfit1: 106 } },
+      { bias: 'neutral', families: emptyFamilies(), candidateSetup: null },
+      { bias: 'bearish', families: emptyFamilies(), candidateSetup: null },
+      { families: emptyFamilies(), candidateSetup: null },
+    ];
+    for (const reading of cases) {
+      const d = decide({ reading, perception });
+      expect(['BUY', 'SELL']).toContain(d.decision);
+      expect(d.decision).not.toBe('WAIT');
+      expect(d.decision).not.toBe('NO_TRADE');
+    }
+  });
+
+  it('synthesizes SL/TP from ATR when the setup omits them', () => {
+    const candles = Array.from({ length: 14 }, () => ({ open: 100, high: 102, low: 98, close: 100 }));
+    const reading = {
+      bias: 'bullish', families: emptyFamilies(),
+      candidateSetup: { direction: 'BUY', entry: 100 },
+    };
+    const d = decide({
+      reading, perception,
+      market: { quote: { price: 100 }, candles, isRealData: true, source: 'binance' },
+    });
+    expect(d.decision).toBe('BUY');
+    expect(d.tradePlan.stopLoss).toBeLessThan(100);
+    expect(d.tradePlan.takeProfit1).toBeGreaterThan(100);
+  });
+
+  it('confidence is the pure confluence score and exposes a label', () => {
     const d = decide({ reading: strongBuyReading(), perception });
     expect(d.confidenceScore).toBe(87);
+    expect(d.confidenceLabel).toBe('Élevée');
   });
 
   it('exposes the confluence breakdown and risk zones', () => {
     const withRisk = strongBuyReading();
-    withRisk.families.fakeBreakouts = [det('bearish')]; // -12 detractor
+    withRisk.families.fakeBreakouts = [det('bearish')];
     const d = decide({ reading: withRisk, perception });
     expect(d.confluenceBreakdown.length).toBeGreaterThan(0);
     expect(d.riskZones.some((r) => r.impact < 0)).toBe(true);
   });
 
-  it('exposes MIN_CONFIDENCE = 70', () => {
-    expect(MIN_CONFIDENCE).toBe(70);
-    expect(MIN_RR).toBeLessThanOrEqual(2);
+  it('confidenceLabelFor maps score ranges', () => {
+    expect(confidenceLabelFor(85)).toBe('Élevée');
+    expect(confidenceLabelFor(60)).toBe('Moyenne');
+    expect(confidenceLabelFor(30)).toBe('Faible');
   });
 });

@@ -6,8 +6,8 @@ import {
 
 const FEATURES = [
   { icon: Brain, title: 'Smart Money Concepts', desc: 'Detects BOS, CHoCH, MSS, order blocks, FVGs, breaker & mitigation blocks — the full ICT toolkit.' },
-  { icon: Target, title: 'Clear decisions', desc: 'Every scan returns exactly one verdict: BUY, SELL, or WAIT — with the optimal zone to wait for. No ambiguity, no noise.' },
-  { icon: Gauge, title: 'Confidence scoring', desc: 'A 0–100 score based only on real detected confluences. Below 70? It tells you where to wait instead.' },
+  { icon: Target, title: 'Clear decisions', desc: 'Every scan returns exactly one actionable verdict — BUY or SELL — with the entry zone and full plan. No ambiguity, no “wait and see”.' },
+  { icon: Gauge, title: 'Confidence scoring', desc: 'A 0–100 score based only on real detected confluences, labelled High / Medium / Low so you know how strong the setup is.' },
   { icon: Layers, title: 'Liquidity mapping', desc: 'Equal highs/lows, buy-side & sell-side liquidity, premium and discount zones.' },
   { icon: FileText, title: 'Full trade plan', desc: 'Entry, stop loss, three take-profits, risk/reward, estimated duration and probability.' },
   { icon: TrendingUp, title: 'All markets', desc: 'Forex, Crypto, Indices, Commodities, and Deriv Synthetic Indices — auto-recognized.' },

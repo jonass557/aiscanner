@@ -1,8 +1,12 @@
 import { formatPrice } from '../../utils/format.js';
 
-/** Trade plan table: entry, SL, three TPs, R/R, duration, probability. */
+/**
+ * Trade plan table: entry, SL, three TPs, R/R, duration, probability.
+ * New scans are always directional with a complete plan. The legacy WAIT /
+ * NO_TRADE branches below only trigger for old records kept in history.
+ */
 export default function TradePlanCard({ tradePlan, decision }) {
-  if (!tradePlan || (decision === 'NO_TRADE')) {
+  if (!tradePlan || decision === 'NO_TRADE') {
     return (
       <div className="card p-6">
         <h3 className="font-semibold">Trade Plan</h3>
@@ -13,7 +17,7 @@ export default function TradePlanCard({ tradePlan, decision }) {
     );
   }
 
-  // WAIT: no live entry — show the SUGGESTED zone to wait for and the reason.
+  // Legacy WAIT records: no live entry — show the SUGGESTED zone and the reason.
   if (decision === 'WAIT') {
     return (
       <div className="card p-6">

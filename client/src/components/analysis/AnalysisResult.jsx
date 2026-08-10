@@ -4,6 +4,7 @@ import TradePlanCard from './TradePlanCard.jsx';
 import TechnicalAnalysis from './TechnicalAnalysis.jsx';
 import DetailedReport from './DetailedReport.jsx';
 import AnnotatedChart from './AnnotatedChart.jsx';
+import LiveChart from './LiveChart.jsx';
 import FeedbackButtons from './FeedbackButtons.jsx';
 import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
@@ -11,12 +12,18 @@ import { marketLabel, formatPrice, formatDateTime } from '../../utils/format.js'
 
 /**
  * Full analysis result view, reused by the Scanner (post-scan) and the
- * AnalysisDetail history page. `onExportPdf` is optional.
+ * AnalysisDetail history page. `onExportPdf` is optional. `market` is the live
+ * snapshot returned by the scan (candles + quote); it is not persisted on the
+ * Analysis, so history views pass none and the live chart self-fetches from the
+ * symbol/timeframe instead.
  */
-export default function AnalysisResult({ analysis, onExportPdf, exporting }) {
+export default function AnalysisResult({ analysis, market, onExportPdf, exporting }) {
   if (!analysis) return null;
 
   const hasAnnotations = Array.isArray(analysis.annotations) && analysis.annotations.length > 0;
+  // Show the live chart whenever we can identify the instrument (either from the
+  // scan's snapshot or the analysis symbol — LiveChart will fetch on its own).
+  const canShowLive = Boolean(market?.candles?.length || (analysis.symbol && analysis.symbol !== 'Unknown'));
 
   return (
     <div className="space-y-6">
@@ -53,9 +60,24 @@ export default function AnalysisResult({ analysis, onExportPdf, exporting }) {
         />
       )}
 
+      {/* Real-time chart of the detected pair + timeframe, with the trade-plan
+          levels drawn on the live price. */}
+      {canShowLive && (
+        <LiveChart
+          market={market}
+          symbol={analysis.symbol}
+          timeframe={analysis.timeframe}
+          tradePlan={analysis.tradePlan}
+        />
+      )}
+
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3 space-y-6">
-          <DecisionCard decision={analysis.decision} confidenceScore={analysis.confidenceScore} />
+          <DecisionCard
+            decision={analysis.decision}
+            confidenceScore={analysis.confidenceScore}
+            confidenceLabel={analysis.confidenceLabel}
+          />
           {/* Fallback raw image for legacy analyses without annotations. */}
           {analysis.imageUrl && !hasAnnotations && (
             <div className="card overflow-hidden">

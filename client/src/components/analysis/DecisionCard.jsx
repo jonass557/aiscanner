@@ -2,8 +2,12 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Clock, MinusCircle } from 'lucide-react';
 import { decisionMeta } from '../../utils/format.js';
 
-/** Big, unambiguous decision banner with confidence. */
-export default function DecisionCard({ decision, confidenceScore }) {
+/**
+ * Big, unambiguous decision banner with confidence. New scans are always
+ * directional (BUY/SELL); the WAIT/NO_TRADE branches only render for legacy
+ * records still stored in history.
+ */
+export default function DecisionCard({ decision, confidenceScore, confidenceLabel }) {
   const meta = decisionMeta(decision);
   const Icon =
     decision === 'BUY' ? TrendingUp : decision === 'SELL' ? TrendingDown : decision === 'WAIT' ? Clock : MinusCircle;
@@ -33,8 +37,11 @@ export default function DecisionCard({ decision, confidenceScore }) {
           </div>
         </div>
         <div className="text-right">
-          <p className="text-sm font-medium text-white/80">Confidence</p>
+          <p className="text-sm font-medium text-white/80">Confiance</p>
           <p className="text-4xl font-extrabold">{confidenceScore}%</p>
+          {confidenceLabel && (
+            <p className="text-sm font-medium text-white/80">{confidenceLabel}</p>
+          )}
         </div>
       </div>
 

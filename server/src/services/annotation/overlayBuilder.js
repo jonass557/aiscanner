@@ -103,14 +103,12 @@ export const build = ({ perception, reading, decision }) => {
     }
   }
 
-  // 2. Trade levels from the decision as horizontal lines. For a live BUY/SELL
-  //    this draws entry + SL + TPs. For WAIT, only `entry` is set (the SUGGESTED
-  //    zone to wait for); SL/TP are null and skipped, so WAIT shows a single
-  //    "zone to wait for" line. Legacy NO_TRADE has a fully-nulled plan → nothing.
+  // 2. Trade levels from the decision as horizontal lines. The scanner always
+  //    returns a directional BUY/SELL with a complete plan, so this draws
+  //    entry + SL + TPs whenever the price axis could be reconstructed.
   if (priceToY) {
     const tp = decision?.tradePlan || {};
-    const zoneLabel = decision?.decision === 'WAIT' ? `Zone ${tp.entry}` : `Entry ${tp.entry}`;
-    if (tp.entry != null) annotations.push(hLine('entry', priceToY(tp.entry), zoneLabel, decision.confidenceScore));
+    if (tp.entry != null) annotations.push(hLine('entry', priceToY(tp.entry), `Entry ${tp.entry}`, decision.confidenceScore));
     if (tp.stopLoss != null) annotations.push(hLine('stopLoss', priceToY(tp.stopLoss), `SL ${tp.stopLoss}`, decision.confidenceScore));
     [tp.takeProfit1, tp.takeProfit2, tp.takeProfit3].forEach((v, i) => {
       if (v != null) annotations.push(hLine('takeProfit', priceToY(v), `TP${i + 1} ${v}`, decision.confidenceScore));

@@ -6,9 +6,13 @@
  * elements, and a step-by-step `reasoning` chain). It also assembles the
  * `symbol/market/timeframe/...` header fields the Analysis document needs.
  *
+ * The scanner always produces a directional verdict (BUY/SELL), so the summary
+ * is always an actionable setup. When a live market snapshot is available the
+ * plan is anchored on the real price and the report says so; otherwise it flags
+ * that levels are estimated from the screenshot.
+ *
  * Deterministic by design: everything it needs is already in the upstream
- * contracts, so it needs no extra AI call. It explains WHY a trade is proposed
- * — or, crucially, why NO trade — as a transparent chain of confluences.
+ * contracts, so it needs no extra AI call.
  */
 
 const fmt = (n) => (n == null ? '—' : String(n));
@@ -19,46 +23,44 @@ const fmt = (n) => (n == null ? '—' : String(n));
  * @param {Object} params.perception
  * @param {Object} params.reading
  * @param {Object} params.decision - output of decisionEngine.decide
+ * @param {Object} [params.market] - live snapshot { symbol, quote, source, isRealData }
  * @returns {{ header: Object, report: Object }}
  */
-export const explain = ({ perception, reading, decision }) => {
+export const explain = ({ perception, reading, decision, market = null }) => {
   const ctx = perception?.context || {};
-  const { decision: verdict, confidenceScore, tradePlan, confluenceBreakdown = [] } = decision;
+  const {
+    decision: verdict,
+    confidenceScore,
+    confidenceLabel,
+    tradePlan,
+    confluenceBreakdown = [],
+  } = decision;
 
   const positives = confluenceBreakdown.filter((m) => m.weight > 0);
   const negatives = confluenceBreakdown.filter((m) => m.weight < 0);
 
-  const symbol = ctx.symbol || 'Unknown';
-  const timeframe = ctx.timeframe || 'Unknown';
-  const dirWord = verdict === 'BUY' ? 'haussier' : verdict === 'SELL' ? 'baissier' : 'neutre';
-  const waitReason = tradePlan?.waitReason || '';
+  const symbol = ctx.symbol || market?.symbol || 'Unknown';
+  const timeframe = ctx.timeframe || market?.timeframe || 'Unknown';
+  const dirWord = verdict === 'BUY' ? 'haussier (ACHAT)' : 'baissier (VENTE)';
+
+  // Data-source honesty: is the plan anchored on live prices or the screenshot?
+  const dataNote = market
+    ? market.isRealData
+      ? `Niveaux ancrés sur le prix réel en direct (${market.source}).`
+      : `Niveaux estimés — données de marché simulées (pas de flux temps réel pour cet actif).`
+    : `Niveaux estimés depuis la capture (pas de flux marché disponible).`;
 
   // --- Summary --------------------------------------------------------------
-  let summary;
-  if (verdict === 'WAIT') {
-    summary = `Pas d'entrée immédiate sur ${symbol} ${timeframe} (confiance ${confidenceScore}%). ` +
-      (waitReason ||
-        `Le prix actuel n'est pas sur une zone optimale — attendre une meilleure configuration.`) +
-      (positives.length ? ` Confluences déjà en place : ${positives.map((p) => p.reason).join(' ; ')}.` : '');
-  } else if (verdict === 'NO_TRADE') {
-    // Legacy verdict (kept for old records that still carry it).
-    summary = `Aucun trade sur ${symbol} ${timeframe}. La confiance (${confidenceScore}%) est ` +
-      `insuffisante ou les confluences se contredisent — mieux vaut rester à l'écart. ` +
-      (negatives.length ? `Facteurs défavorables : ${negatives.map((n) => n.reason).join(' ; ')}.` : '');
-  } else {
-    summary = `Setup ${dirWord} sur ${symbol} ${timeframe} avec ${confidenceScore}% de confiance. ` +
-      `Entrée ${fmt(tradePlan.entry)}, stop ${fmt(tradePlan.stopLoss)}, ` +
-      `TP1 ${fmt(tradePlan.takeProfit1)} (R:R ${tradePlan.riskRewardRatio || '—'}). ` +
-      `${positives.length} confluence(s) alignée(s).`;
-  }
+  const summary =
+    `Setup ${dirWord} sur ${symbol} ${timeframe} — confiance ${confidenceLabel.toLowerCase()} ` +
+    `(${confidenceScore}%). Entrée ${fmt(tradePlan.entry)}, stop ${fmt(tradePlan.stopLoss)}, ` +
+    `TP1 ${fmt(tradePlan.takeProfit1)} (R:R ${tradePlan.riskRewardRatio || '—'}). ` +
+    `${positives.length} confluence(s) alignée(s). ${dataNote}`;
 
   // --- Step-by-step reasoning ----------------------------------------------
   const decisionStep =
-    verdict === 'WAIT'
-      ? `Étape 5 — Décision : WAIT (${confidenceScore}%). Zone suggérée : ${fmt(tradePlan.entry)}. ${waitReason}`.trim()
-      : verdict === 'NO_TRADE'
-        ? `Étape 5 — Décision : NO_TRADE. Règle métier : confiance < 70 % ⇒ pas de trade (${confidenceScore}%).`
-        : `Étape 5 — Décision : ${verdict} à ${confidenceScore}% ; plan entrée ${fmt(tradePlan.entry)} / stop ${fmt(tradePlan.stopLoss)} / TP ${fmt(tradePlan.takeProfit1)}.`;
+    `Étape 5 — Décision : ${verdict} à ${confidenceScore}% (${confidenceLabel}) ; ` +
+    `plan entrée ${fmt(tradePlan.entry)} / stop ${fmt(tradePlan.stopLoss)} / TP ${fmt(tradePlan.takeProfit1)}.`;
   const reasoning = [
     `Étape 1 — Perception : ${perception?.candles?.length || 0} bougie(s), ` +
       `${perception?.drawnObjects?.length || 0} objet(s) dessiné(s), ` +
@@ -74,18 +76,20 @@ export const explain = ({ perception, reading, decision }) => {
   ];
 
   // --- Reasons / confluences / risks ---------------------------------------
-  // A live trade (BUY/SELL) is validated by its positive confluences; WAIT and
-  // legacy NO_TRADE carry no validation (there is no active entry yet).
-  const isLive = verdict === 'BUY' || verdict === 'SELL';
-  const validationReasons = isLive ? positives.map((p) => p.reason) : [];
+  // A directional trade is validated by its positive confluences.
+  const validationReasons = positives.map((p) => p.reason);
   const confluences = reading?.confluences?.length
     ? reading.confluences
     : positives.map((p) => p.reason);
   const risks = [
     ...(reading?.risks || []),
     ...negatives.map((n) => n.reason),
-    ...(verdict === 'WAIT'
-      ? ['Entrer maintenant (hors zone optimale) expose à un stop-hunt / une liquidation']
+    // Honesty on a low-confidence forced direction.
+    ...(confidenceScore < 50
+      ? ['Confiance faible : confluences limitées — réduire la taille de position']
+      : []),
+    ...(market && !market.isRealData
+      ? ['Données de marché simulées — vérifier les niveaux sur votre plateforme avant d’exécuter']
       : []),
   ];
   const weaknesses = reading?.weaknesses || [];
@@ -105,10 +109,14 @@ export const explain = ({ perception, reading, decision }) => {
 
   const header = {
     symbol,
-    market: ctx.market || 'unknown',
+    market: market?.market || ctx.market || 'unknown',
     timeframe,
     broker: ctx.platform || 'Unknown',
-    currentPrice: ctx.currentPrice ?? null,
+    // Prefer the live price when we have real data; else the perceived price.
+    currentPrice:
+      market?.isRealData && market?.quote?.price != null
+        ? market.quote.price
+        : ctx.currentPrice ?? null,
   };
 
   return { header, report };

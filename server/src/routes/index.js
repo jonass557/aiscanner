@@ -11,6 +11,7 @@ import economicNewsRoutes from './economicNewsRoutes.js';
 import voiceRoutes from './voiceRoutes.js';
 import assistantRoutes from './assistantRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
+import marketRoutes from './marketRoutes.js';
 
 /**
  * Root API router. Mounts each domain's routes under /api/v1.
@@ -29,6 +30,7 @@ router.use('/opportunities', opportunityRoutes);
 router.use('/voice', voiceRoutes);
 router.use('/assistant', assistantRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/', marketRoutes); // /market/snapshot
 router.use('/', multiTimeframeRoutes); // /multi-timeframe-scan + /multi-timeframe-analyses
 router.use('/', tradeValidatorRoutes); // /trade-validator + /trade-validations
 router.use('/', economicNewsRoutes); // /economic-news
