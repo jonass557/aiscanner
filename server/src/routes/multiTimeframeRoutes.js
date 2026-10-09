@@ -6,19 +6,18 @@ import { scanLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
-router.use(protect);
-
 // Multi-timeframe scan (verified users, rate-limited, multi-image upload).
 router.post(
   '/multi-timeframe-scan',
+  protect,
   requireVerified,
   scanLimiter,
   handleMultiUpload,
   mtfController.scanMultiTimeframe
 );
 
-router.get('/multi-timeframe-analyses', mtfController.listMultiTimeframe);
-router.get('/multi-timeframe-analyses/:id', mtfController.getMultiTimeframe);
-router.delete('/multi-timeframe-analyses/:id', mtfController.deleteMultiTimeframe);
+router.get('/multi-timeframe-analyses', protect, mtfController.listMultiTimeframe);
+router.get('/multi-timeframe-analyses/:id', protect, mtfController.getMultiTimeframe);
+router.delete('/multi-timeframe-analyses/:id', protect, mtfController.deleteMultiTimeframe);
 
 export default router;

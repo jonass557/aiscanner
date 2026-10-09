@@ -19,6 +19,7 @@ export const scanApi = {
   scan: (formData, onUploadProgress) =>
     api.post('/scan', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 90000,
       onUploadProgress,
     }),
 };
@@ -33,6 +34,7 @@ export const multiTimeframeApi = {
   scan: (formData, onUploadProgress) =>
     api.post('/multi-timeframe-scan', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 90000,
       onUploadProgress,
     }),
   list: (params) => api.get('/multi-timeframe-analyses', { params }),
@@ -61,7 +63,9 @@ export const tradeValidatorApi = {
     api.post(
       '/trade-validator',
       data,
-      data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}
+      data instanceof FormData
+        ? { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 }
+        : { timeout: 90000 }
     ),
   list: (params) => api.get('/trade-validations', { params }),
   get: (id) => api.get(`/trade-validations/${id}`),

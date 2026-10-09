@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireDbConnection } from '../middleware/dbCheck.js';
 import authRoutes from './authRoutes.js';
 import scanRoutes from './scanRoutes.js';
 import userRoutes from './userRoutes.js';
@@ -22,18 +23,22 @@ router.get('/', (req, res) => {
   res.json({ success: true, message: 'AI Chart Scanner API v1', docs: '/api/v1/docs' });
 });
 
-router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
-router.use('/admin', adminRoutes);
-router.use('/mentor', mentorRoutes);
-router.use('/opportunities', opportunityRoutes);
-router.use('/voice', voiceRoutes);
-router.use('/assistant', assistantRoutes);
-router.use('/payments', paymentRoutes);
+// Market snapshot does not require the DB (connects directly to Binance/TwelveData)
 router.use('/', marketRoutes); // /market/snapshot
-router.use('/', multiTimeframeRoutes); // /multi-timeframe-scan + /multi-timeframe-analyses
-router.use('/', tradeValidatorRoutes); // /trade-validator + /trade-validations
-router.use('/', economicNewsRoutes); // /economic-news
-router.use('/', scanRoutes); // /scan and /analyses live at the root of v1
+
+// All routes below require an active MongoDB connection
+router.use('/auth', requireDbConnection, authRoutes);
+router.use('/users', requireDbConnection, userRoutes);
+router.use('/admin', requireDbConnection, adminRoutes);
+router.use('/mentor', requireDbConnection, mentorRoutes);
+router.use('/opportunities', requireDbConnection, opportunityRoutes);
+router.use('/voice', requireDbConnection, voiceRoutes);
+router.use('/assistant', requireDbConnection, assistantRoutes);
+router.use('/payments', requireDbConnection, paymentRoutes);
+router.use('/', requireDbConnection, multiTimeframeRoutes); // /multi-timeframe-scan + /multi-timeframe-analyses
+router.use('/', requireDbConnection, tradeValidatorRoutes); // /trade-validator + /trade-validations
+router.use('/', requireDbConnection, economicNewsRoutes); // /economic-news
+router.use('/', requireDbConnection, scanRoutes); // /scan and /analyses live at the root of v1
 
 export default router;
+

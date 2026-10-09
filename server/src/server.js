@@ -14,15 +14,6 @@ import { isRealProviderConfigured } from './services/ai/index.js';
  */
 const start = async () => {
   try {
-    await connectDB();
-
-    // Seed subscription plans into the DB on first boot (idempotent).
-    await seedPlans();
-
-    // Overlay admin-edited runtime settings (API keys, active providers) onto
-    // config. Env remains the fallback; DB values override when present.
-    await hydrateSettings();
-
     const app = createApp();
     const server = app.listen(config.port, () => {
       logger.info(`Server running in ${config.env} mode on port ${config.port}`);
@@ -49,11 +40,32 @@ const start = async () => {
       );
     });
 
-    // Start background jobs (skipped in test env).
-    if (!config.isTest) {
-      startScanner();
-      startCalendarRefresh();
-    }
+    let isInitialized = false;
+
+    const initServices = async () => {
+      if (isInitialized) return;
+      try {
+        await connectDB();
+        // Seed subscription plans into the DB on first boot (idempotent).
+        await seedPlans();
+        // Overlay admin-edited runtime settings onto config.
+        await hydrateSettings();
+
+        // Start background jobs (skipped in test env).
+        if (!config.isTest) {
+          startScanner();
+          startCalendarRefresh();
+        }
+        isInitialized = true;
+        logger.info('Database and services successfully initialized.');
+      } catch (error) {
+        logger.warn(`Database connection failed: ${error.message}. Retrying in 5 seconds...`);
+        setTimeout(initServices, 5000).unref();
+      }
+    };
+
+    // Kick off DB connection and service initialization in background
+    initServices();
 
     const shutdown = async (signal) => {
       logger.info(`${signal} received, shutting down gracefully...`);

@@ -4,10 +4,7 @@ import { protect } from '../middleware/auth.js';
 
 const router = Router();
 
-// All market-data routes require authentication.
-router.use(protect);
-
 // Live snapshot (quote + candles) for the real-time chart on the scanner result.
-router.get('/market/snapshot', marketController.getSnapshot);
+router.get('/market/snapshot', protect, marketController.getSnapshot);
 
 export default router;

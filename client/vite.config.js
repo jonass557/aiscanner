@@ -9,8 +9,23 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:5000',
         changeOrigin: true,
+        timeout: 10000,
+        proxyTimeout: 10000,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, res) => {
+            if (res && !res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  success: false,
+                  message: 'Le serveur backend est inaccessible. Assurez-vous qu\'il est lancé (sur le port 5000).',
+                })
+              );
+            }
+          });
+        },
       },
     },
   },

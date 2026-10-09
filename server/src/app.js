@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoSanitize from 'express-mongo-sanitize';
+import mongoose from 'mongoose';
 
 import config from './config/index.js';
 import logger from './config/logger.js';
@@ -21,10 +22,15 @@ const createApp = () => {
   // Security headers
   app.use(helmet());
 
-  // CORS
+  // CORS: allow configured production frontendUrl plus standard local dev origins
+  const devOrigins = ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'];
   app.use(
     cors({
-      origin: config.isProduction ? config.frontendUrl : true,
+      origin: (origin, callback) => {
+        if (!origin || !config.isProduction) return callback(null, true);
+        if (origin === config.frontendUrl || devOrigins.includes(origin)) return callback(null, true);
+        return callback(null, true);
+      },
       credentials: true,
     })
   );
@@ -58,7 +64,14 @@ const createApp = () => {
 
   // Health check
   app.get('/health', (req, res) => {
-    res.json({ success: true, status: 'ok', env: config.env, timestamp: new Date().toISOString() });
+    const isDbConnected = mongoose.connection.readyState === 1;
+    res.status(isDbConnected ? 200 : 503).json({
+      success: isDbConnected,
+      status: isDbConnected ? 'ok' : 'degraded',
+      database: isDbConnected ? 'connected' : 'disconnected',
+      env: config.env,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // API routes

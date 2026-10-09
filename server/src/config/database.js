@@ -9,10 +9,14 @@ import logger from './logger.js';
 export const connectDB = async () => {
   try {
     mongoose.set('strictQuery', true);
+    // Disable command buffering so queries immediately fail if DB is not connected
+    // instead of hanging for 60 seconds (which triggers client timeout 60000ms).
+    mongoose.set('bufferCommands', false);
 
     const conn = await mongoose.connect(config.mongo.uri, {
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });
 
@@ -28,7 +32,8 @@ export const connectDB = async () => {
 
     return conn;
   } catch (error) {
-    logger.error(`MongoDB connection failed: ${error.message}`);
+    logger.error(`MongoDB connection failed (${config.mongo.uri}): ${error.message}`);
+    logger.warn('Conseil MongoDB Atlas : vérifiez que l\'accès réseau est autorisé (IP 0.0.0.0/0) dans Atlas -> Network Access et que le cluster est bien actif.');
     throw error;
   }
 };
