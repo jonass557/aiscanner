@@ -68,7 +68,7 @@ export default function Pricing() {
                 </ul>
 
                 <Link
-                  to="/register"
+                  to="/register?join=true"
                   className={`mt-8 text-center ${highlighted ? 'btn-primary' : 'btn-secondary'}`}
                 >
                   {plan.price === 0 ? 'Start free' : `Get ${plan.name}`}

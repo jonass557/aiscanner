@@ -216,7 +216,7 @@ export default function ToolsShowcase() {
 
               <div className="pt-4">
                 <Link
-                  to="/register"
+                  to="/register?join=true"
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 transition hover:brightness-110 active:scale-95"
                 >
                   Essayer {activeTool.name} gratuitement <ArrowRight className="h-4 w-4" />

@@ -6,13 +6,14 @@ import { useTheme } from '../../context/ThemeContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const NAV_LINKS = [
-  { label: 'Features', href: '#features' },
-  { label: 'How it works', href: '#how' },
-  { label: 'Pricing', href: '#pricing' },
+  { label: 'Outils IA', href: '#tools' },
+  { label: 'Fonctionnalités', href: '#features' },
+  { label: 'Comment ça marche', href: '#how' },
+  { label: 'Tarifs', href: '#pricing' },
   { label: 'FAQ', href: '#faq' },
 ];
 
-/** Sticky, translucent navigation bar for the landing page. */
+/** Navigation bar for public landing page. */
 export default function PublicNavbar() {
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -44,8 +45,8 @@ export default function PublicNavbar() {
             <Link to="/dashboard" className="btn-primary">Dashboard</Link>
           ) : (
             <>
-              <Link to="/login" className="btn-ghost">Log in</Link>
-              <Link to="/register" className="btn-primary">Get started</Link>
+              <Link to="/login" className="btn-ghost">Connexion</Link>
+              <Link to="/register?join=true" className="btn-primary">Commencer Gratuitement</Link>
             </>
           )}
         </div>
@@ -67,8 +68,8 @@ export default function PublicNavbar() {
             </a>
           ))}
           <div className="flex gap-2 pt-2">
-            <Link to="/login" className="btn-secondary flex-1">Log in</Link>
-            <Link to="/register" className="btn-primary flex-1">Get started</Link>
+            <Link to="/login" className="btn-secondary flex-1">Connexion</Link>
+            <Link to="/register?join=true" className="btn-primary flex-1">Commencer Gratuitement</Link>
           </div>
         </motion.div>
       )}

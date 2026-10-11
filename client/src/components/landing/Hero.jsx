@@ -54,7 +54,7 @@ export default function Hero() {
           className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
           <Link
-            to="/register"
+            to="/register?join=true"
             className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-8 py-3.5 text-base font-bold text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:brightness-110 active:scale-95"
           >
             Commencer Gratuitement <ArrowRight className="h-5 w-5" />

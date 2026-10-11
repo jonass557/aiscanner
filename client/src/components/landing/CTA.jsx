@@ -22,7 +22,7 @@ export default function CTA() {
             Get 5 free analyses every month. No credit card required. Upgrade anytime.
           </p>
           <Link
-            to="/register"
+            to="/register?join=true"
             className="relative mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 font-semibold text-brand-700 shadow-lg transition hover:brightness-95"
           >
             Start scanning free <ArrowRight className="h-5 w-5" />

@@ -22,7 +22,7 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(form);
-      toast.success('Welcome back!');
+      toast.success('Ravi de vous revoir !');
       navigate(user.role === 'admin' ? '/admin' : from, { replace: true });
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -33,29 +33,29 @@ export default function Login() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Log in to continue analyzing your charts."
+      title="Connexion à votre espace"
+      subtitle="Connectez-vous pour analyser vos graphiques et accéder à vos IA."
       footer={
         <>
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="font-semibold text-brand-600 hover:underline">
-            Sign up
+          Vous n&apos;avez pas encore de compte ?{' '}
+          <Link to="/register?join=true" className="font-semibold text-cyan-400 hover:underline">
+            Créer un compte
           </Link>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <Input
-          label="Email"
+          label="Adresse Email"
           type="email"
           icon={Mail}
-          placeholder="you@example.com"
+          placeholder="vous@example.com"
           required
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
         />
         <Input
-          label="Password"
+          label="Mot de passe"
           type="password"
           icon={Lock}
           placeholder="••••••••"
@@ -64,12 +64,12 @@ export default function Login() {
           onChange={(e) => setForm({ ...form, password: e.target.value })}
         />
         <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-sm text-brand-600 hover:underline">
-            Forgot password?
+          <Link to="/forgot-password" className="text-xs text-cyan-400 hover:underline">
+            Mot de passe oublié ?
           </Link>
         </div>
-        <Button type="submit" loading={loading} className="w-full">
-          Log in
+        <Button type="submit" variant="primary" loading={loading} className="w-full">
+          Se connecter
         </Button>
       </form>
     </AuthShell>
