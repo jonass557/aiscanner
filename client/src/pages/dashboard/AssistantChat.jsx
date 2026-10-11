@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Bot, Plus, Send, Trash2, MessageSquare, Menu, Mic, MicOff, Sparkles,
+  Bot, Plus, Send, Trash2, MessageSquare, Menu, Mic, MicOff, Sparkles, Volume2, VolumeX,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
@@ -51,6 +51,25 @@ export default function AssistantChat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages.length, sending]);
 
+  const [ttsOn, setTtsOn] = useState(true);
+
+  const {
+    supported: micSupported,
+    synthSupported,
+    listening,
+    speaking,
+    interim,
+    handsFree,
+    toggleHandsFree,
+    startListening,
+    stopListening,
+    speak,
+    cancelSpeech,
+  } = useSpeech({
+    lang: 'fr-FR',
+    onResult: (t) => send(t),
+  });
+
   const send = useCallback(
     async (text) => {
       const clean = String(text || '').trim();
@@ -81,6 +100,9 @@ export default function AssistantChat() {
             isRealData: res.isRealData,
           },
         ]);
+        if (ttsOn && res.reply) {
+          speak(res.reply);
+        }
         loadList();
       } catch (err) {
         toast.error(getErrorMessage(err));
@@ -92,13 +114,8 @@ export default function AssistantChat() {
         setSending(false);
       }
     },
-    [conversationId, sending, loadList]
+    [conversationId, sending, loadList, ttsOn, speak]
   );
-
-  const { supported: micSupported, listening, interim, startListening, stopListening } = useSpeech({
-    lang: 'fr-FR',
-    onResult: (t) => send(t),
-  });
 
   const newConversation = () => {
     setConversationId(null);
@@ -184,8 +201,38 @@ export default function AssistantChat() {
             </span>
             <div>
               <span className="font-semibold">AI Trading Assistant</span>
-              <p className="text-[11px] text-gray-500">Analyse temps réel · langage naturel</p>
+              <p className="text-[11px] text-gray-500">Analyse temps réel · dialogue vocal continu</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {micSupported && (
+              <button
+                type="button"
+                onClick={toggleHandsFree}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  handsFree
+                    ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300 animate-pulse'
+                    : 'border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-white'
+                }`}
+                title="Activer le mode mains-libres pour parler en continu sans toucher le micro"
+              >
+                <span className={`h-2 w-2 rounded-full ${handsFree ? 'bg-cyan-400' : 'bg-slate-500'}`} />
+                {handsFree ? 'Mains Libres Activé' : 'Mode Mains Libres'}
+              </button>
+            )}
+            {synthSupported && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (ttsOn) cancelSpeech();
+                  setTtsOn(!ttsOn);
+                }}
+                className="btn-ghost !px-2"
+                title={ttsOn ? 'Couper la voix' : 'Activer la voix'}
+              >
+                {ttsOn ? <Volume2 className="h-5 w-5 text-cyan-400" /> : <VolumeX className="h-5 w-5 text-gray-400" />}
+              </button>
+            )}
           </div>
         </div>
 

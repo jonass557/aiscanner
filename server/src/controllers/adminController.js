@@ -316,10 +316,17 @@ export const testProvider = asyncHandler(async (req, res) => {
       ok = r.status !== 401 && r.status !== 403;
       message = ok ? 'Connection successful.' : 'Authentication failed (invalid key).';
     } else if (provider === 'gemini') {
-      const model = settingsService.getValue('ai.gemini.model') || 'gemini-1.5-pro';
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${apiKey}`);
+      const t0 = Date.now();
+      const model = settingsService.getValue('ai.gemini.model') || 'gemini-3.8-flash';
+      // Test listing models with key or checking model endpoint
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      const latency = Date.now() - t0;
       ok = r.ok;
-      message = r.ok ? 'Connection successful.' : `Provider returned HTTP ${r.status}.`;
+      message = r.ok
+        ? `Connexion réussie ! Clé Gemini valide et active (latence: ${latency}ms, modèle: ${model}).`
+        : `Gemini a retourné le code HTTP ${r.status}. Vérifiez votre clé API.`;
     } else {
       throw ApiError.badRequest('Unknown provider.');
     }

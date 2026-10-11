@@ -1,0 +1,36 @@
+name: CI & Deployment Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Test Server Build
+        run: |
+          cd server
+          npm ci || npm install
+          node -e "console.log('Server dependencies valid')"
+
+      - name: Test Client Build (Vercel Simulation)
+        run: |
+          cd client
+          npm ci || npm install
+          npm run build

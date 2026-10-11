@@ -69,8 +69,19 @@ export default function VoiceAssistant() {
     [conversationId, processing, ttsOn, navigate]
   );
 
-  const { supported, synthSupported, listening, speaking, interim, startListening, stopListening, speak, cancelSpeech } =
-    useSpeech({ lang: 'fr-FR', onResult: send });
+  const {
+    supported,
+    synthSupported,
+    listening,
+    speaking,
+    interim,
+    handsFree,
+    toggleHandsFree,
+    startListening,
+    stopListening,
+    speak,
+    cancelSpeech,
+  } = useSpeech({ lang: 'fr-FR', onResult: send });
 
   const loadList = useCallback(async () => {
     try {
@@ -190,11 +201,27 @@ export default function VoiceAssistant() {
             <Mic className="h-5 w-5 text-brand-500" />
             <span className="font-semibold">Voice Assistant</span>
           </div>
-          {synthSupported && (
-            <button onClick={toggleTts} className="btn-ghost !px-2" title={ttsOn ? 'Couper la voix' : 'Activer la voix'}>
-              {ttsOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5 text-gray-400" />}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {supported && (
+              <button
+                onClick={toggleHandsFree}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  handsFree
+                    ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300 animate-pulse'
+                    : 'border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-white'
+                }`}
+                title="Activer le mode mains-libres pour parler en continu sans appuyer"
+              >
+                <span className={`h-2 w-2 rounded-full ${handsFree ? 'bg-cyan-400' : 'bg-slate-500'}`} />
+                {handsFree ? 'Mains Libres Activé' : 'Mode Mains Libres'}
+              </button>
+            )}
+            {synthSupported && (
+              <button onClick={toggleTts} className="btn-ghost !px-2" title={ttsOn ? 'Couper la voix' : 'Activer la voix'}>
+                {ttsOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5 text-gray-400" />}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Messages */}

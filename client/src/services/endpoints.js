@@ -46,14 +46,14 @@ export const opportunityApi = {
   list: (params) => api.get('/opportunities', { params }),
   meta: () => api.get('/opportunities/meta'),
   get: (id) => api.get(`/opportunities/${id}`),
-  scan: (payload) => api.post('/opportunities/scan', payload),
+  scan: (payload) => api.post('/opportunities/scan', payload, { timeout: 90000 }),
 };
 
 export const mentorApi = {
   conversations: () => api.get('/mentor/conversations'),
   createConversation: (payload) => api.post('/mentor/conversations', payload),
   getConversation: (id) => api.get(`/mentor/conversations/${id}`),
-  sendMessage: (id, payload) => api.post(`/mentor/conversations/${id}/message`, payload),
+  sendMessage: (id, payload) => api.post(`/mentor/conversations/${id}/message`, payload, { timeout: 90000 }),
   deleteConversation: (id) => api.delete(`/mentor/conversations/${id}`),
 };
 
@@ -79,7 +79,7 @@ export const economicNewsApi = {
 };
 
 export const voiceApi = {
-  command: (payload) => api.post('/voice/command', payload),
+  command: (payload) => api.post('/voice/command', payload, { timeout: 90000 }),
   conversations: (params) => api.get('/voice/conversations', { params }),
   getConversation: (id) => api.get(`/voice/conversations/${id}`),
   deleteConversation: (id) => api.delete(`/voice/conversations/${id}`),
@@ -89,7 +89,7 @@ export const assistantApi = {
   conversations: (params) => api.get('/assistant/conversations', { params }),
   createConversation: (payload) => api.post('/assistant/conversations', payload),
   getConversation: (id) => api.get(`/assistant/conversations/${id}`),
-  sendMessage: (id, payload) => api.post(`/assistant/conversations/${id}/message`, payload),
+  sendMessage: (id, payload) => api.post(`/assistant/conversations/${id}/message`, payload, { timeout: 90000 }),
   deleteConversation: (id) => api.delete(`/assistant/conversations/${id}`),
 };
 

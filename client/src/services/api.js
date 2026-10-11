@@ -9,7 +9,7 @@ const api = axios.create({
   // production, VITE_API_URL points at the Render backend (e.g.
   // https://api.your-app.com) and we append the /api/v1 prefix.
   baseURL: `${import.meta.env.VITE_API_URL || ''}/api/v1`,
-  timeout: 15000,
+  timeout: 60000,
 });
 
 const TOKEN_KEY = 'acs_access_token';
@@ -92,7 +92,7 @@ api.interceptors.response.use(
 /** Normalizes an axios error into a human-readable message. */
 export const getErrorMessage = (error) => {
   if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
-    return 'Délai d\'attente dépassé (timeout). Le serveur ou la base de données ne répond pas. Vérifiez la connexion.';
+    return "Délai d'attente dépassé (timeout). L'analyse IA prend plus de temps que prévu ou le réseau est saturé. Veuillez réessayer.";
   }
   if (!error.response && error.message === 'Network Error') {
     return 'Impossible de joindre le serveur. Vérifiez votre connexion et assurez-vous que le serveur backend est démarré.';
