@@ -9,7 +9,7 @@ const api = axios.create({
   // production, VITE_API_URL points at the Render backend (e.g.
   // https://api.your-app.com) and we append the /api/v1 prefix.
   baseURL: `${import.meta.env.VITE_API_URL || ''}/api/v1`,
-  timeout: 60000,
+  timeout: 90000,
 });
 
 const TOKEN_KEY = 'acs_access_token';
