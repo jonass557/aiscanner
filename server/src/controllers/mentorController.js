@@ -139,9 +139,12 @@ export const sendMessage = asyncHandler(async (req, res) => {
       .slice(-CONTEXT_WINDOW)
       .map((m) => ({ role: m.role, content: m.content }));
 
+    const userLang = req.body.lang || req.user.preferences?.language || 'fr';
+
     const { reply, meta } = await mentorReply({
       messages: history,
       level: conversation.level,
+      lang: userLang,
     });
 
     const replyText = reply || 'Sorry, I could not generate a response. Please try rephrasing your question.';

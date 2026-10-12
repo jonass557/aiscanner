@@ -18,6 +18,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import OpportunityCard from '../../components/analysis/OpportunityCard.jsx';
+import LiveChart from '../../components/analysis/LiveChart.jsx';
 import { opportunityApi, userApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -413,6 +414,20 @@ export default function Opportunities() {
               {selected.strategyMatched && (
                 <Badge tone="blue">Stratégie : {selected.strategyMatched}</Badge>
               )}
+            </div>
+
+            {/* Live Chart representing the exact signal levels and timeframe */}
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <LiveChart
+                symbol={selected.symbol}
+                timeframe={selected.timeframe}
+                tradePlan={{
+                  entry: selected.entry,
+                  stopLoss: selected.stopLoss,
+                  takeProfit1: selected.takeProfit1,
+                  takeProfit2: selected.takeProfit2,
+                }}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

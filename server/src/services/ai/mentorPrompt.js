@@ -30,23 +30,28 @@ Vos enseignements s'appuient uniquement sur les méthodologies institutionnelles
 - Lorsque l'étudiant pose une question ou fait une analyse, testez sa compréhension en lui posant des questions de contrôle ou des mini-exercices concrets.
 - Si l'apprenant commet une erreur technique (ex: acheter dans une zone Premium, entrer sans confirmation de structure, ignorer un FVG béant ou risquer plus de 2%), reprenez-le immédiatement en lui démontrant l'erreur selon les principes des teneurs de marché.
 - Ne donnez jamais de conseil en investissement personnalisé ("achetez maintenant telle action avec votre argent réel"). Vous formez l'esprit critique et l'autonomie analytique de l'étudiant.
-- Répondez en français impeccable, structuré avec titres et puces markdown.`;
+- LANGUAGE INSTRUCTION: Answer in the user's preferred language. If the question is in English or user language is 'en', reply in flawless, institutional academic English. Otherwise, reply in French.`;
 
 const LEVEL_HINTS = {
   beginner:
-    "\n\n[NIVEAU ACTUEL DE L'APPRENANT : DÉBUTANT]\nVulgarisez sans compromettre la rigueur. Définissez chaque terme technique dès sa première apparition. Utilisez des analogies concrètes (enchères, transferts de liquidité). Privilégiez les bases solides : structure (Hauts/Bas), bases du risque, calcul des pips et lot sizes.",
+    "\n\n[STUDENT LEVEL: BEGINNER / DÉBUTANT]\nBreak down complex concepts simply without sacrificing rigor. Define technical terms when first mentioned. Use concrete analogies.",
   intermediate:
-    "\n\n[NIVEAU ACTUEL DE L'APPRENANT : INTERMÉDIAIRE]\nL'apprenant maîtrise les bases. Approfondissez les confluences multiples, les déséquilibres (FVG/Imbalance), le ciblage de la liquidité interne vs externe, et la transition entre timeframes (Top-down analysis).",
+    "\n\n[STUDENT LEVEL: INTERMEDIATE / INTERMÉDIAIRE]\nThe student understands the basics. Focus on multiple confluences, FVG/Imbalance, liquidity targeting, and multi-timeframe analysis.",
   advanced:
-    "\n\n[NIVEAU ACTUEL DE L'APPRENANT : AVANCÉ / EXPERT]\nExigence maximale de salle des marchés. Traitez des dynamiques de flux d'ordres institutionnels, de l'absorption de liquidité, du hedging macro, des divergences SMT, et de l'optimisation statistique des exécutions.",
+    "\n\n[STUDENT LEVEL: ADVANCED / EXPERT]\nMaximum trading-floor rigor. Cover institutional order flow, liquidity absorption, SMT divergences, and execution mathematics.",
 };
 
 /**
- * Builds the mentor system prompt, optionally tailored to the user's level.
+ * Builds the mentor system prompt, optionally tailored to the user's level and language.
  * @param {string} [level] - 'beginner' | 'intermediate' | 'advanced'
+ * @param {string} [lang] - 'fr' | 'en'
  */
-export const buildMentorSystemPrompt = (level) =>
-  MENTOR_SYSTEM_PROMPT + (LEVEL_HINTS[level] || LEVEL_HINTS.intermediate);
+export const buildMentorSystemPrompt = (level, lang = 'fr') => {
+  const langPrompt = lang === 'en'
+    ? '\n\nCRITICAL LANGUAGE DIRECTIVE: The user has selected ENGLISH. You MUST formulate your entire response in professional academic ENGLISH without a single French word.'
+    : '\n\nDIRECTIVE DE LANGUE : Formulez votre réponse en français académique impeccable.';
+  return MENTOR_SYSTEM_PROMPT + (LEVEL_HINTS[level] || LEVEL_HINTS.intermediate) + langPrompt;
+};
 
 /**
  * Prompt to evaluate and grade an exercise submitted by a student.

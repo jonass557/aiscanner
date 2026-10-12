@@ -19,6 +19,8 @@ const AssistantChat = lazy(() => import('./pages/dashboard/AssistantChat.jsx'));
 const Scanner = lazy(() => import('./pages/dashboard/Scanner.jsx'));
 const MultiTimeframe = lazy(() => import('./pages/dashboard/MultiTimeframe.jsx'));
 const Opportunities = lazy(() => import('./pages/dashboard/Opportunities.jsx'));
+const TradingJournal = lazy(() => import('./pages/dashboard/TradingJournal.jsx'));
+const Backtesting = lazy(() => import('./pages/dashboard/Backtesting.jsx'));
 const Mentor = lazy(() => import('./pages/dashboard/Mentor.jsx'));
 const TradeValidator = lazy(() => import('./pages/dashboard/TradeValidator.jsx'));
 const EconomicNews = lazy(() => import('./pages/dashboard/EconomicNews.jsx'));
@@ -64,6 +66,8 @@ export default function App() {
           <Route path="scanner" element={<Scanner />} />
           <Route path="multi-timeframe" element={<MultiTimeframe />} />
           <Route path="opportunities" element={<Opportunities />} />
+          <Route path="journal" element={<TradingJournal />} />
+          <Route path="backtesting" element={<Backtesting />} />
           <Route path="mentor" element={<Mentor />} />
           <Route path="trade-validator" element={<TradeValidator />} />
           <Route path="economic-news" element={<EconomicNews />} />

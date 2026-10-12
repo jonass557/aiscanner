@@ -19,6 +19,7 @@ export default function Scanner() {
   const [preview, setPreview] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState(null);
   const [market, setMarket] = useState(null);
   const [customStrategy, setCustomStrategy] = useState('');

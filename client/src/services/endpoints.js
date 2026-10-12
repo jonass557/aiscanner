@@ -115,6 +115,13 @@ export const analysisApi = {
   getChat: (id) => api.get(`/analyses/${id}/chat`),
 };
 
+export const journalApi = {
+  list: (params) => api.get('/journal', { params }),
+  create: (payload) => api.post('/journal', payload),
+  update: (id, payload) => api.patch(`/journal/${id}`, payload),
+  remove: (id) => api.delete(`/journal/${id}`),
+};
+
 export const userApi = {
   plans: () => api.get('/users/plans'),
   updateProfile: (payload) => api.patch('/users/profile', payload),

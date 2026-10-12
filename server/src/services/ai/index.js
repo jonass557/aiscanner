@@ -217,12 +217,12 @@ export const analyzeMultiTimeframe = async ({ images, timeframes, customStrategy
  * @param {string} [params.providerName]
  * @returns {Promise<{ reply: string, meta: Object }>}
  */
-export const mentorReply = async ({ messages, level, providerName }) => {
+export const mentorReply = async ({ messages, level, lang = 'fr', providerName }) => {
   const startedAt = Date.now();
 
   const { result: reply, provider } = await runWithFallback(providerName, (p) =>
     p.chat({
-      systemPrompt: buildMentorSystemPrompt(level),
+      systemPrompt: buildMentorSystemPrompt(level, lang),
       messages,
     })
   );
