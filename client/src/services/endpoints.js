@@ -56,6 +56,8 @@ export const mentorApi = {
   createConversation: (payload) => api.post('/mentor/conversations', payload),
   getConversation: (id) => api.get(`/mentor/conversations/${id}`),
   sendMessage: (id, payload) => api.post(`/mentor/conversations/${id}/message`, payload, { timeout: 90000 }),
+  submitExercise: (id, payload) => api.post(`/mentor/conversations/${id}/exercise/submit`, payload, { timeout: 90000 }),
+  selectLesson: (id, payload) => api.post(`/mentor/conversations/${id}/lesson/select`, payload),
   deleteConversation: (id) => api.delete(`/mentor/conversations/${id}`),
 };
 

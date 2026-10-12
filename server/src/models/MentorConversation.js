@@ -14,6 +14,48 @@ const messageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const exerciseSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: true },
+    context: { type: String, default: '' },
+    chartIllustration: { type: String, default: '' }, // ASCII/SVG or chart description
+    hint: { type: String, default: '' },
+    passingScore: { type: Number, default: 70 },
+  },
+  { _id: false }
+);
+
+const submissionSchema = new mongoose.Schema(
+  {
+    answer: { type: String, default: '' },
+    feedback: { type: String, default: '' },
+    score: { type: Number, default: null }, // 0 to 100
+    passed: { type: Boolean, default: false },
+    submittedAt: { type: Date, default: null },
+    evaluatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const lessonSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    title: { type: String, required: true },
+    description: { type: String, default: '' },
+    objectives: [{ type: String }],
+    status: {
+      type: String,
+      enum: ['locked', 'available', 'in_progress', 'completed'],
+      default: 'locked',
+    },
+    exercise: exerciseSchema,
+    submission: submissionSchema,
+    chartIllustration: { type: String, default: '' },
+    completedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const mentorConversationSchema = new mongoose.Schema(
   {
     userId: {
@@ -25,7 +67,7 @@ const mentorConversationSchema = new mongoose.Schema(
     title: { type: String, default: 'New conversation' },
     topic: {
       type: String,
-      enum: ['smc', 'ict', 'price-action', 'risk-management', 'psychology', 'general'],
+      enum: ['smc', 'ict', 'price-action', 'risk-management', 'psychology', 'institutional_orderflow', 'general'],
       default: 'general',
     },
     level: {
@@ -34,6 +76,13 @@ const mentorConversationSchema = new mongoose.Schema(
       default: 'intermediate',
     },
     messages: [messageSchema],
+    curriculum: [lessonSchema],
+    activeLessonIndex: { type: Number, default: 0 },
+    studentProgress: {
+      overallScore: { type: Number, default: 0 },
+      completedCount: { type: Number, default: 0 },
+      totalLessons: { type: Number, default: 0 },
+    },
   },
   {
     timestamps: true,

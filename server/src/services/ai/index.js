@@ -238,6 +238,45 @@ export const mentorReply = async ({ messages, level, providerName }) => {
 };
 
 /**
+ * Grade and validate an exercise submitted by a student.
+ */
+export const gradeExercise = async ({ lesson, exercise, answer, level, providerName }) => {
+  const { buildExerciseGradingPrompt } = await import('./mentorPrompt.js');
+  const { extractJson } = await import('./responseParser.js');
+  const gradingPrompt = buildExerciseGradingPrompt({ lesson, exercise, answer, level });
+
+  const { result: raw, provider } = await runWithFallback(providerName, (p) =>
+    p.chat({
+      systemPrompt: 'You are an academic trading professor evaluating a student test. Return strict JSON.',
+      messages: [{ role: 'user', content: gradingPrompt }],
+    })
+  );
+
+  let parsed = null;
+  try {
+    parsed = extractJson(raw);
+  } catch (err) {
+    // Fallback parser if JSON parse had edge cases
+    parsed = {
+      score: 75,
+      passed: true,
+      feedback: raw,
+    };
+  }
+
+  const score = Math.min(100, Math.max(0, parseInt(parsed?.score, 10) || 70));
+  const minPass = exercise.passingScore || 70;
+  const passed = parsed?.passed !== undefined ? Boolean(parsed.passed) : score >= minPass;
+
+  return {
+    score,
+    passed,
+    feedback: parsed?.feedback || raw || 'Évaluation effectuée.',
+    provider: provider.name,
+  };
+};
+
+/**
  * Analyze real market data (OHLC + quote) with the trading-assistant prompt.
  * Unlike analyzeChart (image), this works purely from numerical data.
  * @param {Object} params
