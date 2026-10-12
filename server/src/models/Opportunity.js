@@ -35,6 +35,14 @@ const opportunitySchema = new mongoose.Schema(
 
     rationale: String,
     confluences: [String],
+    strategyMatched: { type: String, default: 'SMC' }, // SMC, ICT, Price-Action, or Nom de la Stratégie Personnalisée
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    }, // null if global SMC scan, or specific user ID if custom strategy/plan scan
+    emailSent: { type: Boolean, default: false },
 
     status: {
       type: String,

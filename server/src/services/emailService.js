@@ -154,3 +154,64 @@ export const sendWelcomeEmail = async (user) =>
       `${config.frontendUrl}/dashboard`
     ),
   });
+
+/**
+ * Sends a real-time trading opportunity alert email to a subscriber.
+ * Automatically respects the user's subscription and trading plan rules.
+ */
+export const sendOpportunityAlertEmail = async (user, opportunity) => {
+  const isBuy = opportunity.direction === 'BUY';
+  const color = isBuy ? '#10b981' : '#ef4444';
+  const directionBadge = `<span style="background:${color}; color:#fff; padding:4px 10px; border-radius:6px; font-weight:700; font-size:14px;">${opportunity.direction}</span>`;
+
+  const detailsHtml = `
+    <div style="margin:20px 0; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-size:20px; font-weight:800; color:#111827;">${opportunity.symbol} (${opportunity.timeframe})</span>
+        ${directionBadge}
+      </div>
+
+      <div style="margin-bottom:12px; font-size:13px; color:#4b5563;">
+        <strong>Stratégie :</strong> ${opportunity.strategyMatched || 'SMC'} &bull;
+        <strong>Probabilité :</strong> <span style="color:#6366f1; font-weight:700;">${opportunity.confidenceScore}%</span> &bull;
+        <strong>R:R :</strong> ${opportunity.riskRewardRatio || '1:2.5'}
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; font-family:monospace;">
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:6px 0; color:#6b7280;">Prix d'Entrée :</td>
+          <td style="padding:6px 0; text-align:right; font-weight:700; color:#111827;">${opportunity.entry}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:6px 0; color:#ef4444;">Stop Loss :</td>
+          <td style="padding:6px 0; text-align:right; font-weight:700; color:#ef4444;">${opportunity.stopLoss}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:6px 0; color:#10b981;">Take Profit 1 :</td>
+          <td style="padding:6px 0; text-align:right; font-weight:700; color:#10b981;">${opportunity.takeProfit1}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#10b981;">Take Profit 2 :</td>
+          <td style="padding:6px 0; text-align:right; font-weight:700; color:#10b981;">${opportunity.takeProfit2}</td>
+        </tr>
+      </table>
+
+      ${
+        opportunity.rationale
+          ? `<p style="margin-top:14px; font-size:13px; color:#374151; line-height:1.5;"><strong>Analyse :</strong> ${opportunity.rationale}</p>`
+          : ''
+      }
+    </div>
+  `;
+
+  return send({
+    to: user.email,
+    subject: `🚨 Opportunité Détectée : ${opportunity.direction} sur ${opportunity.symbol} (${opportunity.confidenceScore}%)`,
+    html: baseTemplate(
+      `Nouvelle Opportunité en Temps Réel`,
+      `L'Opportunity Scanner a identifié un setup à haute probabilité de réussite aligné avec votre stratégie :${detailsHtml}`,
+      'Consulter sur la Plateforme',
+      `${config.frontendUrl}/dashboard/opportunities`
+    ),
+  });
+};

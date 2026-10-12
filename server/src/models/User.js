@@ -91,6 +91,9 @@ const userSchema = new mongoose.Schema(
         default: 'smc',
       },
       customStrategy: { type: String, default: '' }, // injected into the AI prompt when favoriteStrategy === 'custom'
+      customTradingPlan: { type: String, default: '' }, // detailed personal trading plan & execution guidelines
+      opportunityEmailAlerts: { type: Boolean, default: true }, // receive high-probability setups by email when active
+      minOpportunityConfidence: { type: Number, min: 70, max: 100, default: 80 }, // filter for email dispatch
       riskPercent: { type: Number, min: 0.1, max: 100, default: 1 },
       minRiskReward: { type: Number, min: 0.5, max: 20, default: 2 }, // e.g. 3 → require 1:3
       favoriteMarkets: { type: [String], default: [] }, // ['forex','crypto',...] or symbols

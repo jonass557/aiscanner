@@ -40,6 +40,9 @@ export default function OpportunityCard({ opportunity, onClick }) {
           <div className="flex items-center gap-2">
             <span className="font-bold">{o.symbol}</span>
             <Badge tone="purple">{marketLabel(o.market)}</Badge>
+            {o.strategyMatched && (
+              <Badge tone="blue">{o.strategyMatched}</Badge>
+            )}
           </div>
           <p className="mt-0.5 text-xs text-gray-500">{o.timeframe} · {SETUP_LABEL[o.setupType] || o.setupType}</p>
         </div>

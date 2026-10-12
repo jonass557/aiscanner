@@ -99,7 +99,10 @@ export const getPreferences = asyncHandler(async (req, res) => {
 const PREFERENCE_FIELDS = {
   level: (v) => (['beginner', 'intermediate', 'expert'].includes(v) ? v : undefined),
   favoriteStrategy: (v) => (['smc', 'ict', 'price-action', 'custom'].includes(v) ? v : undefined),
-  customStrategy: (v) => (typeof v === 'string' ? v.slice(0, 2000) : undefined),
+  customStrategy: (v) => (typeof v === 'string' ? v.slice(0, 3000) : undefined),
+  customTradingPlan: (v) => (typeof v === 'string' ? v.slice(0, 4000) : undefined),
+  opportunityEmailAlerts: (v) => (typeof v === 'boolean' ? v : Boolean(v)),
+  minOpportunityConfidence: (v) => (Number.isFinite(+v) ? Math.min(100, Math.max(70, +v)) : undefined),
   riskPercent: (v) => (Number.isFinite(+v) ? Math.min(100, Math.max(0.1, +v)) : undefined),
   minRiskReward: (v) => (Number.isFinite(+v) ? Math.min(20, Math.max(0.5, +v)) : undefined),
   favoriteMarkets: (v) => (Array.isArray(v) ? v.map(String).slice(0, 20) : undefined),

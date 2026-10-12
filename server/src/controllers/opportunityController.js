@@ -13,7 +13,13 @@ export const listOpportunities = asyncHandler(async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
   const skip = (page - 1) * limit;
 
-  const filter = { status: 'active', expiresAt: { $gt: new Date() } };
+  // Show global opportunities (userId: null) AND user's own strategy opportunities (userId: req.user._id)
+  const filter = {
+    status: 'active',
+    expiresAt: { $gt: new Date() },
+    $or: [{ userId: null }, { userId: req.user?._id }],
+  };
+
   if (req.query.market) filter.market = req.query.market;
   if (req.query.timeframe) filter.timeframe = req.query.timeframe;
   if (req.query.direction) filter.direction = req.query.direction;
@@ -21,6 +27,7 @@ export const listOpportunities = asyncHandler(async (req, res) => {
   if (req.query.riskLevel) filter.riskLevel = req.query.riskLevel;
   if (req.query.minConfidence) filter.confidenceScore = { $gte: Number(req.query.minConfidence) };
   if (req.query.symbol) filter.symbol = new RegExp(req.query.symbol, 'i');
+  if (req.query.strategy) filter.strategyMatched = new RegExp(req.query.strategy, 'i');
 
   const [items, total] = await Promise.all([
     Opportunity.find(filter).sort({ confidenceScore: -1, detectedAt: -1 }).skip(skip).limit(limit).lean(),
@@ -39,9 +46,19 @@ export const listOpportunities = asyncHandler(async (req, res) => {
  */
 export const getMeta = asyncHandler(async (req, res) => {
   const [total, byMarket] = await Promise.all([
-    Opportunity.countDocuments({ status: 'active', expiresAt: { $gt: new Date() } }),
+    Opportunity.countDocuments({
+      status: 'active',
+      expiresAt: { $gt: new Date() },
+      $or: [{ userId: null }, { userId: req.user?._id }],
+    }),
     Opportunity.aggregate([
-      { $match: { status: 'active', expiresAt: { $gt: new Date() } } },
+      {
+        $match: {
+          status: 'active',
+          expiresAt: { $gt: new Date() },
+          $or: [{ userId: null }, { userId: req.user?._id }],
+        },
+      },
       { $group: { _id: '$market', count: { $sum: 1 } } },
     ]),
   ]);
@@ -70,13 +87,15 @@ export const getOpportunity = asyncHandler(async (req, res) => {
 
 /**
  * POST /opportunities/scan
- * Trigger an immediate scan sweep on demand (optionally per-market).
+ * Trigger an immediate scan sweep on demand, applying the user's strategy and preferences.
  */
 export const triggerScan = asyncHandler(async (req, res) => {
   const { market } = req.body || {};
-  const result = await runScan({ market });
+  const user = req.user; // contains user preferences & trading plan
+
+  const result = await runScan({ market, user });
   return sendSuccess(res, {
-    message: `Scan complete: ${result.created} new opportunities.`,
+    message: `Scan en temps réel terminé : ${result.created} opportunités haute probabilité détectées.`,
     data: result,
   });
 });

@@ -10,7 +10,7 @@ router.get('/', opportunityController.listOpportunities);
 router.get('/meta', opportunityController.getMeta);
 router.get('/:id', opportunityController.getOpportunity);
 
-// Manual on-demand scan is admin-only (guards against abuse / cost).
-router.post('/scan', authorize('admin'), opportunityController.triggerScan);
+// Manual on-demand scan with personal strategy and live market data.
+router.post('/scan', opportunityController.triggerScan);
 
 export default router;
