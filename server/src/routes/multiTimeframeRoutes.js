@@ -18,6 +18,8 @@ router.post(
 
 router.get('/multi-timeframe-analyses', protect, mtfController.listMultiTimeframe);
 router.get('/multi-timeframe-analyses/:id', protect, mtfController.getMultiTimeframe);
+router.post('/multi-timeframe-analyses/:id/chat', protect, mtfController.askMtfQuestion);
+router.get('/multi-timeframe-analyses/:id/chat', protect, mtfController.getMtfChat);
 router.delete('/multi-timeframe-analyses/:id', protect, mtfController.deleteMultiTimeframe);
 
 export default router;

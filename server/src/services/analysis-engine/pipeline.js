@@ -66,10 +66,11 @@ const fetchLiveMarket = async (perception) => {
  * Run the full pipeline for one image.
  * @param {Object} params
  * @param {string} params.imageUrl
+ * @param {string} [params.customStrategy] - optional user strategy description or rules
  * @param {string} [params.providerName] - override vision provider
  * @returns {Promise<{ analysis: Object, meta: Object, market: Object|null }>}
  */
-export const run = async ({ imageUrl, providerName }) => {
+export const run = async ({ imageUrl, customStrategy = '', providerName }) => {
   const startedAt = Date.now();
 
   // 1. Perception — fails hard: if we can't see the chart, we don't proceed
@@ -80,8 +81,8 @@ export const run = async ({ imageUrl, providerName }) => {
   //     This anchors the decision on the REAL price and powers the live chart.
   const market = await fetchLiveMarket(perception);
 
-  // 2. Technical reading (SMC/ICT) over the perception JSON.
-  const { reading, meta: techMeta } = await readTechnical({ perception });
+  // 2. Technical reading (SMC/ICT + user custom strategy) over the perception JSON.
+  const { reading, meta: techMeta } = await readTechnical({ perception, customStrategy });
 
   // 3. Decision (deterministic confluences + always-directional verdict,
   //    anchored on the live price when a market snapshot is available).

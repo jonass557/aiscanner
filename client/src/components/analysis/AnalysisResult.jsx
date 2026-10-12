@@ -1,4 +1,4 @@
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Volume2, VolumeX, Sparkles } from 'lucide-react';
 import DecisionCard from './DecisionCard.jsx';
 import TradePlanCard from './TradePlanCard.jsx';
 import TechnicalAnalysis from './TechnicalAnalysis.jsx';
@@ -6,9 +6,12 @@ import DetailedReport from './DetailedReport.jsx';
 import AnnotatedChart from './AnnotatedChart.jsx';
 import LiveChart from './LiveChart.jsx';
 import FeedbackButtons from './FeedbackButtons.jsx';
+import AnalysisChatBox from './AnalysisChatBox.jsx';
 import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
 import { marketLabel, formatPrice, formatDateTime } from '../../utils/format.js';
+import { useSpeech } from '../../hooks/useSpeech.js';
+import { useState, useEffect } from 'react';
 
 /**
  * Full analysis result view, reused by the Scanner (post-scan) and the
@@ -19,6 +22,36 @@ import { marketLabel, formatPrice, formatDateTime } from '../../utils/format.js'
  */
 export default function AnalysisResult({ analysis, market, onExportPdf, exporting }) {
   if (!analysis) return null;
+
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const { speak, cancelSpeech, speaking } = useSpeech({ lang: 'fr-FR' });
+
+  // Generate spoken text summary
+  const getSpeechSummary = () => {
+    const symbol = analysis.symbol || 'l\'actif';
+    const tf = analysis.timeframe || '';
+    const decision = analysis.decision === 'BUY' ? 'un Achat' : analysis.decision === 'SELL' ? 'une Vente' : 'de Patienter';
+    const conf = analysis.confidenceScore ? `${analysis.confidenceScore} pourcent` : '';
+    const entry = analysis.tradePlan?.entry ? `Entrée suggérée à ${analysis.tradePlan.entry}.` : '';
+    const sl = analysis.tradePlan?.stopLoss ? `Stop Loss fixé à ${analysis.tradePlan.stopLoss}.` : '';
+    const tp1 = analysis.tradePlan?.takeProfit1 ? `Premier Take Profit à ${analysis.tradePlan.takeProfit1}.` : '';
+    const summary = analysis.report?.summary || '';
+    return `Analyse de ${symbol} en unité de temps ${tf}. L'intelligence artificielle recommande ${decision} avec une probabilité de réussite de ${conf}. ${entry} ${sl} ${tp1} ${summary}`;
+  };
+
+  const toggleVoice = () => {
+    if (speaking) {
+      cancelSpeech();
+      setVoiceEnabled(false);
+    } else {
+      setVoiceEnabled(true);
+      speak(getSpeechSummary());
+    }
+  };
+
+  useEffect(() => {
+    return () => cancelSpeech();
+  }, [cancelSpeech]);
 
   const hasAnnotations = Array.isArray(analysis.annotations) && analysis.annotations.length > 0;
   // Show the live chart whenever we can identify the instrument (either from the
@@ -44,11 +77,32 @@ export default function AnalysisResult({ analysis, market, onExportPdf, exportin
             {analysis.createdAt ? ` · ${formatDateTime(analysis.createdAt)}` : ''}
           </p>
         </div>
-        {onExportPdf && (
-          <Button variant="secondary" onClick={onExportPdf} loading={exporting}>
-            <Download className="h-4 w-4" /> Export PDF
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={speaking ? 'primary' : 'secondary'}
+            onClick={toggleVoice}
+            className="flex items-center gap-1.5"
+            title={speaking ? 'Arrêter la voix' : 'Écouter le débrief vocal de l\'IA'}
+          >
+            {speaking ? (
+              <>
+                <VolumeX className="h-4 w-4 animate-pulse text-red-400" />
+                <span>Couper la voix</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="h-4 w-4 text-brand-500" />
+                <span>Écouter le résultat</span>
+              </>
+            )}
           </Button>
-        )}
+
+          {onExportPdf && (
+            <Button variant="secondary" onClick={onExportPdf} loading={exporting}>
+              <Download className="h-4 w-4" /> Export PDF
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Annotated chart (CV overlay) full-width when available. */}
@@ -92,6 +146,15 @@ export default function AnalysisResult({ analysis, market, onExportPdf, exportin
 
       <TechnicalAnalysis ta={analysis.technicalAnalysis} />
       <DetailedReport report={analysis.report} />
+
+      {/* Interactive AI Debriefing & Q&A Chat */}
+      {(analysis._id || analysis.id) && (
+        <AnalysisChatBox
+          analysisId={analysis._id || analysis.id}
+          type="single"
+          initialMessages={analysis.chatMessages || []}
+        />
+      )}
 
       {/* Quality feedback (persisted analyses only). */}
       {(analysis._id || analysis.id) && (

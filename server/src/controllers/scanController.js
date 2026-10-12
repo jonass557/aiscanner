@@ -43,21 +43,38 @@ export const scanChart = asyncHandler(async (req, res) => {
   // 1. Upload image
   const { url, publicId } = await uploadImage(req.file.buffer, user._id.toString());
 
+  // Extract strategy from request body or fall back to user's saved strategy
+  const reqStrategy = req.body.strategy || '';
+  const saveStrategy = req.body.saveStrategy === true || req.body.saveStrategy === 'true';
+  const effectiveStrategy = reqStrategy.trim() || (user.preferences?.customStrategy || '');
+
+  // If requested, persist strategy to user's profile preferences
+  if (saveStrategy && reqStrategy.trim()) {
+    user.preferences = user.preferences || {};
+    user.preferences.customStrategy = reqStrategy.trim();
+    user.preferences.favoriteStrategy = 'custom';
+    await user.save();
+  }
+
   // 2. Create pending record
   const analysis = await Analysis.create({
     userId: user._id,
     imageUrl: url,
     imagePublicId: publicId,
+    customStrategy: effectiveStrategy,
     status: 'pending',
   });
 
   try {
     // 3. Run the Computer-Vision pipeline (Engine 1→2→3→4 + overlay). This also
     //    connects to the live market feed for the perceived symbol + timeframe.
-    const { analysis: result, meta, market } = await runPipeline({ imageUrl: url });
+    const { analysis: result, meta, market } = await runPipeline({
+      imageUrl: url,
+      customStrategy: effectiveStrategy,
+    });
 
     // 4. Persist result
-    Object.assign(analysis, result, meta, { status: 'completed' });
+    Object.assign(analysis, result, meta, { customStrategy: effectiveStrategy, status: 'completed' });
     await analysis.save();
 
     // 5. Consume a credit (only on success)

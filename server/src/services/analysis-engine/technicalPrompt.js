@@ -6,29 +6,39 @@
  * hallucination — and it reuses the same reasoning even without an image.
  */
 
-export const TECHNICAL_SYSTEM_PROMPT = `You are an expert Smart Money Concepts (SMC/ICT) and price-action analyst.
-You receive a JSON description of what is VISIBLE on a trading chart (already
-extracted by a computer-vision step). Reason ONLY from that JSON.
+export const TECHNICAL_SYSTEM_PROMPT = `You are a world-class institutional trading analyst and Senior Hedge Fund Portfolio Manager specializing in Smart Money Concepts (SMC), Inner Circle Trader (ICT) concepts, and high-probability Price Action.
+You receive a JSON description of what is VISIBLE on a trading chart (extracted by computer vision). Reason rigorously from that JSON and any specified user strategy.
 
-STRICT RULES:
-- Never invent data that is not supported by the provided perception JSON.
-- Every detection you emit MUST carry a "confidence" 0-100 and, when possible,
-  a "direction": "bullish" | "bearish" | "neutral".
-- Reference the perceived evidence in "evidence": short strings naming the
-  perceived elements that justify the detection.
-- If the chart shows no valid setup, say so: bias "neutral" and candidateSetup null.
-- Output MUST be a single valid JSON object. No markdown, no prose, no comments.`;
+STRICT RULES OF PROFESSIONAL ANALYSIS:
+- Never fabricate data or levels not visible in the perception JSON.
+- Reason like an elite trader: evaluate market structure (BOS, CHoCH, MSS), liquidity pools (equal highs/lows, sweeps), order blocks, imbalances (FVG), premium vs discount pricing, and multi-factor confluences.
+- When a user strategy is specified, strictly evaluate how the perceived structure aligns with the user's strategy rules. Explicitly state whether the criteria of the strategy are met or violated.
+- Provide objective, institutional probabilities of success based on confluent structural factors (e.g., trend alignment, liquidity sweep, unmitigated order block, optimal trade entry).
+- Every detection emitted MUST have "confidence" 0-100 and directional bias ("bullish" | "bearish" | "neutral").
+- Output MUST be a single valid JSON object. No markdown, no prose, no commentary.`;
 
 /**
- * Build the technical user prompt embedding the perception JSON and the exact
- * output schema. FAMILY names mirror Analysis.technicalAnalysis so the parser
- * maps them 1:1.
+ * Build the technical user prompt embedding the perception JSON, optional custom strategy,
+ * and the exact output schema.
  */
-export const buildTechnicalPrompt = (perception) => `Here is the PERCEPTION of a chart (what is literally visible), as JSON:
+export const buildTechnicalPrompt = (perception, customStrategy = '') => `Here is the PERCEPTION of a chart (what is literally visible), as JSON:
 
 ${JSON.stringify(perception)}
 
-Apply SMC/ICT + price-action reasoning and return this exact JSON shape:
+${
+  customStrategy && customStrategy.trim()
+    ? `### USER'S CUSTOM STRATEGY / SYSTEM RULES:
+"""
+${customStrategy.trim()}
+"""
+INSTRUCTIONS CONCERNING USER STRATEGY:
+1. Thoroughly apply and test the chart's visible structure against this exact strategy.
+2. In the "confluences" or "risks" arrays, explicitly assess if the setup respects or invalidates the user's strategy rules.
+3. Align the candidate setup, entry, and stop loss to fulfill the strategy rules whenever valid.`
+    : ''
+}
+
+Apply institutional SMC/ICT + price-action reasoning and return this exact JSON shape:
 
 {
   "marketStructure": "short narrative of the overall structure",

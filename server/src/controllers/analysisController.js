@@ -186,3 +186,91 @@ export const exportCSV = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="chart-analyses.csv"');
   return res.send(csv);
 });
+
+/**
+ * POST /analyses/:id/chat
+ * Ask questions to the AI about this specific scan analysis.
+ */
+export const askAnalysisQuestion = asyncHandler(async (req, res) => {
+  const { question } = req.body;
+  if (!question || !question.trim()) {
+    throw ApiError.badRequest('Question text is required.');
+  }
+
+  const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.user._id });
+  if (!analysis) throw ApiError.notFound('Analysis not found.');
+
+  // Contextualize the prompt with the exact scan facts
+  const contextSummary = {
+    symbol: analysis.symbol,
+    timeframe: analysis.timeframe,
+    market: analysis.market,
+    currentPrice: analysis.currentPrice,
+    decision: analysis.decision,
+    confidenceScore: analysis.confidenceScore,
+    confidenceLabel: analysis.confidenceLabel,
+    tradePlan: analysis.tradePlan,
+    technicalSummary: analysis.technicalAnalysis?.marketStructure,
+    report: analysis.report,
+    customStrategy: analysis.customStrategy,
+  };
+
+  const systemPrompt = `You are a world-class institutional trading mentor and hedge fund risk manager.
+The trader is asking you a question about a SPECIFIC chart analysis that was just performed.
+
+EXACT VERIFIED ANALYSIS CONTEXT:
+${JSON.stringify(contextSummary, null, 2)}
+
+STRICT RULES:
+1. NEVER hallucinate or invent price levels or signals not supported by the analysis context.
+2. Provide deep, institutional-grade explanations (Order Flow, Liquidity sweeps, Inefficiencies, Market Structure, Risk-Reward).
+3. Be completely honest and constructive: if the trader is misinterpreting something or proposing a dangerous/premature trade, tell them directly and explain the exact technical error.
+4. Speak professionally, encouragingly, and clearly in French. Keep explanations actionable.`;
+
+  const previousHistory = (analysis.chatMessages || []).slice(-6).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  const messages = [
+    ...previousHistory,
+    { role: 'user', content: question.trim() },
+  ];
+
+  const { getProvider } = await import('../services/ai/index.js');
+  const provider = getProvider();
+
+  let aiReply = '';
+  try {
+    aiReply = await provider.chat({ systemPrompt, messages });
+  } catch (err) {
+    throw ApiError.internal(`AI failed to answer: ${err.message}`);
+  }
+
+  // Persist messages in the analysis document
+  analysis.chatMessages = analysis.chatMessages || [];
+  analysis.chatMessages.push({ role: 'user', content: question.trim() });
+  analysis.chatMessages.push({ role: 'assistant', content: aiReply });
+  await analysis.save();
+
+  return sendSuccess(res, {
+    statusCode: 200,
+    message: 'Question answered.',
+    data: {
+      reply: aiReply,
+      chatMessages: analysis.chatMessages,
+    },
+  });
+});
+
+/**
+ * GET /analyses/:id/chat
+ * Retrieve the chat history for this analysis.
+ */
+export const getAnalysisChat = asyncHandler(async (req, res) => {
+  const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.user._id }).select('chatMessages');
+  if (!analysis) throw ApiError.notFound('Analysis not found.');
+  return sendSuccess(res, {
+    data: { chatMessages: analysis.chatMessages || [] },
+  });
+});

@@ -55,6 +55,18 @@ export const scanMultiTimeframe = asyncHandler(async (req, res) => {
     throw ApiError.serviceUnavailable(err.message);
   }
 
+  // Extract strategy from request body or fall back to user's saved strategy
+  const reqStrategy = req.body.strategy || '';
+  const saveStrategy = req.body.saveStrategy === true || req.body.saveStrategy === 'true';
+  const effectiveStrategy = reqStrategy.trim() || (user.preferences?.customStrategy || '');
+
+  if (saveStrategy && reqStrategy.trim()) {
+    user.preferences = user.preferences || {};
+    user.preferences.customStrategy = reqStrategy.trim();
+    user.preferences.favoriteStrategy = 'custom';
+    await user.save();
+  }
+
   // 1. Upload every image, keeping its timeframe label. Sort low -> high.
   const uploaded = [];
   try {
@@ -74,6 +86,7 @@ export const scanMultiTimeframe = asyncHandler(async (req, res) => {
   const record = await MultiTimeframeAnalysis.create({
     userId: user._id,
     timeframes: uploaded.map((u) => ({ timeframe: u.timeframe, imageUrl: u.url, imagePublicId: u.publicId })),
+    customStrategy: effectiveStrategy,
     status: 'pending',
   });
 
@@ -82,6 +95,7 @@ export const scanMultiTimeframe = asyncHandler(async (req, res) => {
     const { analysis, meta } = await analyzeMultiTimeframe({
       images: uploaded.map((u) => ({ url: u.url, label: u.timeframe })),
       timeframes: uploaded.map((u) => u.timeframe),
+      customStrategy: effectiveStrategy,
     });
 
     // 4. Merge the model's per-timeframe reads back onto our uploaded images
@@ -184,6 +198,97 @@ export const getMultiTimeframe = asyncHandler(async (req, res) => {
   }).lean();
   if (!analysis) throw ApiError.notFound('Analysis not found.');
   return sendSuccess(res, { data: { analysis } });
+});
+
+/**
+ * POST /multi-timeframe-analyses/:id/chat
+ * Ask questions to the AI about this specific multi-timeframe analysis.
+ */
+export const askMtfQuestion = asyncHandler(async (req, res) => {
+  const { question } = req.body;
+  if (!question || !question.trim()) {
+    throw ApiError.badRequest('Question text is required.');
+  }
+
+  const analysis = await MultiTimeframeAnalysis.findOne({ _id: req.params.id, userId: req.user._id });
+  if (!analysis) throw ApiError.notFound('Analysis not found.');
+
+  const contextSummary = {
+    symbol: analysis.symbol,
+    market: analysis.market,
+    currentPrice: analysis.currentPrice,
+    alignmentStatus: analysis.alignmentStatus,
+    confluenceScore: analysis.confluenceScore,
+    dominantBias: analysis.dominantBias,
+    conflicts: analysis.conflicts,
+    recommendation: analysis.recommendation,
+    summary: analysis.summary,
+    timeframes: analysis.timeframes?.map((t) => ({
+      timeframe: t.timeframe,
+      trend: t.trend,
+      bias: t.bias,
+      marketStructure: t.marketStructure,
+    })),
+    customStrategy: analysis.customStrategy,
+  };
+
+  const systemPrompt = `You are an elite institutional trading mentor and hedge fund top-down analyst.
+The trader is asking questions regarding this MULTI-TIMEFRAME analysis.
+
+EXACT VERIFIED MULTI-TIMEFRAME CONTEXT:
+${JSON.stringify(contextSummary, null, 2)}
+
+STRICT RULES:
+1. NEVER invent price levels or trends not in this multi-timeframe context.
+2. Explain top-down order flow, alignment, HTF dominance vs LTF timing, and any structural conflict.
+3. If the trader has a misconception or wants to enter prematurely against the higher timeframe, point out the error honestly and clearly.
+4. Speak professionally, encouragingly, and clearly in French.`;
+
+  const previousHistory = (analysis.chatMessages || []).slice(-6).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  const messages = [
+    ...previousHistory,
+    { role: 'user', content: question.trim() },
+  ];
+
+  const { getProvider } = await import('../services/ai/index.js');
+  const provider = getProvider();
+
+  let aiReply = '';
+  try {
+    aiReply = await provider.chat({ systemPrompt, messages });
+  } catch (err) {
+    throw ApiError.internal(`AI failed to answer: ${err.message}`);
+  }
+
+  analysis.chatMessages = analysis.chatMessages || [];
+  analysis.chatMessages.push({ role: 'user', content: question.trim() });
+  analysis.chatMessages.push({ role: 'assistant', content: aiReply });
+  await analysis.save();
+
+  return sendSuccess(res, {
+    statusCode: 200,
+    message: 'Question answered.',
+    data: {
+      reply: aiReply,
+      chatMessages: analysis.chatMessages,
+    },
+  });
+});
+
+/**
+ * GET /multi-timeframe-analyses/:id/chat
+ * Retrieve the chat history for this multi-timeframe analysis.
+ */
+export const getMtfChat = asyncHandler(async (req, res) => {
+  const analysis = await MultiTimeframeAnalysis.findOne({ _id: req.params.id, userId: req.user._id }).select('chatMessages');
+  if (!analysis) throw ApiError.notFound('Analysis not found.');
+  return sendSuccess(res, {
+    data: { chatMessages: analysis.chatMessages || [] },
+  });
 });
 
 /**

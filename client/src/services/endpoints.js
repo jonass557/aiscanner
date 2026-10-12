@@ -40,6 +40,8 @@ export const multiTimeframeApi = {
   list: (params) => api.get('/multi-timeframe-analyses', { params }),
   get: (id) => api.get(`/multi-timeframe-analyses/${id}`),
   remove: (id) => api.delete(`/multi-timeframe-analyses/${id}`),
+  askChat: (id, question) => api.post(`/multi-timeframe-analyses/${id}/chat`, { question }, { timeout: 90000 }),
+  getChat: (id) => api.get(`/multi-timeframe-analyses/${id}/chat`),
 };
 
 export const opportunityApi = {
@@ -107,6 +109,8 @@ export const analysisApi = {
   feedback: (id, payload) => api.post(`/analyses/${id}/feedback`, payload),
   exportPdf: (id) => api.get(`/analyses/${id}/export/pdf`, { responseType: 'blob' }),
   exportCsv: (params) => api.get('/analyses/export/csv', { params, responseType: 'blob' }),
+  askChat: (id, question) => api.post(`/analyses/${id}/chat`, { question }, { timeout: 90000 }),
+  getChat: (id) => api.get(`/analyses/${id}/chat`),
 };
 
 export const userApi = {

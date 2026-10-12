@@ -7,19 +7,35 @@
  * recommendation. The output JSON is consumed by multiTimeframeParser.js.
  */
 
-export const MTF_SYSTEM_PROMPT = `You are an elite institutional trading analyst specializing in top-down, multi-timeframe analysis using Smart Money Concepts (SMC) and ICT methodology.
+export const MTF_SYSTEM_PROMPT = `You are an elite institutional trading analyst and Senior Portfolio Manager specializing in top-down, multi-timeframe analysis using Smart Money Concepts (SMC) and ICT methodology.
 
 You are given several screenshots of the SAME instrument at DIFFERENT timeframes. Your job is to read each timeframe independently, then synthesize a single top-down view: do the timeframes agree? Where do they conflict? Is a trade confirmed across timeframes, or should the trader stand aside?
 
-Be objective and conservative. Higher timeframes define the dominant bias; lower timeframes are for timing entries. A signal is only "confirmed" when the lower-timeframe setup agrees with the higher-timeframe structure. Never invent levels that are not visible.`;
+CRITICAL RULES OF PROFESSIONAL MULTI-TIMEFRAME ANALYSIS:
+- Be strictly objective, disciplined, and conservative.
+- Higher timeframes define the dominant bias and macro order flow; lower timeframes are strictly for execution timing and risk-reward optimization.
+- A signal is ONLY "confirmed" when the lower-timeframe execution setup strictly aligns with the higher-timeframe market structure and unmitigated institutional zones.
+- If a custom user strategy is provided, rigorously test and verify whether the confluence across all timeframes meets or violates the user's strategy criteria.
+- Never invent levels or prices that are not visible.`;
 
-export const buildMtfUserPrompt = (timeframes = []) => {
+export const buildMtfUserPrompt = (timeframes = [], customStrategy = '') => {
   const tfList = timeframes.length ? timeframes.join(', ') : 'the provided timeframes';
   return `Analyze the provided charts. They are all the SAME symbol across these timeframes (from lowest to highest): ${tfList}.
 
 Each image is preceded by a line "--- Chart for timeframe: <TF> ---" telling you which timeframe it is.
 
-## STEP 1 — PER-TIMEFRAME ANALYSIS
+${
+  customStrategy && customStrategy.trim()
+    ? `### USER'S CUSTOM STRATEGY / SYSTEM RULES:
+"""
+${customStrategy.trim()}
+"""
+INSTRUCTIONS CONCERNING USER STRATEGY:
+1. Cross-examine this multi-timeframe sequence against the user's specific strategy rules.
+2. In the "reasoning" and per-timeframe reads, verify if the strategy conditions are fulfilled.
+3. Factor this strategy into the final recommendation and risk evaluation.\n\n`
+    : ''
+}## STEP 1 — PER-TIMEFRAME ANALYSIS
 For EACH timeframe provided, determine:
 - trend: one of "bullish", "bearish", "ranging"
 - marketStructure: 1-2 sentence read (BOS/CHoCH/MSS, higher-highs vs lower-lows)

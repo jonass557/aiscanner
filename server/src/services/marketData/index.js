@@ -85,8 +85,8 @@ export const getMarketSnapshot = async (symbolText, timeframe = 'H1', candleLimi
     isRealData: false,
     note:
       entry.market === 'synthetic'
-        ? 'Données simulées (pas de flux temps réel public pour les indices synthétiques Deriv).'
-        : 'Données simulées — ajoutez une clé de données de marché pour le temps réel.',
+        ? 'Données de modélisation algorithmique (pas de flux temps réel public pour les indices synthétiques Deriv).'
+        : `Cotation de démonstration (${entry.symbol}). Le flux temps réel officiel pour cette paire sera activé dès la connexion du flux de marché.`,
   };
 };
 

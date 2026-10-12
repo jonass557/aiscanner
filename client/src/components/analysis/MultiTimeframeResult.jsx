@@ -1,9 +1,13 @@
 import { motion } from 'framer-motion';
 import {
-  TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, Layers, FileText,
+  TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, Layers, FileText, Volume2, VolumeX,
 } from 'lucide-react';
 import Badge from '../ui/Badge.jsx';
+import Button from '../ui/Button.jsx';
+import AnalysisChatBox from './AnalysisChatBox.jsx';
 import { marketLabel, formatPrice, formatDateTime, decisionMeta } from '../../utils/format.js';
+import { useSpeech } from '../../hooks/useSpeech.js';
+import { useState, useEffect } from 'react';
 
 const TREND_META = {
   bullish: { icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-500', label: 'Bullish', tone: 'green' },
@@ -26,6 +30,30 @@ const biasTone = (bias) => (bias === 'BUY' ? 'green' : bias === 'SELL' ? 'red' :
  */
 export default function MultiTimeframeResult({ analysis }) {
   if (!analysis) return null;
+
+  const { speak, cancelSpeech, speaking } = useSpeech({ lang: 'fr-FR' });
+
+  const getSpeechSummary = () => {
+    const symbol = analysis.symbol || 'l\'actif';
+    const rec = analysis.recommendation || {};
+    const dec = rec.decision === 'BUY' ? 'Achat' : rec.decision === 'SELL' ? 'Vente' : 'Patienter';
+    const align = analysis.alignmentStatus === 'aligned' ? 'totalement alignées' : analysis.alignmentStatus === 'conflicted' ? 'en conflit structurel' : 'partiellement alignées';
+    const conf = analysis.confluenceScore ? `${analysis.confluenceScore} pourcent` : '';
+    const summary = analysis.summary || '';
+    return `Analyse Multi-Unités de temps pour ${symbol}. Les tendances sont ${align} avec une confluence de ${conf}. Décision top-down recommandée : ${dec}. ${summary}`;
+  };
+
+  const toggleVoice = () => {
+    if (speaking) {
+      cancelSpeech();
+    } else {
+      speak(getSpeechSummary());
+    }
+  };
+
+  useEffect(() => {
+    return () => cancelSpeech();
+  }, [cancelSpeech]);
 
   const align = ALIGNMENT_META[analysis.alignmentStatus] || ALIGNMENT_META.partial;
   const AlignIcon = align.icon;
@@ -57,6 +85,24 @@ export default function MultiTimeframeResult({ analysis }) {
             {analysis.createdAt ? ` · ${formatDateTime(analysis.createdAt)}` : ''}
           </p>
         </div>
+        <Button
+          variant={speaking ? 'primary' : 'secondary'}
+          onClick={toggleVoice}
+          className="flex items-center gap-1.5 self-start sm:self-auto"
+          title={speaking ? 'Arrêter la voix' : 'Écouter le débrief vocal de l\'IA'}
+        >
+          {speaking ? (
+            <>
+              <VolumeX className="h-4 w-4 animate-pulse text-red-400" />
+              <span>Couper la voix</span>
+            </>
+          ) : (
+            <>
+              <Volume2 className="h-4 w-4 text-brand-500" />
+              <span>Écouter le résultat</span>
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Alignment / confluence banner */}
@@ -199,6 +245,15 @@ export default function MultiTimeframeResult({ analysis }) {
           <h3 className="font-semibold">Summary</h3>
           <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">{analysis.summary}</p>
         </div>
+      )}
+
+      {/* Interactive AI Debriefing & Q&A Chat for Multi-Timeframe */}
+      {(analysis._id || analysis.id) && (
+        <AnalysisChatBox
+          analysisId={analysis._id || analysis.id}
+          type="multi"
+          initialMessages={analysis.chatMessages || []}
+        />
       )}
 
       <p className="flex items-center justify-center gap-2 text-center text-xs text-gray-400">

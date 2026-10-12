@@ -44,6 +44,9 @@ export const SETTING_DEFS = [
   { key: 'ai.nvidia.model', path: 'ai.nvidia.model', category: 'ai', secret: false },
   { key: 'ai.nvidia.baseUrl', path: 'ai.nvidia.baseUrl', category: 'ai', secret: false },
 
+  // --- Market Data (TwelveData pour Forex/Matières premières temps réel) ---
+  { key: 'marketData.twelveData.apiKey', path: 'marketData.twelveData.apiKey', category: 'ai', secret: true },
+
   // --- Payments: SebPay -----------------------------------------------------
   { key: 'payments.provider', path: 'payments.provider', category: 'payments', secret: false },
   { key: 'payments.sebpay.publicKey', path: 'payments.sebpay.publicKey', category: 'payments', secret: true },

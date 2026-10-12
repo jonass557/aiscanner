@@ -17,6 +17,8 @@ router.get('/analyses', protect, analysisController.listAnalyses);
 router.get('/analyses/:id', protect, analysisController.getAnalysis);
 router.get('/analyses/:id/export/pdf', protect, analysisController.exportPDF);
 router.post('/analyses/:id/feedback', protect, analysisController.submitFeedback);
+router.post('/analyses/:id/chat', protect, analysisController.askAnalysisQuestion);
+router.get('/analyses/:id/chat', protect, analysisController.getAnalysisChat);
 router.delete('/analyses/:id', protect, analysisController.deleteAnalysis);
 
 export default router;

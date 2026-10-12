@@ -81,6 +81,18 @@ const multiTimeframeSchema = new mongoose.Schema(
 
     summary: String,
 
+    // Custom user strategy applied to this multi-timeframe scan
+    customStrategy: { type: String, default: '' },
+
+    // Interactive post-scan Q&A conversation with the AI analyst
+    chatMessages: [
+      {
+        role: { type: String, enum: ['user', 'assistant'], required: true },
+        content: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+
     // Metadata
     processingTime: Number,
     aiProvider: String,

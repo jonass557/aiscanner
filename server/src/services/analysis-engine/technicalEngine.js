@@ -133,10 +133,11 @@ export const deriveReadingFromPerception = (perception) => {
  * Produce a TechnicalReading from a perception.
  * @param {Object} params
  * @param {Object} params.perception
+ * @param {string} [params.customStrategy]
  * @param {string} [params.providerName]
  * @returns {Promise<{ reading: Object, meta: Object }>}
  */
-export const read = async ({ perception, providerName }) => {
+export const read = async ({ perception, customStrategy = '', providerName }) => {
   const provider = getProvider(providerName);
   const startedAt = Date.now();
 
@@ -152,7 +153,7 @@ export const read = async ({ perception, providerName }) => {
   try {
     const raw = await provider.analyzeData({
       systemPrompt: TECHNICAL_SYSTEM_PROMPT,
-      userPrompt: buildTechnicalPrompt(perception),
+      userPrompt: buildTechnicalPrompt(perception, customStrategy),
     });
     reading = parseTechnicalReading(raw);
   } catch (err) {

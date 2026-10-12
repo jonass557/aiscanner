@@ -21,8 +21,18 @@ export default function Scanner() {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState(null);
   const [market, setMarket] = useState(null);
-  const [exporting, setExporting] = useState(false);
+  const [customStrategy, setCustomStrategy] = useState('');
+  const [saveStrategy, setSaveStrategy] = useState(false);
+  const [showStrategyBox, setShowStrategyBox] = useState(false);
   const inputRef = useRef(null);
+
+  // Prepopulate customStrategy from user preferences if available
+  useEffect(() => {
+    if (user?.preferences?.customStrategy) {
+      setCustomStrategy(user.preferences.customStrategy);
+      setShowStrategyBox(true);
+    }
+  }, [user]);
 
   const setChosenFile = useCallback((f) => {
     if (!f) return;
@@ -71,12 +81,18 @@ export default function Scanner() {
     setScanning(true);
     const form = new FormData();
     form.append('image', file);
+    if (customStrategy.trim()) {
+      form.append('strategy', customStrategy.trim());
+    }
+    if (saveStrategy) {
+      form.append('saveStrategy', 'true');
+    }
     try {
       const { data } = await scanApi.scan(form);
       setResult(data.data.analysis);
       setMarket(data.data.market || null);
       await refreshUser();
-      toast.success('Analysis complete!');
+      toast.success('Analyse IA terminée avec succès !');
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -164,12 +180,57 @@ export default function Scanner() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
+              {/* Custom Strategy Input Panel */}
+              <div className="mt-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-600 dark:text-brand-400 text-xs font-bold">
+                      ★
+                    </span>
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Stratégie de trading personnalisée (Optionnelle)
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowStrategyBox(!showStrategyBox)}
+                    className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+                  >
+                    {showStrategyBox ? 'Masquer' : customStrategy ? 'Modifier la stratégie' : '+ Définir une stratégie'}
+                  </button>
+                </div>
+
+                {showStrategyBox && (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Indiquez vos règles précises (ex: <em>"Achat uniquement sur FVG 15M après balayage des plus bas de Londres, confirmation cassure de structure BOS, R:R minimum 1:3"</em>). L'IA adaptera l'analyse et vérifiera le respect de votre système.
+                    </p>
+                    <textarea
+                      rows={3}
+                      value={customStrategy}
+                      onChange={(e) => setCustomStrategy(e.target.value)}
+                      placeholder="Exemple : Stratégie SMC / ICT - Entrée après balayage de liquidité (Sweep), mitigation d'Order Block M15, cibler le prochain Equal High..."
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={saveStrategy}
+                        onChange={(e) => setSaveStrategy(e.target.checked)}
+                        className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span>Enregistrer cette stratégie dans mon profil pour mes prochains scans</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <Button onClick={scan} loading={scanning} className="flex-1 py-3 text-base">
-                  <ScanLine className="h-5 w-5" /> {scanning ? 'Analyzing…' : 'Scan chart'}
+                  <ScanLine className="h-5 w-5" /> {scanning ? 'Analyse en cours…' : 'Lancer le scan IA'}
                 </Button>
                 <Button variant="secondary" onClick={() => inputRef.current?.click()} disabled={scanning}>
-                  Change image
+                  Changer d'image
                 </Button>
                 <input
                   ref={inputRef}

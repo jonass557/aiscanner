@@ -32,6 +32,7 @@ const FIELD_META = {
   'ai.nvidia.apiKey': { label: 'Clé API NVIDIA NIM', secret: true },
   'ai.nvidia.model': { label: 'Modèle NVIDIA', hint: 'meta/llama-3.2-90b-vision-instruct' },
   'ai.nvidia.baseUrl': { label: 'URL de base NVIDIA', hint: 'https://integrate.api.nvidia.com/v1' },
+  'marketData.twelveData.apiKey': { label: 'Clé API TwelveData (Flux Forex / Or / Indices temps réel)', secret: true },
   'payments.provider': { label: 'Fournisseur de paiement actif', hint: 'sebpay | demo' },
   'payments.sebpay.publicKey': { label: 'Clé publique SebPay', secret: true },
   'payments.sebpay.secretKey': { label: 'Clé secrète SebPay', secret: true },

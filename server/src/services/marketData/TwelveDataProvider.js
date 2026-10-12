@@ -16,6 +16,9 @@ const INTERVAL_MAP = {
 const SYMBOL_MAP = {
   EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', AUDUSD: 'AUD/USD',
   USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', USDCHF: 'USD/CHF',
+  EURAUD: 'EUR/AUD', EURGBP: 'EUR/GBP', EURJPY: 'EUR/JPY', GBPJPY: 'GBP/JPY',
+  AUDJPY: 'AUD/JPY', EURCAD: 'EUR/CAD', GBPAUD: 'GBP/AUD', AUDNZD: 'AUD/NZD',
+  CADJPY: 'CAD/JPY', CHFJPY: 'CHF/JPY', CADCHF: 'CAD/CHF', GBPCHF: 'GBP/CHF',
   XAUUSD: 'XAU/USD', XAGUSD: 'XAG/USD',
   US30: 'DJI', NAS100: 'IXIC', SPX500: 'SPX', GER40: 'DAX',
 };
@@ -32,13 +35,20 @@ export class TwelveDataProvider extends BaseMarketProvider {
     return Boolean(this.apiKey);
   }
 
-  /** Anything with a known mapping (forex/indices/commodities). */
+  /** Anything with a known mapping (forex/indices/commodities) or 6-letter forex pairs. */
   supports(entry) {
-    return Boolean(SYMBOL_MAP[entry?.symbol]);
+    if (!entry?.symbol) return false;
+    if (SYMBOL_MAP[entry.symbol]) return true;
+    if (entry.market === 'forex' && entry.symbol.length === 6) return true;
+    return false;
   }
 
   _map(entry) {
-    return SYMBOL_MAP[entry.symbol] || entry.symbol;
+    if (SYMBOL_MAP[entry.symbol]) return SYMBOL_MAP[entry.symbol];
+    if (entry.market === 'forex' && entry.symbol.length === 6) {
+      return `${entry.symbol.slice(0, 3)}/${entry.symbol.slice(3)}`;
+    }
+    return entry.symbol;
   }
 
   async _fetch(path) {

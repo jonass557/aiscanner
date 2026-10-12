@@ -181,17 +181,18 @@ export const analyzeChart = async ({ imageUrl, providerName }) => {
  * @param {Object} params
  * @param {Array<{ url: string, label: string }>} params.images - label is the timeframe
  * @param {string[]} [params.timeframes] - ordered low->high for the prompt
+ * @param {string} [params.customStrategy] - optional user strategy
  * @param {string} [params.providerName]
  * @returns {Promise<{ analysis: Object, meta: Object }>}
  */
-export const analyzeMultiTimeframe = async ({ images, timeframes, providerName }) => {
+export const analyzeMultiTimeframe = async ({ images, timeframes, customStrategy = '', providerName }) => {
   const startedAt = Date.now();
 
   const { result: raw, provider } = await runWithFallback(providerName, (p) =>
     p.analyzeMultiple({
       images,
       systemPrompt: MTF_SYSTEM_PROMPT,
-      userPrompt: buildMtfUserPrompt(timeframes || images.map((i) => i.label)),
+      userPrompt: buildMtfUserPrompt(timeframes || images.map((i) => i.label), customStrategy),
     })
   );
 
