@@ -121,36 +121,54 @@ const computeRR = (entry, stopLoss, tp1) => {
  */
 const buildTradePlan = ({ direction, setup, market, perception }) => {
   const livePrice = market?.quote?.price ?? null;
+  const isRealLive = market?.isRealData && livePrice != null;
   const candles = market?.candles || [];
 
-  // Entry: prefer the model's proposed entry, else the live price, else the
-  // perceived current price.
-  const entry =
-    setup?.entry ?? livePrice ?? perception?.context?.currentPrice ?? null;
+  // Entry: when real live market data is available, anchor the live trade order
+  // on the real-time live price (or the setup entry if very close, else livePrice).
+  let entry = livePrice ?? setup?.entry ?? perception?.context?.currentPrice ?? null;
 
   // Volatility unit for synthesizing levels: ATR from live candles, else a % of
   // the entry price.
   const atr = computeAtr(candles) ?? (entry != null ? entry * PCT_STOP : null);
-  const stopDist = atr != null ? atr * ATR_STOP_MULT : null;
+  const stopDist = atr != null ? atr * ATR_STOP_MULT : (entry != null ? entry * PCT_STOP : null);
 
   const sign = direction === 'BUY' ? 1 : -1;
 
-  // Stop: keep the model's stop if present, else synthesize from volatility.
+  // Stop Loss:
+  // If we have a real live market price, adapt stop loss relative to live price if setup SL is stale
   let stopLoss = setup?.stopLoss ?? null;
-  if (stopLoss == null && entry != null && stopDist != null) {
+  if (isRealLive && entry != null) {
+    if (stopLoss == null || (direction === 'BUY' && stopLoss >= entry) || (direction === 'SELL' && stopLoss <= entry)) {
+      stopLoss = entry - sign * stopDist;
+    }
+  } else if (stopLoss == null && entry != null && stopDist != null) {
     stopLoss = entry - sign * stopDist;
   }
 
-  // Risk distance drives the synthesized targets.
+  // Risk distance drives the targets.
   const risk =
     entry != null && stopLoss != null ? Math.abs(entry - stopLoss) : stopDist;
 
   const synthTp = (mult) =>
     entry != null && risk != null ? entry + sign * risk * mult : null;
 
-  const takeProfit1 = setup?.takeProfit1 ?? synthTp(RR_TARGETS[0]);
-  const takeProfit2 = setup?.takeProfit2 ?? synthTp(RR_TARGETS[1]);
-  const takeProfit3 = setup?.takeProfit3 ?? synthTp(RR_TARGETS[2]);
+  let takeProfit1 = setup?.takeProfit1 ?? synthTp(RR_TARGETS[0]);
+  let takeProfit2 = setup?.takeProfit2 ?? synthTp(RR_TARGETS[1]);
+  let takeProfit3 = setup?.takeProfit3 ?? synthTp(RR_TARGETS[2]);
+
+  // Sanity check: Ensure Take Profits are strictly directional relative to entry
+  if (entry != null) {
+    if (direction === 'BUY') {
+      if (takeProfit1 == null || takeProfit1 <= entry) takeProfit1 = synthTp(RR_TARGETS[0]);
+      if (takeProfit2 == null || takeProfit2 <= takeProfit1) takeProfit2 = synthTp(RR_TARGETS[1]);
+      if (takeProfit3 == null || takeProfit3 <= takeProfit2) takeProfit3 = synthTp(RR_TARGETS[2]);
+    } else {
+      if (takeProfit1 == null || takeProfit1 >= entry) takeProfit1 = synthTp(RR_TARGETS[0]);
+      if (takeProfit2 == null || takeProfit2 >= takeProfit1) takeProfit2 = synthTp(RR_TARGETS[1]);
+      if (takeProfit3 == null || takeProfit3 >= takeProfit2) takeProfit3 = synthTp(RR_TARGETS[2]);
+    }
+  }
 
   const rr = computeRR(entry, stopLoss, takeProfit1);
   const timeframe = perception?.context?.timeframe;
