@@ -63,7 +63,7 @@ export default function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      <aside className="hidden w-64 shrink-0 bg-gradient-to-b from-brand-700 to-accent-800 lg:block">
+      <aside className="hidden w-64 shrink-0 bg-gradient-to-b from-brand-700 to-accent-800 lg:block sticky top-0 h-screen overflow-y-auto">
         <SidebarInner />
       </aside>
 

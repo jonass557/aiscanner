@@ -1,23 +1,25 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Menu, X, Moon, Sun, ScanLine } from 'lucide-react';
+import { Menu, X, Moon, Sun, ScanLine, Globe } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-
-const NAV_LINKS = [
-  { label: 'Outils IA', href: '#tools' },
-  { label: 'Fonctionnalités', href: '#features' },
-  { label: 'Comment ça marche', href: '#how' },
-  { label: 'Tarifs', href: '#pricing' },
-  { label: 'FAQ', href: '#faq' },
-];
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 /** Navigation bar for public landing page. */
 export default function PublicNavbar() {
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { isAuthenticated } = useAuth();
+  const { t, lang, toggleLanguage } = useLanguage();
+
+  const navLinks = [
+    { label: t('landingNavTools'), href: '#tools' },
+    { label: t('landingNavFeatures'), href: '#features' },
+    { label: t('landingNavHow'), href: '#how' },
+    { label: t('landingNavPricing'), href: '#pricing' },
+    { label: t('landingNavFaq'), href: '#faq' },
+  ];
 
   return (
     <header className="fixed inset-x-0 top-0 z-40">
@@ -30,7 +32,7 @@ export default function PublicNavbar() {
         </Link>
 
         <div className="hidden items-center gap-7 md:flex">
-          {NAV_LINKS.map((l) => (
+          {navLinks.map((l) => (
             <a key={l.href} href={l.href} className="text-sm font-medium text-gray-600 transition hover:text-brand-600 dark:text-gray-300">
               {l.label}
             </a>
@@ -38,15 +40,25 @@ export default function PublicNavbar() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
+          {/* Language Switcher */}
+          <button
+            onClick={toggleLanguage}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 px-2.5 py-1 text-xs font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm"
+            title="Changer de langue / Switch language"
+          >
+            <Globe className="h-3.5 w-3.5 text-brand-500" />
+            <span>{lang === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}</span>
+          </button>
+
           <button onClick={toggleTheme} className="btn-ghost !px-2.5" aria-label="Toggle theme">
             {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
           {isAuthenticated ? (
-            <Link to="/dashboard" className="btn-primary">Dashboard</Link>
+            <Link to="/dashboard" className="btn-primary">{t('dashboard')}</Link>
           ) : (
             <>
-              <Link to="/login" className="btn-ghost">Connexion</Link>
-              <Link to="/register?join=true" className="btn-primary">Commencer Gratuitement</Link>
+              <Link to="/login" className="btn-ghost">{t('login')}</Link>
+              <Link to="/register?join=true" className="btn-primary">{t('startFree')}</Link>
             </>
           )}
         </div>
@@ -62,14 +74,23 @@ export default function PublicNavbar() {
           animate={{ opacity: 1, y: 0 }}
           className="glass mx-auto mt-2 max-w-6xl space-y-2 rounded-2xl p-4 md:hidden"
         >
-          {NAV_LINKS.map((l) => (
+          {navLinks.map((l) => (
             <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
               {l.label}
             </a>
           ))}
+          <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800">
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-bold"
+            >
+              <Globe className="h-3.5 w-3.5 text-brand-500" />
+              <span>{lang === 'fr' ? 'Switch to English 🇬🇧' : 'Passer en Français 🇫🇷'}</span>
+            </button>
+          </div>
           <div className="flex gap-2 pt-2">
-            <Link to="/login" className="btn-secondary flex-1">Connexion</Link>
-            <Link to="/register?join=true" className="btn-primary flex-1">Commencer Gratuitement</Link>
+            <Link to="/login" className="btn-secondary flex-1 text-center">{t('login')}</Link>
+            <Link to="/register?join=true" className="btn-primary flex-1 text-center">{t('startFree')}</Link>
           </div>
         </motion.div>
       )}

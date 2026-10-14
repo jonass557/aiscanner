@@ -46,10 +46,28 @@ const opportunitySchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['active', 'expired', 'triggered'],
+      enum: ['active', 'expired', 'triggered', 'closed'],
       default: 'active',
       index: true,
     },
+    outcome: {
+      type: String,
+      enum: ['pending', 'hit_tp1', 'hit_tp2', 'hit_sl', 'closed_profit', 'closed_loss'],
+      default: 'pending',
+      index: true,
+    },
+    pnlPips: { type: Number, default: 0 },
+    closedAt: { type: Date, default: null },
+    closedPrice: { type: Number, default: null },
+    zones: [
+      {
+        zoneType: { type: String, default: 'order-block' }, // order-block, fvg, liquidity, breaker
+        priceMin: Number,
+        priceMax: Number,
+        label: String,
+        color: String,
+      },
+    ],
     detectedAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, index: true },
   },

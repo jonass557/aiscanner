@@ -128,6 +128,29 @@ const generateSetupFromSnapshot = ({ entryDef, snapshot, user = null }) => {
     confluences.push('Respect strict du Plan de Trading personnel');
   }
 
+  // Institutional Zones for chart rendering
+  const obZone = {
+    zoneType: 'order-block',
+    priceMin: round(direction === 'BUY' ? entry - spread * 0.4 : entry + spread * 0.1, dp),
+    priceMax: round(direction === 'BUY' ? entry - spread * 0.05 : entry + spread * 0.45, dp),
+    label: direction === 'BUY' ? 'Bullish Order Block (OB)' : 'Bearish Order Block (OB)',
+    color: direction === 'BUY' ? '#10b981' : '#ef4444',
+  };
+  const fvgZone = {
+    zoneType: 'fair-value-gap',
+    priceMin: round(direction === 'BUY' ? entry + spread * 0.2 : entry - spread * 0.6, dp),
+    priceMax: round(direction === 'BUY' ? entry + spread * 0.55 : entry - spread * 0.15, dp),
+    label: 'Fair Value Gap (FVG)',
+    color: '#06b6d4',
+  };
+  const liquidityZone = {
+    zoneType: 'liquidity',
+    priceMin: round(direction === 'BUY' ? stopLoss - spread * 0.15 : stopLoss + spread * 0.15, dp),
+    priceMax: round(direction === 'BUY' ? stopLoss - spread * 0.15 : stopLoss + spread * 0.15, dp),
+    label: direction === 'BUY' ? 'Sell-Side Liquidity Swept (SSL)' : 'Buy-Side Liquidity Swept (BSL)',
+    color: '#f59e0b',
+  };
+
   return {
     symbol: entryDef.symbol,
     market: entryDef.market,
@@ -147,6 +170,9 @@ const generateSetupFromSnapshot = ({ entryDef, snapshot, user = null }) => {
     strategyMatched,
     userId: user ? user._id : null,
     status: 'active',
+    outcome: 'pending',
+    pnlPips: 0,
+    zones: [obZone, fvgZone, liquidityZone],
     detectedAt: new Date(),
     expiresAt,
   };

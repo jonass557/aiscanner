@@ -16,32 +16,44 @@ const ANALYSIS_ACTIONS = ['analyze', 'find_setups', 'should_i_trade', 'show_risk
 /**
  * Humanize a decision for the chat reply.
  */
-const decisionLabel = (d) =>
-  d === 'BUY' ? 'ACHAT' : d === 'SELL' ? 'VENTE' : d === 'WAIT' ? 'ATTENDRE' : 'AUCUN TRADE';
+const decisionLabel = (d, lang = 'fr') => {
+  if (lang === 'en') {
+    return d === 'BUY' ? 'BUY' : d === 'SELL' ? 'SELL' : d === 'WAIT' ? 'WAIT' : 'NO TRADE';
+  }
+  return d === 'BUY' ? 'ACHAT' : d === 'SELL' ? 'VENTE' : d === 'WAIT' ? 'ATTENDRE' : 'AUCUN TRADE';
+};
 
 /**
  * Build a spoken/chat summary for an assistant analysis message.
  */
-const analysisToText = (analysis, snapshot) => {
+const analysisToText = (analysis, snapshot, lang = 'fr') => {
   const tp = analysis.tradePlan || {};
   const rep = analysis.report || {};
-  const real = snapshot?.isRealData ? `données temps réel (${snapshot.source})` : 'données simulées (démo)';
-  const head = `${analysis.symbol} ${analysis.timeframe} · ${decisionLabel(analysis.decision)} · confiance ${analysis.confidenceScore}% · ${real}.`;
+  const isEn = lang === 'en';
+  const real = snapshot?.isRealData
+    ? (isEn ? `live data (${snapshot.source})` : `données temps réel (${snapshot.source})`)
+    : (isEn ? 'simulated data (demo)' : 'données simulées (démo)');
+  const head = isEn
+    ? `${analysis.symbol} ${analysis.timeframe} · ${decisionLabel(analysis.decision, 'en')} · confidence ${analysis.confidenceScore}% · ${real}.`
+    : `${analysis.symbol} ${analysis.timeframe} · ${decisionLabel(analysis.decision, 'fr')} · confiance ${analysis.confidenceScore}% · ${real}.`;
+
   if (analysis.decision === 'WAIT') {
-    const zone = tp.entry != null ? `\n\nZone à attendre : ${tp.entry}` : '';
-    return `${head}${zone}\n\n${tp.waitReason || rep.summary || 'Attendre une meilleure configuration.'}`;
+    const zone = tp.entry != null ? (isEn ? `\n\nZone to wait for: ${tp.entry}` : `\n\nZone à attendre : ${tp.entry}`) : '';
+    return `${head}${zone}\n\n${tp.waitReason || rep.summary || (isEn ? 'Wait for better market structure alignment.' : 'Attendre une meilleure configuration.')}`;
   }
   if (analysis.decision === 'NO_TRADE') {
-    return `${head}\n\n${rep.summary || 'Pas de setup exploitable.'}`;
+    return `${head}\n\n${rep.summary || (isEn ? 'No exploitable setup.' : 'Pas de setup exploitable.')}`;
   }
   const lines = [
     head,
     '',
-    `Entrée : ${tp.entry}`,
-    `Stop Loss : ${tp.stopLoss}`,
-    `Take Profit 1/2/3 : ${tp.takeProfit1} / ${tp.takeProfit2} / ${tp.takeProfit3}`,
-    `R:R : ${tp.riskRewardRatio} · Probabilité estimée : ${tp.estimatedProbability}% · Type : ${tp.tradeType || '—'}`,
-    `Durée estimée : ${tp.estimatedDuration || '—'}`,
+    isEn ? `Entry: ${tp.entry}` : `Entrée : ${tp.entry}`,
+    `Stop Loss: ${tp.stopLoss}`,
+    `Take Profit 1/2/3: ${tp.takeProfit1} / ${tp.takeProfit2} / ${tp.takeProfit3}`,
+    isEn
+      ? `R:R: ${tp.riskRewardRatio} · Estimated Probability: ${tp.estimatedProbability}% · Type: ${tp.tradeType || '—'}`
+      : `R:R : ${tp.riskRewardRatio} · Probabilité estimée : ${tp.estimatedProbability}% · Type : ${tp.tradeType || '—'}`,
+    isEn ? `Estimated Duration: ${tp.estimatedDuration || '—'}` : `Durée estimée : ${tp.estimatedDuration || '—'}`,
     '',
     rep.summary || '',
   ];
@@ -128,9 +140,10 @@ export const deleteConversation = asyncHandler(async (req, res) => {
  */
 export const sendMessage = asyncHandler(async (req, res) => {
   const user = req.user;
-  const { content } = req.body;
+  const { content, language } = req.body;
   if (!content || !String(content).trim()) throw ApiError.badRequest('Message is required.');
   const text = String(content).trim();
+  const lang = language || (req.headers['accept-language']?.includes('en') ? 'en' : 'fr');
 
   // Load (or create) the conversation, then the message history.
   let conv = await AssistantConversation.findOne({ _id: req.params.id, user: user._id });
@@ -206,7 +219,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
       metadata: { analysisId: saved._id, source: dataSource, isRealData },
     });
 
-    assistantText = analysisToText(analysis, snapshot);
+    assistantText = analysisToText(analysis, snapshot, lang);
     analysisIds = [saved._id];
 
     // show_risks: emphasize risks in the reply.
@@ -325,6 +338,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
         { role: 'user', content: text },
       ],
       level: user.preferences?.level,
+      lang,
     });
     assistantText = reply;
   }

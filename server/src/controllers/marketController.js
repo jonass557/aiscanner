@@ -19,7 +19,8 @@ export const getSnapshot = asyncHandler(async (req, res) => {
   if (!symbol) throw ApiError.badRequest('A symbol is required.');
 
   const tf = normalizeTimeframe(timeframe);
-  const snapshot = await getMarketSnapshot(symbol, tf, 150);
+  const candleLimit = Math.min(Math.max(Number(req.query.limit) || 200, 30), 500);
+  const snapshot = await getMarketSnapshot(symbol, tf, candleLimit);
 
   if (!snapshot) {
     throw ApiError.notFound(`Symbol "${symbol}" could not be resolved to a known market.`);

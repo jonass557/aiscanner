@@ -108,8 +108,8 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 lg:block">
+      {/* Desktop sidebar - permanently fixed during page scroll */}
+      <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 lg:block sticky top-0 h-screen overflow-y-auto">
         <SidebarInner />
       </aside>
 

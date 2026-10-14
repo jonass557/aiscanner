@@ -9,15 +9,19 @@ import logger from './logger.js';
 export const connectDB = async () => {
   try {
     mongoose.set('strictQuery', true);
-    // Disable command buffering so queries immediately fail if DB is not connected
-    // instead of hanging for 60 seconds (which triggers client timeout 60000ms).
-    mongoose.set('bufferCommands', false);
+    // Allow buffer commands with high tolerance so transient mobile drops don't fail immediately
+    mongoose.set('bufferCommands', true);
+    mongoose.set('bufferTimeoutMS', 30000);
 
     const conn = await mongoose.connect(config.mongo.uri, {
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
+      maxPoolSize: 20,
+      minPoolSize: 2,
+      serverSelectionTimeoutMS: 30000,
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 60000,
+      heartbeatFrequencyMS: 10000,
+      retryWrites: true,
+      retryReads: true,
     });
 
     logger.info(`MongoDB connected: ${conn.connection.host}`);
@@ -27,7 +31,11 @@ export const connectDB = async () => {
     });
 
     mongoose.connection.on('disconnected', () => {
-      logger.warn('MongoDB disconnected');
+      logger.warn('MongoDB disconnected — attempting automatic reconnect...');
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      logger.info('MongoDB reconnected successfully.');
     });
 
     return conn;

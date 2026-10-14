@@ -26,8 +26,8 @@ export const scanApi = {
 
 export const marketApi = {
   // Live snapshot (quote + candles) for a detected pair + timeframe.
-  snapshot: (symbol, timeframe) =>
-    api.get('/market/snapshot', { params: { symbol, timeframe } }),
+  snapshot: (symbol, timeframe, limit = 250) =>
+    api.get('/market/snapshot', { params: { symbol, timeframe, limit } }),
 };
 
 export const multiTimeframeApi = {

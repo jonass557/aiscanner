@@ -10,14 +10,24 @@ import NewsBanner from '../../components/news/NewsBanner.jsx';
 import { assistantApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useSpeech } from '../../hooks/useSpeech.js';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
-const SUGGESTIONS = [
+const SUGGESTIONS_FR = [
   'Analyse EURUSD en H4',
   'Analyse BTCUSD selon Smart Money Concepts',
   'Donne-moi un trade avec un ratio minimum de 1:3',
   'Quels sont les meilleurs marchés aujourd\'hui ?',
   'Compare EURUSD et GBPUSD',
-  'C\'est quoi un order block ?',
+  'C\'est quoi un order block institutionnel ?',
+];
+
+const SUGGESTIONS_EN = [
+  'Analyze EURUSD on H4',
+  'Analyze BTCUSD with Smart Money Concepts',
+  'Find me a setup with minimum 1:3 R:R',
+  'What are the best trending markets today?',
+  'Compare EURUSD and GBPUSD',
+  'Explain what an institutional Order Block is',
 ];
 
 /**
@@ -26,6 +36,9 @@ const SUGGESTIONS = [
  * context, and renders rich decision/trade-plan cards inline.
  */
 export default function AssistantChat() {
+  const { lang, t } = useLanguage();
+  const isEn = lang === 'en';
+
   const [conversations, setConversations] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -66,7 +79,7 @@ export default function AssistantChat() {
     speak,
     cancelSpeech,
   } = useSpeech({
-    lang: 'fr-FR',
+    lang: isEn ? 'en-US' : 'fr-FR',
     onResult: (t) => send(t),
   });
 
@@ -86,7 +99,7 @@ export default function AssistantChat() {
           id = data.data.conversation._id;
           setConversationId(id);
         }
-        const { data } = await assistantApi.sendMessage(id, { content: clean });
+        const { data } = await assistantApi.sendMessage(id, { content: clean, language: lang });
         const res = data.data;
         setMessages((m) => [
           ...m,
@@ -201,7 +214,9 @@ export default function AssistantChat() {
             </span>
             <div>
               <span className="font-semibold">AI Trading Assistant</span>
-              <p className="text-[11px] text-gray-500">Analyse temps réel · dialogue vocal continu</p>
+              <p className="text-[11px] text-gray-500">
+                {isEn ? 'Real-time analysis · Continuous hands-free voice' : 'Analyse temps réel · dialogue vocal continu'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -214,10 +229,14 @@ export default function AssistantChat() {
                     ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300 animate-pulse'
                     : 'border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-white'
                 }`}
-                title="Activer le mode mains-libres pour parler en continu sans toucher le micro"
+                title={
+                  isEn
+                    ? 'Toggle hands-free mode to speak continuously without touching the mic'
+                    : 'Activer le mode mains-libres pour parler en continu sans toucher le micro'
+                }
               >
                 <span className={`h-2 w-2 rounded-full ${handsFree ? 'bg-cyan-400' : 'bg-slate-500'}`} />
-                {handsFree ? 'Mains Libres Activé' : 'Mode Mains Libres'}
+                {handsFree ? (isEn ? 'Hands-Free Active' : 'Mains Libres Activé') : (isEn ? 'Hands-Free Mode' : 'Mode Mains Libres')}
               </button>
             )}
             {synthSupported && (
@@ -228,7 +247,7 @@ export default function AssistantChat() {
                   setTtsOn(!ttsOn);
                 }}
                 className="btn-ghost !px-2"
-                title={ttsOn ? 'Couper la voix' : 'Activer la voix'}
+                title={ttsOn ? (isEn ? 'Mute AI voice' : 'Couper la voix') : (isEn ? 'Enable AI voice' : 'Activer la voix')}
               >
                 {ttsOn ? <Volume2 className="h-5 w-5 text-cyan-400" /> : <VolumeX className="h-5 w-5 text-gray-400" />}
               </button>
@@ -245,13 +264,14 @@ export default function AssistantChat() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-accent-500 text-white">
                 <Bot className="h-8 w-8" />
               </div>
-              <h2 className="text-lg font-semibold">Votre copilote de trading</h2>
+              <h2 className="text-lg font-semibold">{isEn ? 'Your AI Trading Copilot' : 'Votre copilote de trading'}</h2>
               <p className="mt-1 text-sm text-gray-500">
-                Parlez ou écrivez naturellement. J'analyse les marchés en données réelles, j'explique
-                mon raisonnement et je m'adapte à vos préférences.
+                {isEn
+                  ? 'Speak or write naturally. I analyze markets in real time, provide verified institutional trade plans, and adapt to your strategies.'
+                  : 'Parlez ou écrivez naturellement. J\'analyse les marchés en données réelles, j\'explique mon raisonnement et je m\'adapte à vos préférences.'}
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {SUGGESTIONS.map((s) => (
+                {(isEn ? SUGGESTIONS_EN : SUGGESTIONS_FR).map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}

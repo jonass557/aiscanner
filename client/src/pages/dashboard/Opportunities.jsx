@@ -12,6 +12,11 @@ import {
   Sliders,
   Bell,
   Clock,
+  TrendingUp,
+  TrendingDown,
+  Award,
+  Layers,
+  Crosshair,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -23,6 +28,7 @@ import { opportunityApi, userApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatPrice, marketLabel } from '../../utils/format.js';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 const REFRESH_MS = 60 * 1000; // poll every minute for fresh opportunities
 
@@ -37,14 +43,22 @@ const emptyFilters = {
 
 /**
  * AI Opportunity Scanner:
- * - Scan temps réel haute probabilité
- * - Configuration libre de sa stratégie & de son plan de trading personnel
- * - Alertes emails automatiques tant que l'abonnement/plan est actif (désactivé si expiré)
+ * - Tab 1: Live Active Signals with real-time chart, SL, TP, and strategy confluences
+ * - Tab 2: Performance Report for closed signals (Winrate %, TP1/TP2 hits, SL hits, Total Pips)
+ * - Custom Trading Strategy and Trading Plan configuration
+ * - Automatic Email alerts when subscribed
  */
 export default function Opportunities() {
   const { user } = useAuth();
+  const { t, lang } = useLanguage();
+  const isEn = lang === 'en';
+
+  // Tabs: 'active' | 'closed'
+  const [activeTab, setActiveTab] = useState('active');
+
   const [meta, setMeta] = useState(null);
   const [opportunities, setOpportunities] = useState([]);
+  const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -64,9 +78,15 @@ export default function Opportunities() {
     async (isBackground = false) => {
       if (!isBackground) setRefreshing(true);
       try {
-        const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== ''));
+        const params = {
+          ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '')),
+          tab: activeTab,
+        };
         const { data } = await opportunityApi.list(params);
-        setOpportunities(data.data.opportunities);
+        setOpportunities(data.data.opportunities || []);
+        if (data.data.report) {
+          setReport(data.data.report);
+        }
       } catch (err) {
         if (!isBackground) toast.error(getErrorMessage(err));
       } finally {
@@ -74,7 +94,7 @@ export default function Opportunities() {
         setRefreshing(false);
       }
     },
-    [filters]
+    [filters, activeTab]
   );
 
   // Load preferences & meta
@@ -97,7 +117,7 @@ export default function Opportunities() {
       .catch(() => {});
   }, []);
 
-  // Reload when filters change & auto-poll
+  // Reload when filters or tab change & auto-poll
   useEffect(() => {
     load();
     const id = setInterval(() => load(true), REFRESH_MS);
@@ -108,7 +128,9 @@ export default function Opportunities() {
     setScanning(true);
     try {
       const { data } = await opportunityApi.scan({ market: filters.market || undefined });
-      toast.success(data.message || 'Scan en temps réel terminé !');
+      toast.success(
+        data.message || (isEn ? 'Real-time scan completed!' : 'Scan en temps réel terminé !')
+      );
       await load(true);
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -127,9 +149,12 @@ export default function Opportunities() {
         opportunityEmailAlerts: emailAlertsEnabled,
         minOpportunityConfidence: Number(minEmailConfidence),
       });
-      toast.success('Stratégie et Plan de Trading enregistrés avec succès !');
+      toast.success(
+        isEn
+          ? 'Trading Strategy and Plan saved successfully!'
+          : 'Stratégie et Plan de Trading enregistrés avec succès !'
+      );
       setStrategyModalOpen(false);
-      // Run on-demand scan with the updated strategy
       runScan();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -149,7 +174,7 @@ export default function Opportunities() {
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
       >
-        <option value="">All</option>
+        <option value="">{t('all')}</option>
         {options.map((opt) => (
           <option key={opt} value={opt}>
             {formatOption ? formatOption(opt) : opt}
@@ -161,198 +186,326 @@ export default function Opportunities() {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner & Control */}
+      {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-extrabold text-gray-900 dark:text-white">
-            <Radar className="h-7 w-7 text-brand-500 animate-pulse" /> Opportunity Scanner
-          </h1>
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-accent-600 text-white shadow-md">
+              <Radar className="h-4 w-4" />
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              {t('oppTitle')}
+            </h1>
+          </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Setups en direct avec flux de marché temps réel, filtrés selon votre stratégie & votre plan de trading.
-            {meta?.activeTotal != null && ` ${meta.activeTotal} opportunités actives en ce moment.`}
+            {t('oppSubtitle')}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {/* Strategy & Trading Plan Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Custom Strategy & Plan button */}
           <Button
             variant="secondary"
             onClick={() => setStrategyModalOpen(true)}
-            className="border-brand-500/30 text-brand-700 dark:text-brand-300 bg-brand-50/60 dark:bg-brand-950/40 hover:bg-brand-100"
+            className="flex items-center gap-1.5 text-xs border-brand-500/40 text-brand-600 dark:text-brand-400"
           >
-            <BookMarked className="h-4 w-4 text-brand-600" />
-            <span>Ma Stratégie & Plan</span>
+            <BookMarked className="h-4 w-4" />
+            {isEn ? 'My Strategy & Plan' : 'Ma Stratégie & Mon Plan'}
           </Button>
 
-          <Button variant="secondary" onClick={() => load()} loading={refreshing}>
-            <RefreshCw className="h-4 w-4" /> Rafraîchir
+          {/* Refresh Button */}
+          <Button
+            variant="ghost"
+            onClick={() => load(false)}
+            loading={refreshing}
+            className="flex items-center gap-1.5 text-xs"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {t('refresh')}
           </Button>
 
-          <Button onClick={runScan} loading={scanning} className="bg-brand-600 hover:bg-brand-500 shadow-sm">
-            <Radar className="h-4 w-4" /> Scanner Maintenant
+          {/* Scan Now */}
+          <Button
+            variant="primary"
+            onClick={runScan}
+            loading={scanning}
+            className="flex items-center gap-1.5 text-xs"
+          >
+            <Sparkles className="h-4 w-4" />
+            {t('scanNow')}
           </Button>
         </div>
       </div>
 
-      {/* Plan status alert banner */}
-      <div className="flex flex-wrap items-center justify-between rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50/80 via-white to-brand-50/40 p-4 text-xs dark:border-brand-900/60 dark:from-brand-950/30 dark:via-gray-900 dark:to-brand-950/20">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
-            <Bell className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="font-bold text-gray-900 dark:text-white">
-              Stratégie Active :{' '}
-              <span className="text-brand-600 dark:text-brand-400 uppercase font-extrabold">
-                {strategyType === 'custom' ? 'Personnalisée' : strategyType}
-              </span>
-            </p>
-            <p className="text-gray-500 dark:text-gray-400 mt-0.5">
-              {emailAlertsEnabled
-                ? `Notifications email activées (probabilité ≥ ${minEmailConfidence}%). Les alertes s'arrêtent automatiquement si votre plan arrive à expiration.`
-                : 'Alertes emails désactivées.'}
-            </p>
-          </div>
-        </div>
+      {/* Navigation Tabs: Live Active Signals vs Closed Performance Report */}
+      <div className="flex border-b border-gray-200 dark:border-gray-800">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition ${
+            activeTab === 'active'
+              ? 'border-brand-600 text-brand-600 dark:text-brand-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+          }`}
+        >
+          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          {t('activeSignalsTab')}
+        </button>
 
         <button
-          onClick={() => setStrategyModalOpen(true)}
-          className="mt-2 sm:mt-0 font-semibold text-brand-600 hover:underline dark:text-brand-400"
+          onClick={() => setActiveTab('closed')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition ${
+            activeTab === 'closed'
+              ? 'border-brand-600 text-brand-600 dark:text-brand-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+          }`}
         >
-          Modifier ma stratégie & mes règles →
+          <Award className="h-4 w-4" />
+          {t('closedSignalsTab')}
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="card p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="flex items-center gap-2 text-sm font-semibold">
-            <SlidersHorizontal className="h-4 w-4" /> Filtres Avancés
-          </p>
-          <button onClick={clearFilters} className="text-xs text-brand-600 hover:underline">
-            Réinitialiser
-          </button>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Select label="Marché" value={filters.market} onChange={(v) => setFilter('market', v)} options={meta?.markets || []} formatOption={marketLabel} />
-          <Select label="Timeframe" value={filters.timeframe} onChange={(v) => setFilter('timeframe', v)} options={meta?.timeframes || []} />
-          <Select label="Direction" value={filters.direction} onChange={(v) => setFilter('direction', v)} options={['BUY', 'SELL']} />
-          <Select label="Type de Setup" value={filters.setupType} onChange={(v) => setFilter('setupType', v)} options={meta?.setupTypes || []} />
-          <Select label="Niveau de Risque" value={filters.riskLevel} onChange={(v) => setFilter('riskLevel', v)} options={meta?.riskLevels || []} />
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Probabilité Min.</label>
-            <select
-              value={filters.minConfidence}
-              onChange={(e) => setFilter('minConfidence', e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-            >
-              <option value="">Toutes</option>
-              <option value="75">≥ 75% (Haute Probabilité)</option>
-              <option value="80">≥ 80% (Setup Institutionnel)</option>
-              <option value="85">≥ 85% (Prime A+)</option>
-            </select>
+      {/* Closed Tab: Performance KPI Report */}
+      {activeTab === 'closed' && report && (
+        <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-6 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:to-gray-950">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-4 dark:border-gray-800">
+            <div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Award className="h-5 w-5 text-amber-500" />
+                {t('reportTitle')}
+              </h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {isEn
+                  ? 'Verifiable statistical tracking of past signals, Stop Losses and Take Profits hit.'
+                  : 'Suivi statistique vérifiable des signaux passés, des Stop Loss et des Take Profits atteints.'}
+              </p>
+            </div>
+            <span className="rounded-xl bg-brand-500/10 px-3 py-1 font-mono text-xs font-bold text-brand-600 dark:text-brand-300">
+              {report.totalClosed} {isEn ? 'Signals Evaluated' : 'Signaux Évalués'}
+            </span>
           </div>
-        </div>
-      </div>
 
-      {/* Opportunity Grid Board */}
-      {loading ? (
-        <Spinner label="Recherche des opportunités haute probabilité…" />
-      ) : opportunities.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {opportunities.map((o) => (
-            <OpportunityCard key={o._id} opportunity={o} onClick={setSelected} />
-          ))}
-        </div>
-      ) : (
-        <div className="card flex flex-col items-center py-16 text-center">
-          <Sparkles className="h-12 w-12 text-brand-400 animate-bounce" />
-          <p className="mt-4 text-base font-bold text-gray-900 dark:text-white">
-            Aucun setup ne correspond à vos filtres en ce moment.
-          </p>
-          <p className="mt-1 max-w-md text-sm text-gray-500">
-            L'Opportunity Scanner analyse les marchés en continu. Vous pouvez cliquer sur "Scanner Maintenant" ou ajuster votre stratégie.
-          </p>
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {/* Winrate */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
+              <span className="text-[10px] font-bold uppercase text-gray-400">{t('winrate')}</span>
+              <p className="mt-1 font-mono text-2xl font-black text-brand-600 dark:text-brand-400">
+                {report.winRate}%
+              </p>
+            </div>
+
+            {/* Total Pips */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
+              <span className="text-[10px] font-bold uppercase text-gray-400">{t('pipsWon')}</span>
+              <p
+                className={`mt-1 font-mono text-2xl font-black ${
+                  report.totalPips >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                }`}
+              >
+                {report.totalPips >= 0 ? `+${report.totalPips}` : report.totalPips} pips
+              </p>
+            </div>
+
+            {/* TP1 Count */}
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-center">
+              <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">
+                {t('tp1Hit')}
+              </span>
+              <p className="mt-1 font-mono text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                {report.tp1Count}
+              </p>
+            </div>
+
+            {/* TP2 Count */}
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-center">
+              <span className="text-[10px] font-bold uppercase text-emerald-500">
+                {t('tp2Hit')}
+              </span>
+              <p className="mt-1 font-mono text-2xl font-black text-emerald-500">
+                {report.tp2Count}
+              </p>
+            </div>
+
+            {/* SL Count */}
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 text-center">
+              <span className="text-[10px] font-bold uppercase text-rose-500">
+                {t('slHit')}
+              </span>
+              <p className="mt-1 font-mono text-2xl font-black text-rose-500">
+                {report.slCount}
+              </p>
+            </div>
+
+            {/* Profit Factor */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
+              <span className="text-[10px] font-bold uppercase text-gray-400">Profit Factor</span>
+              <p className="mt-1 font-mono text-2xl font-black text-cyan-500">
+                {report.profitFactor}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Strategy & Trading Plan Modal */}
+      {/* Filter Bar */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-semibold">{t('filter')}</span>
+          </div>
+          <button
+            onClick={clearFilters}
+            className="text-xs text-gray-500 transition hover:text-brand-600 dark:hover:text-brand-400"
+          >
+            {isEn ? 'Reset Filters' : 'Réinitialiser filtres'}
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <Select
+            label="Marché"
+            value={filters.market}
+            onChange={(v) => setFilter('market', v)}
+            options={meta?.markets || []}
+            formatOption={marketLabel}
+          />
+          <Select
+            label="Timeframe"
+            value={filters.timeframe}
+            onChange={(v) => setFilter('timeframe', v)}
+            options={meta?.timeframes || []}
+          />
+          <Select
+            label="Direction"
+            value={filters.direction}
+            onChange={(v) => setFilter('direction', v)}
+            options={['BUY', 'SELL']}
+          />
+          <Select
+            label="Type de Setup"
+            value={filters.setupType}
+            onChange={(v) => setFilter('setupType', v)}
+            options={meta?.setupTypes || []}
+          />
+          <Select
+            label="Risque"
+            value={filters.riskLevel}
+            onChange={(v) => setFilter('riskLevel', v)}
+            options={meta?.riskLevels || []}
+          />
+          <Select
+            label="Probabilité Min."
+            value={filters.minConfidence}
+            onChange={(v) => setFilter('minConfidence', v)}
+            options={['70', '80', '85', '90']}
+            formatOption={(v) => `≥ ${v}%`}
+          />
+        </div>
+      </div>
+
+      {/* Content Grid */}
+      {loading ? (
+        <Spinner label={t('loading')} />
+      ) : opportunities.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-300 p-12 text-center dark:border-gray-800">
+          <Radar className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-base font-semibold">
+            {isEn ? 'No signals matching criteria' : 'Aucun signal correspondant aux critères'}
+          </h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {isEn
+              ? 'Try widening your filters or click Scan Now to launch a real-time sweep.'
+              : 'Essayez d\'élargir vos filtres ou cliquez sur Scanner Maintenant.'}
+          </p>
+          <Button variant="secondary" onClick={clearFilters} className="mt-4">
+            {isEn ? 'Reset Filters' : 'Réinitialiser les filtres'}
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {opportunities.map((opp) => (
+            <OpportunityCard
+              key={opp._id}
+              opportunity={opp}
+              onClick={() => setSelected(opp)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Custom Strategy & Trading Plan Modal */}
       {strategyModalOpen && (
         <Modal
           open={strategyModalOpen}
           onClose={() => setStrategyModalOpen(false)}
-          title="Mon Plan de Trading & Stratégie Personnalisée"
+          title={isEn ? 'My Trading Strategy & Plan' : 'Ma Stratégie & Mon Plan de Trading'}
         >
           <div className="space-y-4">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Définissez vos règles de trading. L'Opportunity Scanner scannera les marchés en temps réel selon vos critères précis et vous enverra les meilleurs setups par email.
+            <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+              {isEn
+                ? 'Configure your personal strategy. The Opportunity Scanner will scan live markets according to your exact rules.'
+                : 'Configurez votre stratégie personnelle. L\'Opportunity Scanner analysera les marchés selon vos règles exactes.'}
             </p>
 
-            {/* Methodology selector */}
             <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Méthodologie de Scan Préférée :
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                {t('strategy')}
               </label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[
-                  { id: 'smc', label: 'SMC (Défaut)' },
-                  { id: 'ict', label: 'ICT (Killzones)' },
-                  { id: 'price-action', label: 'Price Action' },
-                  { id: 'custom', label: '✨ Personnalisée' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setStrategyType(m.id)}
-                    className={`rounded-xl border p-2.5 text-xs font-bold transition text-center ${
-                      strategyType === m.id
-                        ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300 ring-2 ring-brand-500/20'
-                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={strategyType}
+                onChange={(e) => setStrategyType(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-800"
+              >
+                <option value="smc">Smart Money Concepts (SMC - Par Défaut)</option>
+                <option value="ict">Inner Circle Trader (ICT)</option>
+                <option value="price-action">Price Action Institutionnel</option>
+                <option value="custom">Ma Stratégie Personnalisée</option>
+              </select>
             </div>
 
-            {/* Custom Strategy Description if 'custom' */}
             {strategyType === 'custom' && (
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  Description de votre Stratégie Personnalisée :
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  {isEn ? 'Custom Strategy Description' : 'Description de votre Stratégie'}
                 </label>
                 <textarea
+                  rows={4}
                   value={customStrategyText}
                   onChange={(e) => setCustomStrategyText(e.target.value)}
-                  rows={4}
-                  placeholder="Ex : Je recherche un balayage du plus haut de la veille en session de Londres, suivi d'un MSS en M15 et d'un retour sur l'Order Block extrême en zone Discount..."
-                  className="w-full rounded-xl border border-gray-300 p-3 text-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  placeholder={
+                    isEn
+                      ? 'e.g., Scan for M15 rejections on 1H Order Blocks after Asian session liquidity sweep...'
+                      : 'ex: Chercher un rejet M15 sur Order Block 1H après balayage de la liquidité asiatique...'
+                  }
+                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white p-3 text-xs dark:border-gray-700 dark:bg-gray-800"
                 />
               </div>
             )}
 
-            {/* Trading Plan & Execution rules */}
             <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Plan de Trading & Règles d'Exécution :
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                {isEn ? 'Personal Trading Plan (Rules & Constraints)' : 'Plan de Trading Personnel (Règles & Contraintes)'}
               </label>
               <textarea
+                rows={3}
                 value={customTradingPlanText}
                 onChange={(e) => setCustomTradingPlanText(e.target.value)}
-                rows={3}
-                placeholder="Ex : Risque max 1% par trade, ratio Risk/Reward minimum 1:2.5, ne trader que Forex et Or, jamais pendant les annonces NFP/CPI..."
-                className="w-full rounded-xl border border-gray-300 p-3 text-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                placeholder={
+                  isEn
+                    ? 'e.g., Maximum 1% risk per trade, Minimum 1:2.5 R:R, Only trade during London and NY sessions...'
+                    : 'ex: Risque max 1% par trade, Ratio R:R minimum 1:2.5, Ne trader que pendant les sessions Londres et New York...'
+                }
+                className="mt-1 w-full rounded-xl border border-gray-300 bg-white p-3 text-xs dark:border-gray-700 dark:bg-gray-800"
               />
             </div>
 
-            {/* Email Dispatch Settings */}
+            {/* Email Notifications */}
             <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 dark:border-gray-700 dark:bg-gray-800/40">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-brand-600" />
                   <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                    Alertes Automatiques par Email
+                    {isEn ? 'Automatic Email Alerts' : 'Alertes Automatiques par Email'}
                   </span>
                 </div>
                 <input
@@ -363,23 +516,29 @@ export default function Opportunities() {
                 />
               </div>
               <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                Recevez directement les opportunités détectées dans votre boîte mail dès leur apparition en temps réel.
+                {isEn
+                  ? 'Receive detected opportunities straight into your inbox in real time.'
+                  : 'Recevez directement les opportunités détectées dans votre boîte mail dès leur apparition en temps réel.'}
                 <span className="block mt-0.5 text-amber-600 dark:text-amber-400">
-                  ⚠️ Les alertes s'arrêtent automatiquement dès que votre abonnement arrive à expiration.
+                  {isEn
+                    ? '⚠️ Alerts automatically stop when your subscription expires.'
+                    : '⚠️ Les alertes s\'arrêtent automatiquement dès que votre abonnement arrive à expiration.'}
                 </span>
               </p>
 
               {emailAlertsEnabled && (
                 <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">Seuil de Probabilité pour Email :</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+                    {isEn ? 'Minimum Confidence Threshold:' : 'Seuil de Probabilité pour Email :'}
+                  </span>
                   <select
                     value={minEmailConfidence}
                     onChange={(e) => setMinEmailConfidence(Number(e.target.value))}
                     className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800"
                   >
-                    <option value="75">75% et plus</option>
-                    <option value="80">80% et plus (Recommandé)</option>
-                    <option value="85">85% et plus (Très haute sélectivité)</option>
+                    <option value="75">75% {isEn ? 'and above' : 'et plus'}</option>
+                    <option value="80">80% {isEn ? 'and above (Recommended)' : 'et plus (Recommandé)'}</option>
+                    <option value="85">85% {isEn ? 'and above (High Selectivity)' : 'et plus (Très haute sélectivité)'}</option>
                   </select>
                 </div>
               )}
@@ -387,17 +546,21 @@ export default function Opportunities() {
 
             <div className="flex justify-end gap-2 pt-3 border-t dark:border-gray-800">
               <Button variant="ghost" onClick={() => setStrategyModalOpen(false)}>
-                Annuler
+                {t('cancel')}
               </Button>
-              <Button onClick={handleSaveStrategyPlan} loading={savingPlan} className="bg-brand-600 hover:bg-brand-500 text-white">
-                Enregistrer & Scanner
+              <Button
+                onClick={handleSaveStrategyPlan}
+                loading={savingPlan}
+                className="bg-brand-600 hover:bg-brand-500 text-white"
+              >
+                {t('save')} &amp; {t('scanNow')}
               </Button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Opportunity Detail Modal */}
+      {/* Opportunity Detail Modal with Live Candlestick Chart & Confluences */}
       <Modal
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
@@ -409,14 +572,25 @@ export default function Opportunities() {
               <Badge tone="purple">{marketLabel(selected.market)}</Badge>
               <Badge tone="gray">{selected.timeframe}</Badge>
               <Badge tone={selected.confidenceScore >= 80 ? 'green' : 'blue'}>
-                {selected.confidenceScore}% de probabilité
+                {selected.confidenceScore}% {isEn ? 'probability' : 'de probabilité'}
               </Badge>
               {selected.strategyMatched && (
-                <Badge tone="blue">Stratégie : {selected.strategyMatched}</Badge>
+                <Badge tone="blue">
+                  {t('strategy')} : {selected.strategyMatched}
+                </Badge>
+              )}
+              {selected.outcome && selected.outcome !== 'pending' && (
+                <Badge tone={selected.outcome.includes('tp') ? 'green' : 'red'}>
+                  {selected.outcome === 'hit_tp2'
+                    ? '🎯 TP2 REACHED (+85 pips)'
+                    : selected.outcome === 'hit_tp1'
+                    ? '🎯 TP1 REACHED (+40 pips)'
+                    : '🛑 STOP LOSS HIT'}
+                </Badge>
               )}
             </div>
 
-            {/* Live Chart representing the exact signal levels and timeframe */}
+            {/* Real-time Candlestick Chart */}
             <div className="rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
               <LiveChart
                 symbol={selected.symbol}
@@ -430,32 +604,60 @@ export default function Opportunities() {
               />
             </div>
 
+            {/* Levels Grid */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                ['Prix Entrée', selected.entry],
-                ['Stop Loss', selected.stopLoss],
-                ['TP1', selected.takeProfit1],
-                ['TP2', selected.takeProfit2],
-              ].map(([label, val]) => (
-                <div key={label} className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
-                  <p className="text-xs font-medium text-gray-500">{label}</p>
+                [t('entry'), selected.entry],
+                [t('stopLoss'), selected.stopLoss],
+                ['Take Profit 1', selected.takeProfit1],
+                ['Take Profit 2', selected.takeProfit2],
+              ].map(([lbl, val]) => (
+                <div key={lbl} className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+                  <p className="text-xs font-medium text-gray-500">{lbl}</p>
                   <p className="mt-1 font-mono text-sm font-bold">{formatPrice(val)}</p>
                 </div>
               ))}
             </div>
 
+            {/* Strategic Zones Detected (Order Block, FVG, Liquidity) */}
+            {selected.zones && selected.zones.length > 0 && (
+              <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3.5 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                  <Layers className="h-4 w-4 text-brand-500" />
+                  {t('zonesTitle')}
+                </p>
+                <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {selected.zones.map((zone, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-lg border border-gray-200 bg-white p-2.5 text-xs dark:border-gray-700 dark:bg-gray-800"
+                    >
+                      <span className="font-semibold block text-[11px]" style={{ color: zone.color || '#3b82f6' }}>
+                        ● {zone.label}
+                      </span>
+                      <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400 block mt-1">
+                        {formatPrice(zone.priceMin)} - {formatPrice(zone.priceMax)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Rationale */}
             {selected.rationale && (
               <div>
-                <p className="text-sm font-semibold">Analyse Institutionnelle & Rationale</p>
+                <p className="text-sm font-semibold">{t('rationale')}</p>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
                   {selected.rationale}
                 </p>
               </div>
             )}
 
+            {/* Confluences */}
             {selected.confluences?.length > 0 && (
               <div>
-                <p className="text-sm font-semibold">Confluences Confirmées</p>
+                <p className="text-sm font-semibold">{t('confluences')}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selected.confluences.map((c, i) => (
                     <Badge key={i} tone="blue">
@@ -468,7 +670,9 @@ export default function Opportunities() {
             )}
 
             <p className="text-center text-xs text-gray-400 pt-2 border-t dark:border-gray-800">
-              Généré en temps réel à des fins éducatives et d'aide à la décision. Respectez toujours votre gestion du risque.
+              {isEn
+                ? 'Generated in real-time for educational and decision-support purposes. Always practice prudent risk management.'
+                : 'Généré en temps réel à des fins éducatives et d\'aide à la décision. Respectez toujours votre gestion du risque.'}
             </p>
           </div>
         )}

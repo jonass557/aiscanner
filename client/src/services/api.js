@@ -85,6 +85,13 @@ api.interceptors.response.use(
       }
     }
 
+    // Auto-retry once on transient network drop (weak mobile connection)
+    if (!original._netRetried && (!error.response || [502, 503, 504].includes(status))) {
+      original._netRetried = true;
+      await new Promise((r) => setTimeout(r, 1200));
+      return api(original);
+    }
+
     return Promise.reject(error);
   }
 );
