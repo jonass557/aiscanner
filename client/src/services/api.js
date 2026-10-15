@@ -99,10 +99,25 @@ api.interceptors.response.use(
 /** Normalizes an axios error into a human-readable message. */
 export const getErrorMessage = (error) => {
   if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
-    return "Délai d'attente dépassé (timeout). L'analyse IA prend plus de temps que prévu ou le réseau est saturé. Veuillez réessayer.";
+    return "Délai d'attente dépassé (timeout). Le serveur backend prend plus de temps que prévu à répondre ou le réseau est saturé. Veuillez réessayer.";
   }
+
+  // Detect missing VITE_API_URL on Vercel or cloud deployment
+  const isVercelOrRemote = typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname);
+  if (isVercelOrRemote && !import.meta.env.VITE_API_URL) {
+    return "L'URL du serveur backend (Render) n'est pas renseignée dans Vercel (variable VITE_API_URL manquante). Veuillez ajouter VITE_API_URL=<URL_BACKEND_RENDER> dans Vercel -> Settings -> Environment Variables puis redéployer.";
+  }
+
+  // Detect HTML returned by Vercel rewrites when API endpoint doesn't exist on static host
+  if (typeof error.response?.data === 'string' && error.response.data.includes('<!doctype html>')) {
+    return "Le serveur frontend (Vercel) a renvoyé une page HTML au lieu de l'API. Assurez-vous que la variable VITE_API_URL est bien configurée avec l'URL de votre backend Render.";
+  }
+
   if (!error.response && error.message === 'Network Error') {
-    return 'Impossible de joindre le serveur. Vérifiez votre connexion et assurez-vous que le serveur backend est démarré.';
+    if (isVercelOrRemote) {
+      return "Impossible de joindre le serveur backend (Render). Si vous utilisez l'offre gratuite de Render, le serveur s'endort après 15 min d'inactivité et prend 40 à 50 secondes pour démarrer (démarrage à froid). Patientez une minute et réessayez, ou vérifiez l'état de votre service sur le tableau de bord Render.";
+    }
+    return 'Impossible de joindre le serveur backend. Vérifiez que le serveur est bien démarré sur le port 5000 (npm run dev dans le dossier server).';
   }
   return error.response?.data?.message || error.message || 'Une erreur est survenue. Veuillez réessayer.';
 };

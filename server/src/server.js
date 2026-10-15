@@ -15,8 +15,8 @@ import { isRealProviderConfigured } from './services/ai/index.js';
 const start = async () => {
   try {
     const app = createApp();
-    const server = app.listen(config.port, () => {
-      logger.info(`Server running in ${config.env} mode on port ${config.port}`);
+    const server = app.listen(config.port, '0.0.0.0', () => {
+      logger.info(`Server running in ${config.env} mode on port ${config.port} (0.0.0.0)`);
       // Surface email/verification config so misconfig is obvious in host logs.
       const emailMode = config.email.resendApiKey
         ? 'Resend API (HTTP)'

@@ -9,10 +9,10 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: process.env.VITE_PROXY_TARGET || 'http://localhost:5000',
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:5000',
         changeOrigin: true,
-        timeout: 10000,
-        proxyTimeout: 10000,
+        timeout: 90000,
+        proxyTimeout: 90000,
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, res) => {
             if (res && !res.headersSent) {
