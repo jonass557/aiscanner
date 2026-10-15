@@ -4,11 +4,11 @@ import axios from 'axios';
  * Central axios instance. Attaches the access token to every request and
  * transparently refreshes it once on a 401 before retrying.
  */
+const rawBase = (import.meta.env.VITE_API_URL || '').trim();
+const cleanBaseUrl = rawBase.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
 const api = axios.create({
-  // In dev the Vite proxy forwards /api/v1 to the Express server. In
-  // production, VITE_API_URL points at the Render backend (e.g.
-  // https://api.your-app.com) and we append the /api/v1 prefix.
-  baseURL: `${import.meta.env.VITE_API_URL || ''}/api/v1`,
+  // If VITE_API_URL is provided, use it; otherwise fallback to relative /api/v1 (Vite proxy in dev)
+  baseURL: cleanBaseUrl ? `${cleanBaseUrl}/api/v1` : '/api/v1',
   timeout: 90000,
 });
 
