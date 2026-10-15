@@ -19,7 +19,11 @@ export const getSnapshot = asyncHandler(async (req, res) => {
   if (!symbol) throw ApiError.badRequest('A symbol is required.');
 
   const tf = normalizeTimeframe(timeframe);
-  const candleLimit = Math.min(Math.max(Number(req.query.limit) || 200, 30), 500);
+  const requestedLimit = Number(req.query.limit);
+  // Support high-depth / unlimited history requests up to 5000 bars for backtesting
+  const candleLimit = requestedLimit === 0 || req.query.limit === 'max'
+    ? 5000
+    : Math.min(Math.max(requestedLimit || 200, 30), 5000);
   const snapshot = await getMarketSnapshot(symbol, tf, candleLimit);
 
   if (!snapshot) {

@@ -108,29 +108,56 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Desktop sidebar - permanently fixed during page scroll */}
-      <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 lg:block sticky top-0 h-screen overflow-y-auto">
-        <SidebarInner />
-      </aside>
-
-      {/* Mobile drawer */}
+      {/* Sliding Drawer Menu (unfolds when toggled, rolls up automatically on navigation click) */}
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-64 bg-white dark:bg-gray-900">
-            <SidebarInner />
+        <div className="fixed inset-0 z-50 transition-opacity animate-fadeIn">
+          {/* Backdrop overlay */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setOpen(false)}
+            aria-label="Fermer le menu"
+          />
+          {/* Sidebar Drawer */}
+          <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-gray-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900">
+            <div className="relative h-full">
+              <button
+                onClick={() => setOpen(false)}
+                className="absolute right-4 top-5 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+                title={t('close')}
+                aria-label="Fermer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <SidebarInner />
+            </div>
           </aside>
         </div>
       )}
 
-      {/* Main */}
+      {/* Main Container - Takes 100% full screen width */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white/80 px-4 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/80 lg:px-8">
-          <button className="lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
-            <Menu className="h-6 w-6" />
-          </button>
-          <div className="hidden lg:block" />
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white/90 px-4 py-2.5 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 lg:px-6">
           <div className="flex items-center gap-3">
+            {/* Menu Déroulant Button (Works on Desktop & Mobile, auto-rolls up when item clicked) */}
+            <button
+              onClick={() => setOpen(!open)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              title={t('featuresMenu')}
+            >
+              <Menu className="h-4 w-4 text-brand-500" />
+              <span className="hidden sm:inline">{t('featuresMenu')}</span>
+            </button>
+
+            {/* Quick logo badge */}
+            <Link to="/" className="flex items-center gap-2 font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-accent-600 text-white">
+                <ScanLine className="h-4 w-4" />
+              </span>
+              <span className="hidden md:inline font-black tracking-tight">AI Scanner</span>
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-2.5 sm:gap-3">
             {/* Language Switcher Button */}
             <button
               onClick={toggleLanguage}
@@ -144,18 +171,19 @@ export default function DashboardLayout() {
             <button onClick={toggleTheme} className="btn-ghost !px-2.5" aria-label="Toggle theme">
               {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
+
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white shadow-sm">
                 {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
               </div>
-              <span className="hidden text-sm font-medium sm:block">
+              <span className="hidden text-sm font-semibold sm:block text-gray-800 dark:text-gray-200">
                 {user?.firstName || user?.email?.split('@')[0]}
               </span>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 w-full max-w-full">
           <Outlet />
         </main>
       </div>

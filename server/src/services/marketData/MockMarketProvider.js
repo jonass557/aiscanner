@@ -86,7 +86,8 @@ export class MockMarketProvider extends BaseMarketProvider {
   }
 
   async getCandles(entry, timeframe = 'H1', limit = 120) {
-    return this._generate(entry, timeframe, limit);
+    const effectiveLimit = Math.max(30, Math.min(Number(limit) || 120, 5000));
+    return this._generate(entry, timeframe, effectiveLimit);
   }
 
   async getQuote(entry) {

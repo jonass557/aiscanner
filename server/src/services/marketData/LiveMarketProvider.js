@@ -140,12 +140,13 @@ export class LiveMarketProvider extends BaseMarketProvider {
   async getCandles(entry, timeframe = 'H1', limit = 120) {
     const ticker = this._mapSymbol(entry);
     const interval = YAHOO_INTERVAL_MAP[timeframe] || '1h';
-    // Choose appropriate range depending on interval
+    // Choose appropriate range depending on interval and requested limit
     let range = '5d';
-    if (interval === '1m' || interval === '5m') range = '1d';
-    else if (interval === '15m' || interval === '30m') range = '5d';
-    else if (interval === '1h') range = '1mo';
-    else if (interval === '1d') range = '1y';
+    if (interval === '1m') range = limit > 200 ? '7d' : '1d';
+    else if (interval === '5m' || interval === '15m' || interval === '30m') range = limit > 200 ? '60d' : '5d';
+    else if (interval === '1h') range = limit > 200 ? '730d' : '1mo';
+    else if (interval === '1d') range = limit > 200 ? '10y' : '1y';
+    else if (interval === '1wk' || interval === '1mo') range = 'max';
 
     const result = await this._fetchChart(ticker, interval, range);
     const timestamps = result.timestamp || [];
