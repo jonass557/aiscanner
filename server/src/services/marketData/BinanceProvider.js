@@ -8,9 +8,23 @@ import { BaseMarketProvider } from './BaseMarketProvider.js';
  * the catalog (e.g. BTCUSD → BTCUSDT) are supported here.
  */
 
-// App timeframe → Binance kline interval.
 const INTERVAL_MAP = {
-  M5: '5m', M15: '15m', M30: '30m', H1: '1h', H4: '4h', D1: '1d',
+  M1: '1m',
+  M2: '1m',
+  M3: '3m',
+  M5: '5m',
+  M15: '15m',
+  M30: '30m',
+  M45: '15m',
+  H1: '1h',
+  H2: '2h',
+  H3: '1h',
+  H4: '4h',
+  D1: '1d',
+  W1: '1w',
+  '3M': '1M',
+  '6M': '1M',
+  '12M': '1M',
 };
 
 export class BinanceProvider extends BaseMarketProvider {

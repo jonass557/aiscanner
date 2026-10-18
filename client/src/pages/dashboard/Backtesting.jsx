@@ -54,6 +54,7 @@ import {
   X,
   CandlestickChart,
   Sparkles,
+  Calendar,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -74,17 +75,52 @@ const ASSET_CATEGORIES = [
 ];
 
 const ALL_PAIRS = [
-  // Forex
-  { symbol: 'EURUSD', category: 'forex', label: 'EUR/USD · Euro', base: 1.085 },
-  { symbol: 'GBPUSD', category: 'forex', label: 'GBP/USD · Livre', base: 1.272 },
-  { symbol: 'USDJPY', category: 'forex', label: 'USD/JPY · Yen', base: 156.4 },
-  { symbol: 'AUDUSD', category: 'forex', label: 'AUD/USD · Aussie', base: 0.665 },
-  { symbol: 'USDCAD', category: 'forex', label: 'USD/CAD · Dollar Canadien', base: 1.368 },
-  { symbol: 'EURJPY', category: 'forex', label: 'EUR/JPY · Euro Yen', base: 169.8 },
-  { symbol: 'GBPJPY', category: 'forex', label: 'GBP/JPY · Livre Yen', base: 198.5 },
-  { symbol: 'EURGBP', category: 'forex', label: 'EUR/GBP · Euro Livre', base: 0.855 },
-  { symbol: 'NZDUSD', category: 'forex', label: 'NZD/USD · Kiwi', base: 0.598 },
-  { symbol: 'USDCHF', category: 'forex', label: 'USD/CHF · Franc Suisse', base: 0.865 },
+  // Forex - Paires Majeures
+  { symbol: 'EURUSD', category: 'forex', subgroup: 'Majeures', label: 'EUR/USD · Euro / Dollar US', base: 1.0865 },
+  { symbol: 'GBPUSD', category: 'forex', subgroup: 'Majeures', label: 'GBP/USD · Livre / Dollar US', base: 1.271 },
+  { symbol: 'USDJPY', category: 'forex', subgroup: 'Majeures', label: 'USD/JPY · Dollar US / Yen', base: 156.2 },
+  { symbol: 'USDCHF', category: 'forex', subgroup: 'Majeures', label: 'USD/CHF · Dollar US / Franc Suisse', base: 0.904 },
+  { symbol: 'AUDUSD', category: 'forex', subgroup: 'Majeures', label: 'AUD/USD · Dollar Australien / US', base: 0.664 },
+  { symbol: 'USDCAD', category: 'forex', subgroup: 'Majeures', label: 'USD/CAD · Dollar US / Canadien', base: 1.368 },
+  { symbol: 'NZDUSD', category: 'forex', subgroup: 'Majeures', label: 'NZD/USD · Dollar NZ / Dollar US', base: 0.61 },
+
+  // Forex - Paires Mineures (Crosses)
+  { symbol: 'EURGBP', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'EUR/GBP · Euro / Livre', base: 0.855 },
+  { symbol: 'EURJPY', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'EUR/JPY · Euro / Yen', base: 169.7 },
+  { symbol: 'GBPJPY', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'GBP/JPY · Livre / Yen', base: 198.4 },
+  { symbol: 'EURAUD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'EUR/AUD · Euro / Aussie', base: 1.636 },
+  { symbol: 'EURCAD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'EUR/CAD · Euro / Dollar Canadien', base: 1.486 },
+  { symbol: 'EURCHF', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'EUR/CHF · Euro / Franc Suisse', base: 0.982 },
+  { symbol: 'EURNZD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'EUR/NZD · Euro / Dollar NZ', base: 1.778 },
+  { symbol: 'GBPAUD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'GBP/AUD · Livre / Aussie', base: 1.913 },
+  { symbol: 'GBPCAD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'GBP/CAD · Livre / Dollar Canadien', base: 1.738 },
+  { symbol: 'GBPCHF', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'GBP/CHF · Livre / Franc Suisse', base: 1.148 },
+  { symbol: 'GBPNZD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'GBP/NZD · Livre / Dollar NZ', base: 2.082 },
+  { symbol: 'AUDCAD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'AUD/CAD · Aussie / Dollar Canadien', base: 0.908 },
+  { symbol: 'AUDCHF', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'AUD/CHF · Aussie / Franc Suisse', base: 0.601 },
+  { symbol: 'AUDJPY', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'AUD/JPY · Aussie / Yen', base: 103.7 },
+  { symbol: 'AUDNZD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'AUD/NZD · Aussie / Kiwi', base: 1.088 },
+  { symbol: 'CADCHF', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'CAD/CHF · Dollar Canadien / Franc', base: 0.661 },
+  { symbol: 'CADJPY', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'CAD/JPY · Dollar Canadien / Yen', base: 114.2 },
+  { symbol: 'CHFJPY', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'CHF/JPY · Franc Suisse / Yen', base: 172.8 },
+  { symbol: 'NZDCAD', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'NZD/CAD · Kiwi / Dollar Canadien', base: 0.835 },
+  { symbol: 'NZDCHF', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'NZD/CHF · Kiwi / Franc Suisse', base: 0.552 },
+  { symbol: 'NZDJPY', category: 'forex', subgroup: 'Mineures (Crosses)', label: 'NZD/JPY · Kiwi / Yen', base: 95.3 },
+
+  // Forex - Paires Exotiques
+  { symbol: 'USDZAR', category: 'forex', subgroup: 'Exotiques', label: 'USD/ZAR · Dollar / Rand Sud-Africain', base: 18.25 },
+  { symbol: 'USDMXN', category: 'forex', subgroup: 'Exotiques', label: 'USD/MXN · Dollar / Peso Mexicain', base: 19.85 },
+  { symbol: 'USDTRY', category: 'forex', subgroup: 'Exotiques', label: 'USD/TRY · Dollar / Livre Turque', base: 34.25 },
+  { symbol: 'USDBRL', category: 'forex', subgroup: 'Exotiques', label: 'USD/BRL · Dollar / Real Brésilien', base: 5.65 },
+  { symbol: 'USDSEK', category: 'forex', subgroup: 'Exotiques', label: 'USD/SEK · Dollar / Couronne Suédoise', base: 10.42 },
+  { symbol: 'USDNOK', category: 'forex', subgroup: 'Exotiques', label: 'USD/NOK · Dollar / Couronne Norvégienne', base: 10.88 },
+  { symbol: 'USDPLN', category: 'forex', subgroup: 'Exotiques', label: 'USD/PLN · Dollar / Zloty Polonais', base: 3.96 },
+  { symbol: 'USDSGD', category: 'forex', subgroup: 'Exotiques', label: 'USD/SGD · Dollar / Dollar Singapour', base: 1.312 },
+  { symbol: 'USDHKD', category: 'forex', subgroup: 'Exotiques', label: 'USD/HKD · Dollar / Dollar Hong Kong', base: 7.77 },
+  { symbol: 'USDCNH', category: 'forex', subgroup: 'Exotiques', label: 'USD/CNH · Dollar / Yuan Offshore', base: 7.12 },
+  { symbol: 'EURTRY', category: 'forex', subgroup: 'Exotiques', label: 'EUR/TRY · Euro / Livre Turque', base: 37.2 },
+  { symbol: 'EURZAR', category: 'forex', subgroup: 'Exotiques', label: 'EUR/ZAR · Euro / Rand Sud-Africain', base: 19.82 },
+  { symbol: 'GBPZAR', category: 'forex', subgroup: 'Exotiques', label: 'GBP/ZAR · Livre / Rand Sud-Africain', base: 23.2 },
 
   // Commodities & Métaux
   { symbol: 'XAUUSD', category: 'commodities', label: 'Or (Gold / XAUUSD)', base: 2685.0 },
@@ -92,29 +128,70 @@ const ALL_PAIRS = [
   { symbol: 'USOIL', category: 'commodities', label: 'Pétrole Brut (WTI)', base: 74.5 },
   { symbol: 'UKOIL', category: 'commodities', label: 'Pétrole Brent', base: 78.2 },
 
-  // Indices
+  // Indices Mondiaux
   { symbol: 'US30', category: 'indices', label: 'Dow Jones (US30)', base: 43250 },
   { symbol: 'NAS100', category: 'indices', label: 'Nasdaq 100 (NAS100)', base: 20450 },
   { symbol: 'SPX500', category: 'indices', label: 'S&P 500 (SPX500)', base: 5860 },
   { symbol: 'GER40', category: 'indices', label: 'DAX 40 (Allemagne)', base: 19550 },
   { symbol: 'UK100', category: 'indices', label: 'FTSE 100 (UK100)', base: 8250 },
+  { symbol: 'FRA40', category: 'indices', label: 'CAC 40 (FRA40)', base: 7520 },
+  { symbol: 'JPN225', category: 'indices', label: 'Nikkei 225 (JPN225)', base: 38950 },
 
-  // Crypto
+  // Crypto (Binance)
   { symbol: 'BTCUSD', category: 'crypto', label: 'Bitcoin (BTC/USD)', base: 68400 },
   { symbol: 'ETHUSD', category: 'crypto', label: 'Ethereum (ETH/USD)', base: 2640 },
-  { symbol: 'SOLUSD', category: 'crypto', label: 'Solana (SOL/USD)', base: 158 },
+  { symbol: 'SOLUSD', category: 'crypto', label: 'Solana (SOL/USD)', base: 158.0 },
+  { symbol: 'XRPUSD', category: 'crypto', label: 'XRP (XRP/USD)', base: 0.548 },
   { symbol: 'BNBUSD', category: 'crypto', label: 'BNB (BNB/USD)', base: 595 },
+  { symbol: 'ADAUSD', category: 'crypto', label: 'Cardano (ADA/USD)', base: 0.355 },
+  { symbol: 'DOGEUSD', category: 'crypto', label: 'Dogecoin (DOGE/USD)', base: 0.142 },
 
-  // Synthétiques
+  // Indices Synthétiques (Deriv)
   { symbol: 'Volatility 75 Index', category: 'synthetic', label: 'Volatility 75 Index (V75)', base: 325400 },
   { symbol: 'Volatility 100 Index', category: 'synthetic', label: 'Volatility 100 Index (V100)', base: 1840 },
-  { symbol: 'Volatility 50 Index', category: 'synthetic', label: 'Volatility 50 Index (V50)', base: 285 },
-  { symbol: 'Volatility 25 Index', category: 'synthetic', label: 'Volatility 25 Index (V25)', base: 1950 },
-  { symbol: 'Boom 1000 Index', category: 'synthetic', label: 'Boom 1000 Index', base: 9850 },
-  { symbol: 'Crash 1000 Index', category: 'synthetic', label: 'Crash 1000 Index', base: 6420 },
-  { symbol: 'Boom 500 Index', category: 'synthetic', label: 'Boom 500 Index', base: 5200 },
-  { symbol: 'Crash 500 Index', category: 'synthetic', label: 'Crash 500 Index', base: 3900 },
-  { symbol: 'Step Index', category: 'synthetic', label: 'Step Index Deriv', base: 4200 },
+  { symbol: 'Volatility 50 Index', category: 'synthetic', label: 'Volatility 50 Index (V50)', base: 412.5 },
+  { symbol: 'Volatility 25 Index', category: 'synthetic', label: 'Volatility 25 Index (V25)', base: 2450 },
+  { symbol: 'Volatility 10 Index', category: 'synthetic', label: 'Volatility 10 Index (V10)', base: 1250 },
+  { symbol: 'Boom 1000 Index', category: 'synthetic', label: 'Boom 1000 Index', base: 12500 },
+  { symbol: 'Crash 1000 Index', category: 'synthetic', label: 'Crash 1000 Index', base: 6400 },
+  { symbol: 'Boom 500 Index', category: 'synthetic', label: 'Boom 500 Index', base: 4820 },
+  { symbol: 'Crash 500 Index', category: 'synthetic', label: 'Crash 500 Index', base: 3910 },
+  { symbol: 'Boom 300 Index', category: 'synthetic', label: 'Boom 300 Index', base: 3200 },
+  { symbol: 'Crash 300 Index', category: 'synthetic', label: 'Crash 300 Index', base: 2800 },
+  { symbol: 'Step Index', category: 'synthetic', label: 'Step Index Deriv', base: 8420 },
+];
+
+export const DRAWING_TOOLS_CATEGORIES = [
+  {
+    id: 'lines',
+    nameFr: 'Catégorie Lignes (Lines)',
+    nameEn: 'Lines',
+    tools: [
+      { id: 'trendline', symbol: '↗', nameFr: 'Trendline (Ligne de tendance)', nameEn: 'Trendline', points: 2 },
+      { id: 'ray', symbol: '➔', nameFr: 'Ray (Rayon)', nameEn: 'Ray', points: 2 },
+      { id: 'horizontal', symbol: '⎯⎯', nameFr: 'Horizontal line (Ligne horizontale)', nameEn: 'Horizontal Line', points: 1 },
+      { id: 'vertical', symbol: '⎪', nameFr: 'Vertical line (Ligne verticale)', nameEn: 'Vertical Line', points: 1 },
+    ],
+  },
+  {
+    id: 'fibonacci',
+    nameFr: 'Catégorie Fibonacci & Gann',
+    nameEn: 'Fibonacci & Gann',
+    tools: [
+      { id: 'fibonacci', symbol: '𝛗', nameFr: 'Fib retracement (Retracement Fibonacci)', nameEn: 'Fib Retracement', points: 2 },
+      { id: 'gann_box', symbol: '⊞', nameFr: 'Gann box (Boîte de Gann)', nameEn: 'Gann Box', points: 2 },
+      { id: 'fib_channel', symbol: '⫽', nameFr: 'Fib channel (Canal de Fibonacci)', nameEn: 'Fib Channel', points: 2 },
+    ],
+  },
+  {
+    id: 'forecasting',
+    nameFr: 'Catégorie Forecasting (Positions)',
+    nameEn: 'Forecasting',
+    tools: [
+      { id: 'long_position', symbol: '📈', nameFr: 'Long position (Position Longue)', nameEn: 'Long Position', points: 1 },
+      { id: 'short_position', symbol: '📉', nameFr: 'Short position (Position Courte)', nameEn: 'Short Position', points: 1 },
+    ],
+  },
 ];
 
 // Extended Timeframes list including M2, M3, M30, M45, H2, H3, 3 months, 6 months, 12 months
@@ -227,6 +304,22 @@ export default function Backtesting() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [loading, setLoading] = useState(true);
 
+  // Historical Backtest Period (Mois, Jour, Année)
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 3);
+    return d.toISOString().slice(0, 10);
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [showDateRangeModal, setShowDateRangeModal] = useState(false);
+  const [modalStartDate, setModalStartDate] = useState(startDate);
+  const [modalEndDate, setModalEndDate] = useState(endDate);
+
+  useEffect(() => {
+    setModalStartDate(startDate);
+    setModalEndDate(endDate);
+  }, [startDate, endDate]);
+
   // Chart Customization State
   const [chartType, setChartType] = useState('candlestick');
   const [chartTheme, setChartTheme] = useState(THEME_COLORS[0]);
@@ -245,7 +338,11 @@ export default function Backtesting() {
 
   // TradingView Drawing Tools state
   const [activeDrawingTool, setActiveDrawingTool] = useState('none');
-  const [drawings, setDrawings] = useState([]); // [{ id, type, price, price2, time, label }]
+  const [pendingPoints, setPendingPoints] = useState([]);
+  const [selectedDrawingId, setSelectedDrawingId] = useState(null);
+  const [showToolSettings, setShowToolSettings] = useState(false);
+  const [drawings, setDrawings] = useState([]); // [{ id, type, price, time, ... }]
+  const [renderTick, setRenderTick] = useState(0);
 
   // Account Capital & Realistic Trade Simulation ($10,000 initial balance)
   const [balance, setBalance] = useState(() => {
@@ -283,7 +380,22 @@ export default function Backtesting() {
   const sma20SeriesRef = useRef(null);
   const sma50SeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
-  const drawingLinesRef = useRef([]);
+
+  // Refs for persistent event handling
+  const activeDrawingToolRef = useRef(activeDrawingTool);
+  useEffect(() => { activeDrawingToolRef.current = activeDrawingTool; }, [activeDrawingTool]);
+
+  const pendingPointsRef = useRef(pendingPoints);
+  useEffect(() => { pendingPointsRef.current = pendingPoints; }, [pendingPoints]);
+
+  const replayIndexRef = useRef(replayIndex);
+  useEffect(() => { replayIndexRef.current = replayIndex; }, [replayIndex]);
+
+  const allCandlesRef = useRef([]);
+  useEffect(() => { allCandlesRef.current = allCandles; }, [allCandles]);
+
+  const cutModeRef = useRef(false);
+  useEffect(() => { cutModeRef.current = cutMode; }, [cutMode]);
 
   // Filtered pairs according to category
   const filteredPairs = useMemo(() => {
@@ -312,39 +424,133 @@ export default function Backtesting() {
     return Math.round((balance + floatingPnl) * 100) / 100;
   }, [balance, floatingPnl]);
 
-  // Load candle data from server or clean continuous generator
-  const fetchCandles = useCallback(async () => {
-    setLoading(true);
-    setIsPlaying(false);
-    try {
-      const { data } = await marketApi.snapshot(selectedPair.symbol, timeframe, candleLimit);
-      const raw = data?.data?.market?.candles || [];
-      const sorted =
-        raw.length > 0
-          ? sanitizeCandles(raw, selectedPair.base)
-          : generateRealisticCandles(selectedPair.base, timeframe, 300);
+  // Load candle data from server or clean continuous generator with timeframe persistence
+  const fetchCandles = useCallback(
+    async (preserveCurrentTime = false) => {
+      setLoading(true);
+      setIsPlaying(false);
+      try {
+        const curTimestamp = allCandlesRef.current[replayIndexRef.current - 1]?.time || null;
+        const { data } = await marketApi.snapshot(selectedPair.symbol, timeframe, candleLimit);
+        const raw = data?.data?.market?.candles || [];
+        const sorted =
+          raw.length > 0
+            ? sanitizeCandles(raw, selectedPair.base)
+            : generateRealisticCandles(selectedPair.base, timeframe, 300);
 
-      if (sorted.length > 0) {
-        setAllCandles(sorted);
-        // Default cut: show initial 60% of candles to allow deep forward replay
-        const initCut = Math.max(15, Math.floor(sorted.length * 0.6));
+        if (sorted.length > 0) {
+          setAllCandles(sorted);
+
+          let newIdx;
+          if (preserveCurrentTime && curTimestamp) {
+            const idx = sorted.findIndex((c) => c.time >= curTimestamp);
+            newIdx = idx === -1 ? sorted.length : Math.max(1, idx);
+          } else {
+            newIdx = Math.max(15, Math.floor(sorted.length * 0.6));
+            setCutIndex(newIdx);
+          }
+          setReplayIndex(newIdx);
+
+          const dp = getDecimals(sorted[sorted.length - 1]?.close || selectedPair.base);
+          if (mainSeriesRef.current) {
+            mainSeriesRef.current.applyOptions({
+              priceFormat: {
+                type: 'price',
+                precision: dp,
+                minMove: Math.pow(10, -dp),
+              },
+            });
+            const visible = sorted.slice(0, newIdx);
+            if (chartType === 'line' || chartType === 'area') {
+              mainSeriesRef.current.setData(visible.map((c) => ({ time: c.time, value: c.close })));
+            } else {
+              mainSeriesRef.current.setData(visible);
+            }
+            chartInstanceRef.current?.timeScale().fitContent();
+          }
+        }
+      } catch (err) {
+        const fallback = generateRealisticCandles(selectedPair.base, timeframe, 300);
+        setAllCandles(fallback);
+        const initCut = Math.max(15, Math.floor(fallback.length * 0.6));
         setCutIndex(initCut);
         setReplayIndex(initCut);
+        chartInstanceRef.current?.timeScale().fitContent();
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      const fallback = generateRealisticCandles(selectedPair.base, timeframe, 300);
-      setAllCandles(fallback);
-      const initCut = Math.max(15, Math.floor(fallback.length * 0.6));
-      setCutIndex(initCut);
-      setReplayIndex(initCut);
-    } finally {
-      setLoading(false);
+    },
+    [selectedPair, timeframe, candleLimit, chartType]
+  );
+
+  // Timeframe change without losing backtest progress
+  const handleTimeframeChange = (newTf) => {
+    if (newTf === timeframe) return;
+    setTimeframe(newTf);
+  };
+
+  const initialLoadRef = useRef(true);
+  useEffect(() => {
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      fetchCandles(false);
+    } else {
+      fetchCandles(true);
     }
-  }, [selectedPair, timeframe, candleLimit]);
+  }, [timeframe]);
 
   useEffect(() => {
-    fetchCandles();
-  }, [fetchCandles]);
+    if (!initialLoadRef.current) {
+      fetchCandles(false);
+    }
+  }, [selectedPair]);
+
+  // Date range application
+  const handleApplyDateRange = (sDate, eDate) => {
+    setStartDate(sDate);
+    setEndDate(eDate);
+    const startSec = Math.floor(new Date(`${sDate}T00:00:00Z`).getTime() / 1000);
+    const endSec = Math.floor(new Date(`${eDate}T23:59:59Z`).getTime() / 1000);
+
+    const filtered = allCandles.filter((c) => c.time >= startSec && c.time <= endSec);
+    if (filtered.length >= 5) {
+      setAllCandles(filtered);
+      const initCut = Math.max(1, Math.floor(filtered.length * 0.25));
+      setCutIndex(initCut);
+      setReplayIndex(initCut);
+      chartInstanceRef.current?.timeScale().fitContent();
+      setShowDateRangeModal(false);
+      toast.success(
+        isEn
+          ? `Backtest bounded from ${sDate} to ${eDate} (${filtered.length} bars)`
+          : `Période délimitée : ${sDate} au ${eDate} (${filtered.length} bougies)`
+      );
+    } else {
+      marketApi
+        .snapshot(selectedPair.symbol, timeframe, 5000)
+        .then(({ data }) => {
+          const raw = data?.data?.market?.candles || [];
+          const sorted =
+            raw.length > 0
+              ? sanitizeCandles(raw, selectedPair.base)
+              : generateRealisticCandles(selectedPair.base, timeframe, 500);
+          const f = sorted.filter((c) => c.time >= startSec && c.time <= endSec);
+          if (f.length > 0) {
+            setAllCandles(f);
+            setCutIndex(1);
+            setReplayIndex(Math.max(1, Math.min(15, f.length)));
+            chartInstanceRef.current?.timeScale().fitContent();
+            setShowDateRangeModal(false);
+            toast.success(`Période délimitée : ${sDate} au ${eDate} (${f.length} bougies)`);
+          } else {
+            toast.error('Aucune bougie disponible sur cette période précise.');
+          }
+        })
+        .catch(() => {
+          toast.error('Impossible de charger les données pour cette période.');
+        });
+    }
+  };
 
   // Reset Capital function ($10,000)
   const handleResetCapital = () => {
@@ -385,17 +591,6 @@ export default function Backtesting() {
     return res;
   };
 
-  // Persistent refs
-  const cutModeRef = useRef(false);
-  useEffect(() => {
-    cutModeRef.current = cutMode;
-  }, [cutMode]);
-
-  const allCandlesRef = useRef([]);
-  useEffect(() => {
-    allCandlesRef.current = allCandles;
-  }, [allCandles]);
-
   // Initialize Lightweight Charts v5 Instance
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -412,6 +607,9 @@ export default function Backtesting() {
         background: { type: ColorType.Solid, color: chartTheme.bg },
         textColor: chartTheme.text,
         fontSize: 12,
+      },
+      watermark: {
+        visible: false,
       },
       grid: {
         vertLines: { color: chartTheme.grid },
@@ -495,22 +693,142 @@ export default function Backtesting() {
       sma50SeriesRef.current = chart.addSeries(LineSeries, { color: '#10b981', lineWidth: 1.5, title: 'SMA 50' });
     }
 
-    // Replay Bar-Cut mode click handler
+    // Replay Bar-Cut mode & Interactive Tool placement click handler
     chart.subscribeClick((param) => {
-      if (!cutModeRef.current || !param.time) return;
-      const clickedTime = param.time;
-      const idx = allCandlesRef.current.findIndex((c) => c.time === clickedTime);
-      if (idx !== -1) {
-        const newCut = idx + 1;
-        setCutIndex(newCut);
-        setReplayIndex(newCut);
-        setCutMode(false);
-        toast.success(
-          isEn
-            ? `Chart cut at bar #${newCut}. Replay initialized!`
-            : `Graphique découpé à la bougie #${newCut}. Replay prêt !`
-        );
+      if (!param || !param.time) return;
+
+      // 1. Cut Mode: set replay cut point
+      if (cutModeRef.current) {
+        const clickedTime = param.time;
+        const idx = allCandlesRef.current.findIndex((c) => c.time === clickedTime);
+        if (idx !== -1) {
+          const newCut = idx + 1;
+          setCutIndex(newCut);
+          setReplayIndex(newCut);
+          setCutMode(false);
+          toast.success(
+            isEn
+              ? `Chart cut at bar #${newCut}. Replay initialized!`
+              : `Graphique découpé à la bougie #${newCut}. Replay prêt !`
+          );
+        }
+        return;
       }
+
+      // 2. Interactive Tool Placement
+      const activeTool = activeDrawingToolRef.current;
+      if (activeTool && activeTool !== 'none') {
+        const clickedTime = param.time;
+        const clickedPrice =
+          mainSeriesRef.current?.coordinateToPrice(param.point?.y) || currentCandle?.close || selectedPair.base;
+        const id = Date.now().toString(36);
+        const dp = getDecimals(clickedPrice);
+
+        if (activeTool === 'horizontal') {
+          const newDrawing = {
+            id,
+            type: 'horizontal',
+            price: Number(clickedPrice.toFixed(dp)),
+            time: clickedTime,
+            color: '#3b82f6',
+            lineWidth: 2,
+            lineStyle: 'solid',
+            label: `Ligne @ ${formatPrice(clickedPrice)}`,
+          };
+          setDrawings((prev) => [...prev, newDrawing]);
+          setSelectedDrawingId(id);
+          setActiveDrawingTool('none');
+          toast.success('Ligne Horizontale positionnée');
+        } else if (activeTool === 'vertical') {
+          const newDrawing = {
+            id,
+            type: 'vertical',
+            price: Number(clickedPrice.toFixed(dp)),
+            time: clickedTime,
+            color: '#3b82f6',
+            lineWidth: 2,
+            lineStyle: 'solid',
+            label: 'Ligne Verticale',
+          };
+          setDrawings((prev) => [...prev, newDrawing]);
+          setSelectedDrawingId(id);
+          setActiveDrawingTool('none');
+          toast.success('Ligne Verticale positionnée');
+        } else if (activeTool === 'long_position') {
+          const delta = clickedPrice * 0.015;
+          const tp = Number((clickedPrice + delta).toFixed(dp));
+          const sl = Number((clickedPrice - delta * 0.5).toFixed(dp));
+          const newDrawing = {
+            id,
+            type: 'long_position',
+            entry: Number(clickedPrice.toFixed(dp)),
+            tp,
+            sl,
+            time: clickedTime,
+            color: '#10b981',
+            lineWidth: 1,
+            lineStyle: 'solid',
+          };
+          setDrawings((prev) => [...prev, newDrawing]);
+          setSelectedDrawingId(id);
+          setActiveDrawingTool('none');
+          toast.success('Position Longue configurée avec suivi du prix');
+        } else if (activeTool === 'short_position') {
+          const delta = clickedPrice * 0.015;
+          const tp = Number((clickedPrice - delta).toFixed(dp));
+          const sl = Number((clickedPrice + delta * 0.5).toFixed(dp));
+          const newDrawing = {
+            id,
+            type: 'short_position',
+            entry: Number(clickedPrice.toFixed(dp)),
+            tp,
+            sl,
+            time: clickedTime,
+            color: '#ef4444',
+            lineWidth: 1,
+            lineStyle: 'solid',
+          };
+          setDrawings((prev) => [...prev, newDrawing]);
+          setSelectedDrawingId(id);
+          setActiveDrawingTool('none');
+          toast.success('Position Courte configurée avec suivi du prix');
+        } else {
+          // 2-point tools: trendline, ray, fibonacci, gann_box, fib_channel
+          const pts = pendingPointsRef.current;
+          if (pts.length === 0) {
+            setPendingPoints([{ time: clickedTime, price: Number(clickedPrice.toFixed(dp)) }]);
+            toast('Point 1 posé. Cliquez sur le graphique pour poser le Point 2.', { icon: '📍' });
+          } else {
+            const p1 = pts[0];
+            const p2 = { time: clickedTime, price: Number(clickedPrice.toFixed(dp)) };
+            const newDrawing = {
+              id,
+              type: activeTool,
+              time: p1.time,
+              price: p1.price,
+              time2: p2.time,
+              price2: p2.price,
+              color: activeTool === 'fibonacci' ? '#eab308' : '#3b82f6',
+              lineWidth: 2,
+              lineStyle: 'solid',
+              fibLevels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0],
+            };
+            setDrawings((prev) => [...prev, newDrawing]);
+            setSelectedDrawingId(id);
+            setPendingPoints([]);
+            setActiveDrawingTool('none');
+            toast.success(`Outil tracé sur le graphique.`);
+          }
+        }
+      }
+    });
+
+    // Subscribe to chart visible range change to update SVG overlay coordinates in real-time
+    chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+      setRenderTick((t) => t + 1);
+    });
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      setRenderTick((t) => t + 1);
     });
 
     const handleResize = () => {
@@ -978,57 +1296,158 @@ export default function Backtesting() {
   };
 
   // Handle Adding Drawing Tools on Chart
-  const handleAddDrawing = (type) => {
+  // Handle Selecting a tool to draw (Activates interactive click mode on chart)
+  const handleSelectToolToDraw = (toolId) => {
+    setActiveDrawingTool(toolId);
+    setPendingPoints([]);
+    setActiveDrawer(null);
+    const toolMeta = DRAWING_TOOLS_CATEGORIES.flatMap((c) => c.tools).find((t) => t.id === toolId);
+    toast(
+      isEn
+        ? `Tool active: ${toolMeta?.nameEn || toolId}. Click on the chart to position.`
+        : `Outil actif : ${toolMeta?.nameFr || toolId}. Cliquez sur le graphique pour positionner ou étirer l'outil.`,
+      { icon: toolMeta?.symbol || '✏️' }
+    );
+  };
+
+  // Add drawing immediately at current price with default sizing
+  const handleQuickAddDrawing = (type) => {
     const id = Date.now().toString(36);
-    const range = currentPrice * 0.005;
+    const dp = getDecimals(currentPrice);
+    const range = currentPrice * 0.008;
+    const curTime = currentCandle?.time || Math.floor(Date.now() / 1000);
 
     if (type === 'horizontal') {
-      setDrawings((prev) => [
-        ...prev,
-        { id, type: 'horizontal', price: currentPrice, label: `Support/Résistance @ ${currentPrice}` },
-      ]);
-      toast.success(`Ligne horizontale tracée à ${currentPrice}`);
-    } else if (type === 'supply_zone') {
-      setDrawings((prev) => [
-        ...prev,
-        {
-          id,
-          type: 'supply_zone',
-          top: Number((currentPrice + range).toFixed(4)),
-          bottom: Number(currentPrice.toFixed(4)),
-        },
-      ]);
-      toast.success('Supply Zone tracée');
-    } else if (type === 'demand_zone') {
-      setDrawings((prev) => [
-        ...prev,
-        {
-          id,
-          type: 'demand_zone',
-          top: Number(currentPrice.toFixed(4)),
-          bottom: Number((currentPrice - range).toFixed(4)),
-        },
-      ]);
-      toast.success('Demand Zone tracée');
-    } else if (type === 'fibonacci') {
-      setDrawings((prev) => [
-        ...prev,
-        {
-          id,
-          type: 'fibonacci',
-          high: currentPrice + range * 2,
-          low: currentPrice - range * 2,
-        },
-      ]);
-      toast.success('Retracement Fibonacci tracé');
+      const d = {
+        id,
+        type: 'horizontal',
+        price: Number(currentPrice.toFixed(dp)),
+        time: curTime,
+        color: '#3b82f6',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        label: `Ligne @ ${formatPrice(currentPrice)}`,
+      };
+      setDrawings((prev) => [...prev, d]);
+      setSelectedDrawingId(id);
+      toast.success(`Ligne horizontale tracée à ${formatPrice(currentPrice)}`);
+    } else if (type === 'vertical') {
+      const d = {
+        id,
+        type: 'vertical',
+        price: Number(currentPrice.toFixed(dp)),
+        time: curTime,
+        color: '#3b82f6',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        label: 'Ligne Verticale',
+      };
+      setDrawings((prev) => [...prev, d]);
+      setSelectedDrawingId(id);
+      toast.success('Ligne verticale tracée');
+    } else if (type === 'long_position') {
+      const delta = currentPrice * 0.015;
+      const tp = Number((currentPrice + delta).toFixed(dp));
+      const sl = Number((currentPrice - delta * 0.5).toFixed(dp));
+      const d = {
+        id,
+        type: 'long_position',
+        entry: Number(currentPrice.toFixed(dp)),
+        tp,
+        sl,
+        time: curTime,
+        color: '#10b981',
+        lineWidth: 1,
+        lineStyle: 'solid',
+      };
+      setDrawings((prev) => [...prev, d]);
+      setSelectedDrawingId(id);
+      toast.success('Position Longue configurée avec suivi du prix en direct');
+    } else if (type === 'short_position') {
+      const delta = currentPrice * 0.015;
+      const tp = Number((currentPrice - delta).toFixed(dp));
+      const sl = Number((currentPrice + delta * 0.5).toFixed(dp));
+      const d = {
+        id,
+        type: 'short_position',
+        entry: Number(currentPrice.toFixed(dp)),
+        tp,
+        sl,
+        time: curTime,
+        color: '#ef4444',
+        lineWidth: 1,
+        lineStyle: 'solid',
+      };
+      setDrawings((prev) => [...prev, d]);
+      setSelectedDrawingId(id);
+      toast.success('Position Courte configurée avec suivi du prix en direct');
+    } else {
+      // Trendline, Ray, Fibonacci, Gann box, Fib channel
+      const tfSec = 3600;
+      const d = {
+        id,
+        type,
+        time: curTime - tfSec * 15,
+        price: Number((currentPrice - range).toFixed(dp)),
+        time2: curTime + tfSec * 10,
+        price2: Number((currentPrice + range).toFixed(dp)),
+        color: type === 'fibonacci' ? '#eab308' : '#3b82f6',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        fibLevels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0],
+      };
+      setDrawings((prev) => [...prev, d]);
+      setSelectedDrawingId(id);
+      toast.success(`Outil ${type} positionné sur le graphique`);
     }
     setActiveDrawer(null);
   };
 
+  // Update specific property of selected drawing (color, lineWidth, lineStyle, tp, sl, etc.)
+  const updateDrawingProperty = (id, patch) => {
+    setDrawings((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  };
+
+  // Delete a drawing
+  const handleDeleteDrawing = (id) => {
+    setDrawings((prev) => prev.filter((d) => d.id !== id));
+    if (selectedDrawingId === id) setSelectedDrawingId(null);
+    toast.success('Outil supprimé du graphique.');
+  };
+
   const handleClearDrawings = () => {
     setDrawings([]);
+    setSelectedDrawingId(null);
     toast.success('Tous les tracés ont été effacés.');
     setActiveDrawer(null);
+  };
+
+  // Currently selected drawing object
+  const selectedDrawing = useMemo(() => {
+    return drawings.find((d) => d.id === selectedDrawingId) || null;
+  }, [drawings, selectedDrawingId]);
+
+  const selectedToolMeta = useMemo(() => {
+    if (!selectedDrawing) return null;
+    return DRAWING_TOOLS_CATEGORIES.flatMap((c) => c.tools).find((t) => t.id === selectedDrawing.type);
+  }, [selectedDrawing]);
+
+  const activeToolMeta = useMemo(() => {
+    if (activeDrawingTool === 'none') return null;
+    return DRAWING_TOOLS_CATEGORIES.flatMap((c) => c.tools).find((t) => t.id === activeDrawingTool);
+  }, [activeDrawingTool]);
+
+  // Coordinate mapper for drawings overlay
+  const getCoords = (time, price) => {
+    if (!chartInstanceRef.current || !mainSeriesRef.current || !time || price == null) return null;
+    try {
+      const x = chartInstanceRef.current.timeScale().timeToCoordinate(time);
+      const y = mainSeriesRef.current.priceToCoordinate(price);
+      if (x == null || y == null || isNaN(x) || isNaN(y)) return null;
+      return { x, y };
+    } catch {
+      return null;
+    }
   };
 
   return (
@@ -1036,9 +1455,9 @@ export default function Backtesting() {
       ref={chartWrapperRef}
       className="flex flex-col h-[calc(100vh-65px)] w-full bg-[#090d16] text-gray-200 select-none overflow-hidden"
     >
-      {/* 1. TOP NAVBAR: Pairs, Timeframes, Candle Style, Indicators, Solde, Équité & Reset */}
+      {/* 1. TOP NAVBAR: Pairs, Timeframes, Period (Dates), Candle Style, Indicators, Solde, Équité & Reset */}
       <div className="flex flex-wrap items-center justify-between border-b border-gray-800 bg-[#0d1322] px-3 py-1.5 gap-2 text-xs">
-        {/* Left: Category + Symbol + Timeframes + Candle Style + Indicators */}
+        {/* Left: Category + Symbol + Timeframes + Period + Candle Style + Indicators */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Category Dropdown */}
           <select
@@ -1059,7 +1478,7 @@ export default function Backtesting() {
             ))}
           </select>
 
-          {/* Pair Selector */}
+          {/* Pair Selector with Grouping for Forex Majors, Minors, Exotics */}
           <select
             value={selectedPair.symbol}
             onChange={(e) => {
@@ -1069,11 +1488,43 @@ export default function Backtesting() {
             className="rounded-lg border border-brand-500/50 bg-brand-500/10 px-2.5 py-1 text-xs font-black text-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
             title="Sélectionner l'actif"
           >
-            {filteredPairs.map((p) => (
-              <option key={p.symbol} value={p.symbol} className="bg-gray-900 text-white font-medium">
-                {p.label}
-              </option>
-            ))}
+            {selectedCategory === 'forex' ? (
+              <>
+                <optgroup label="Forex · Paires Majeures" className="bg-gray-900 text-brand-400 font-bold">
+                  {filteredPairs
+                    .filter((p) => p.subgroup === 'Majeures')
+                    .map((p) => (
+                      <option key={p.symbol} value={p.symbol} className="bg-gray-900 text-white font-medium">
+                        {p.label}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Forex · Paires Mineures (Crosses)" className="bg-gray-900 text-brand-400 font-bold">
+                  {filteredPairs
+                    .filter((p) => p.subgroup === 'Mineures (Crosses)')
+                    .map((p) => (
+                      <option key={p.symbol} value={p.symbol} className="bg-gray-900 text-white font-medium">
+                        {p.label}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Forex · Paires Exotiques" className="bg-gray-900 text-brand-400 font-bold">
+                  {filteredPairs
+                    .filter((p) => p.subgroup === 'Exotiques')
+                    .map((p) => (
+                      <option key={p.symbol} value={p.symbol} className="bg-gray-900 text-white font-medium">
+                        {p.label}
+                      </option>
+                    ))}
+                </optgroup>
+              </>
+            ) : (
+              filteredPairs.map((p) => (
+                <option key={p.symbol} value={p.symbol} className="bg-gray-900 text-white font-medium">
+                  {p.label}
+                </option>
+              ))
+            )}
           </select>
 
           <span className="font-mono font-bold text-white px-1">
@@ -1087,7 +1538,7 @@ export default function Backtesting() {
             {QUICK_TIMEFRAMES.map((tf) => (
               <button
                 key={tf}
-                onClick={() => setTimeframe(tf)}
+                onClick={() => handleTimeframeChange(tf)}
                 className={`rounded px-1.5 py-0.5 text-xs font-bold transition ${
                   timeframe === tf
                     ? 'bg-brand-500 text-white'
@@ -1102,7 +1553,7 @@ export default function Backtesting() {
           {/* All Timeframes Dropdown (M2, M3, M45, H2, H3, 3M, 6M, 12M etc.) */}
           <select
             value={timeframe}
-            onChange={(e) => setTimeframe(e.target.value)}
+            onChange={(e) => handleTimeframeChange(e.target.value)}
             className="rounded border border-gray-800 bg-gray-900 px-1.5 py-0.5 text-xs font-bold text-gray-300 hover:text-white focus:outline-none"
             title="Toutes les unités de temps (M2, M3, M30, M45, H2, H3, 3 mois, 6 mois, 12 mois)"
           >
@@ -1132,6 +1583,19 @@ export default function Backtesting() {
               <option value="12M">12 mois (Annuel)</option>
             </optgroup>
           </select>
+
+          <div className="h-4 w-[1px] bg-gray-800" />
+
+          {/* Historical Period (Mois, Jour, Année) Button */}
+          <button
+            onClick={() => setShowDateRangeModal(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800/80 px-2 py-1 text-xs font-bold text-gray-200 hover:border-brand-500 hover:text-white transition"
+            title="Délimiter la période historique de début et de fin du Backtest (Mois, Jour, Année)"
+          >
+            <Calendar className="h-3.5 w-3.5 text-brand-400" />
+            <span className="hidden lg:inline text-[11px] font-semibold text-gray-400">Période:</span>
+            <span className="font-mono text-[11px]">{startDate} → {endDate}</span>
+          </button>
 
           <div className="h-4 w-[1px] bg-gray-800" />
 
@@ -1369,6 +1833,15 @@ export default function Backtesting() {
 
         {/* CENTRAL CHART CANVAS: Stretches 100% full width and height */}
         <div className="flex-1 relative h-full w-full bg-[#090d16] overflow-hidden">
+          <style>{`
+            #tv-attr-logo, a[href*="tradingview"], [class*="watermark"], [class*="tradingview"] {
+              display: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              pointer-events: none !important;
+            }
+          `}</style>
+
           {loading && (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm">
               <Spinner />
@@ -1392,8 +1865,538 @@ export default function Backtesting() {
             </div>
           )}
 
+          {/* Active Drawing Tool Placement Banner */}
+          {activeDrawingTool !== 'none' && (
+            <div className="absolute top-2 left-4 right-4 z-20 flex items-center justify-between rounded-xl border border-brand-500/50 bg-brand-500/10 px-4 py-2 backdrop-blur">
+              <div className="flex items-center gap-2 text-xs font-bold text-brand-400">
+                <PenTool className="h-4 w-4 animate-pulse" />
+                <span>
+                  Outil actif : <strong className="text-white uppercase">{activeToolMeta?.nameFr || activeDrawingTool}</strong>.
+                  {pendingPoints.length === 0
+                    ? ' Cliquez sur le graphique pour positionner le 1er point.'
+                    : ' Cliquez sur le graphique pour poser le 2ème point et finaliser le tracé.'}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveDrawingTool('none');
+                  setPendingPoints([]);
+                }}
+                className="rounded-lg bg-gray-800 px-3 py-1 text-xs font-bold text-gray-300 hover:bg-gray-700 transition"
+              >
+                Annuler
+              </button>
+            </div>
+          )}
+
+          {/* Floating TradingView Properties Toolbar when a drawing is selected */}
+          {selectedDrawing && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-xl border border-gray-700 bg-[#0d1322]/95 px-3 py-1.5 shadow-2xl backdrop-blur-md animate-fadeIn text-xs">
+              <div className="flex items-center gap-1.5 border-r border-gray-700 pr-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-gray-800 text-amber-400 font-bold text-xs">
+                  {selectedToolMeta?.symbol || '✏️'}
+                </span>
+                <span className="font-bold text-gray-200">
+                  {selectedToolMeta?.nameFr?.split('(')[0] || selectedDrawing.type}
+                </span>
+              </div>
+
+              {/* Colors */}
+              <div className="flex items-center gap-1 border-r border-gray-700 pr-2">
+                {['#3b82f6', '#10b981', '#ef4444', '#eab308', '#a855f7', '#06b6d4', '#ffffff'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => updateDrawingProperty(selectedDrawing.id, { color: c })}
+                    className={`h-4 w-4 rounded-full border transition ${
+                      selectedDrawing.color === c ? 'scale-125 border-white ring-2 ring-brand-400' : 'border-gray-600 hover:scale-110'
+                    }`}
+                    style={{ backgroundColor: c }}
+                    title={`Couleur ${c}`}
+                  />
+                ))}
+              </div>
+
+              {/* Line Width */}
+              <div className="flex items-center gap-1 border-r border-gray-700 pr-2">
+                {[1, 2, 3, 4].map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => updateDrawingProperty(selectedDrawing.id, { lineWidth: w })}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition ${
+                      (selectedDrawing.lineWidth || 2) === w ? 'bg-brand-500 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`}
+                    title={`Épaisseur ${w}px`}
+                  >
+                    {w}px
+                  </button>
+                ))}
+              </div>
+
+              {/* Line Style */}
+              <div className="flex items-center gap-1 border-r border-gray-700 pr-2">
+                {[
+                  { id: 'solid', label: '—' },
+                  { id: 'dashed', label: '--' },
+                  { id: 'dotted', label: '···' },
+                ].map((st) => (
+                  <button
+                    key={st.id}
+                    onClick={() => updateDrawingProperty(selectedDrawing.id, { lineStyle: st.id })}
+                    className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold transition ${
+                      (selectedDrawing.lineStyle || 'solid') === st.id ? 'bg-brand-500 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`}
+                    title={`Style ${st.id}`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Settings Button */}
+              <button
+                onClick={() => setShowToolSettings(true)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition"
+                title="Paramètres avancés"
+              >
+                <Sliders className="h-3.5 w-3.5" />
+              </button>
+
+              {/* Delete Button */}
+              <button
+                onClick={() => handleDeleteDrawing(selectedDrawing.id)}
+                className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
+                title="Supprimer cet outil"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+
+              {/* Close */}
+              <button
+                onClick={() => setSelectedDrawingId(null)}
+                className="p-1 rounded text-gray-500 hover:text-white ml-1"
+                title="Désélectionner"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Lightweight Chart Container */}
           <div ref={chartContainerRef} className="h-full w-full" />
+
+          {/* SVG Overlay for Interactive Drawings & Live Setup Tracking */}
+          <svg className="absolute inset-0 h-full w-full pointer-events-none z-10" style={{ overflow: 'hidden' }}>
+            {drawings.map((d) => {
+              const isSelected = selectedDrawingId === d.id;
+
+              if (d.type === 'horizontal') {
+                const y = mainSeriesRef.current?.priceToCoordinate(d.price);
+                if (y == null) return null;
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <line
+                      x1={0}
+                      y1={y}
+                      x2="100%"
+                      y2={y}
+                      stroke={d.color || '#3b82f6'}
+                      strokeWidth={d.lineWidth || 2}
+                      strokeDasharray={d.lineStyle === 'dashed' ? '6,6' : d.lineStyle === 'dotted' ? '2,4' : 'none'}
+                    />
+                    <line x1={0} y1={y} x2="100%" y2={y} stroke="transparent" strokeWidth={16} />
+                    <rect x={12} y={y - 9} width={75} height={18} rx={4} fill="#0d1322" stroke={d.color || '#3b82f6'} strokeWidth={1} />
+                    <text x={16} y={y + 3} fill="#f1f5f9" fontSize={10} fontFamily="monospace" fontWeight="bold">
+                      {formatPrice(d.price)}
+                    </text>
+                    {isSelected && <circle cx={60} cy={y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />}
+                  </g>
+                );
+              }
+
+              if (d.type === 'vertical') {
+                const x = chartInstanceRef.current?.timeScale().timeToCoordinate(d.time);
+                if (x == null) return null;
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <line
+                      x1={x}
+                      y1={0}
+                      x2={x}
+                      y2="100%"
+                      stroke={d.color || '#3b82f6'}
+                      strokeWidth={d.lineWidth || 2}
+                      strokeDasharray={d.lineStyle === 'dashed' ? '6,6' : d.lineStyle === 'dotted' ? '2,4' : 'none'}
+                    />
+                    <line x1={x} y1={0} x2={x} y2="100%" stroke="transparent" strokeWidth={16} />
+                    {isSelected && <circle cx={x} cy={60} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />}
+                  </g>
+                );
+              }
+
+              if (d.type === 'trendline') {
+                const p1 = getCoords(d.time, d.price);
+                const p2 = getCoords(d.time2, d.price2);
+                if (!p1 || !p2) return null;
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <line
+                      x1={p1.x}
+                      y1={p1.y}
+                      x2={p2.x}
+                      y2={p2.y}
+                      stroke={d.color || '#3b82f6'}
+                      strokeWidth={d.lineWidth || 2}
+                      strokeDasharray={d.lineStyle === 'dashed' ? '6,6' : d.lineStyle === 'dotted' ? '2,4' : 'none'}
+                    />
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="transparent" strokeWidth={16} />
+                    {isSelected && (
+                      <>
+                        <circle cx={p1.x} cy={p1.y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                        <circle cx={p2.x} cy={p2.y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                      </>
+                    )}
+                  </g>
+                );
+              }
+
+              if (d.type === 'ray') {
+                const p1 = getCoords(d.time, d.price);
+                const p2 = getCoords(d.time2, d.price2);
+                if (!p1 || !p2) return null;
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const extX = dx >= 0 ? 3000 : -1000;
+                const extY = dx !== 0 ? p1.y + (dy / dx) * (extX - p1.x) : p2.y;
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <line
+                      x1={p1.x}
+                      y1={p1.y}
+                      x2={extX}
+                      y2={extY}
+                      stroke={d.color || '#3b82f6'}
+                      strokeWidth={d.lineWidth || 2}
+                      strokeDasharray={d.lineStyle === 'dashed' ? '6,6' : d.lineStyle === 'dotted' ? '2,4' : 'none'}
+                    />
+                    <line x1={p1.x} y1={p1.y} x2={extX} y2={extY} stroke="transparent" strokeWidth={16} />
+                    {isSelected && (
+                      <>
+                        <circle cx={p1.x} cy={p1.y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                        <circle cx={p2.x} cy={p2.y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                      </>
+                    )}
+                  </g>
+                );
+              }
+
+              if (d.type === 'fibonacci') {
+                const p1 = getCoords(d.time, d.price);
+                const p2 = getCoords(d.time2, d.price2);
+                if (!p1 || !p2) return null;
+                const lvls = d.fibLevels || [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+                const minX = Math.min(p1.x, p2.x);
+                const maxX = Math.max(p1.x, p2.x) + 260;
+                const diff = d.price2 - d.price;
+                const y50 = mainSeriesRef.current?.priceToCoordinate(d.price + diff * 0.5);
+                const y618 = mainSeriesRef.current?.priceToCoordinate(d.price + diff * 0.618);
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={d.color || '#eab308'} strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
+                    {y50 != null && y618 != null && (
+                      <rect
+                        x={minX}
+                        y={Math.min(y50, y618)}
+                        width={maxX - minX}
+                        height={Math.abs(y618 - y50)}
+                        fill="#eab308"
+                        fillOpacity={0.15}
+                      />
+                    )}
+                    {lvls.map((lvl) => {
+                      const lvlPrice = d.price + diff * lvl;
+                      const lvlY = mainSeriesRef.current?.priceToCoordinate(lvlPrice);
+                      if (lvlY == null) return null;
+                      const isGolden = lvl === 0.618 || lvl === 0.5;
+                      return (
+                        <g key={lvl}>
+                          <line
+                            x1={minX}
+                            y1={lvlY}
+                            x2={maxX}
+                            y2={lvlY}
+                            stroke={isGolden ? '#eab308' : d.color || '#94a3b8'}
+                            strokeWidth={isGolden ? 1.5 : 1}
+                            strokeDasharray={lvl === 0 || lvl === 1 ? 'none' : '4,4'}
+                          />
+                          <text x={minX + 4} y={lvlY - 3} fill={isGolden ? '#facc15' : '#cbd5e1'} fontSize={10} fontFamily="monospace" fontWeight="bold">
+                            {lvl} ({formatPrice(lvlPrice)})
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {isSelected && (
+                      <>
+                        <circle cx={p1.x} cy={p1.y} r={4.5} fill="#facc15" stroke="#fff" strokeWidth={1.5} />
+                        <circle cx={p2.x} cy={p2.y} r={4.5} fill="#facc15" stroke="#fff" strokeWidth={1.5} />
+                      </>
+                    )}
+                  </g>
+                );
+              }
+
+              if (d.type === 'gann_box') {
+                const p1 = getCoords(d.time, d.price);
+                const p2 = getCoords(d.time2, d.price2);
+                if (!p1 || !p2) return null;
+                const x = Math.min(p1.x, p2.x);
+                const y = Math.min(p1.y, p2.y);
+                const w = Math.max(1, Math.abs(p2.x - p1.x));
+                const h = Math.max(1, Math.abs(p2.y - p1.y));
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <rect x={x} y={y} width={w} height={h} fill="#3b82f6" fillOpacity={0.08} stroke={d.color || '#3b82f6'} strokeWidth={d.lineWidth || 1.5} />
+                    <line x1={x} y1={y + h * 0.25} x2={x + w} y2={y + h * 0.25} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.6} />
+                    <line x1={x} y1={y + h * 0.5} x2={x + w} y2={y + h * 0.5} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.8} />
+                    <line x1={x} y1={y + h * 0.75} x2={x + w} y2={y + h * 0.75} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.6} />
+                    <line x1={x + w * 0.25} y1={y} x2={x + w * 0.25} y2={y + h} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.6} />
+                    <line x1={x + w * 0.5} y1={y} x2={x + w * 0.5} y2={y + h} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.8} />
+                    <line x1={x + w * 0.75} y1={y} x2={x + w * 0.75} y2={y + h} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.6} />
+                    <line x1={x} y1={y} x2={x + w} y2={y + h} stroke={d.color || '#3b82f6'} strokeWidth={1} opacity={0.5} />
+                    <line x1={x} y1={y + h} x2={x + w} y2={y} stroke={d.color || '#3b82f6'} strokeWidth={1} opacity={0.5} />
+                    {isSelected && (
+                      <>
+                        <circle cx={x} cy={y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                        <circle cx={x + w} cy={y + h} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                      </>
+                    )}
+                  </g>
+                );
+              }
+
+              if (d.type === 'fib_channel') {
+                const p1 = getCoords(d.time, d.price);
+                const p2 = getCoords(d.time2, d.price2);
+                if (!p1 || !p2) return null;
+                const offY = 40;
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={d.color || '#3b82f6'} strokeWidth={2} />
+                    <line x1={p1.x} y1={p1.y - offY} x2={p2.x} y2={p2.y - offY} stroke={d.color || '#3b82f6'} strokeWidth={1.5} strokeDasharray="4,4" />
+                    <line x1={p1.x} y1={p1.y - offY * 1.618} x2={p2.x} y2={p2.y - offY * 1.618} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="3,3" />
+                    <polygon
+                      points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p2.x},${p2.y - offY} ${p1.x},${p1.y - offY}`}
+                      fill="#3b82f6"
+                      fillOpacity={0.08}
+                    />
+                    {isSelected && (
+                      <>
+                        <circle cx={p1.x} cy={p1.y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                        <circle cx={p2.x} cy={p2.y} r={4.5} fill="#60a5fa" stroke="#fff" strokeWidth={1.5} />
+                      </>
+                    )}
+                  </g>
+                );
+              }
+
+              if (d.type === 'long_position') {
+                const entryY = mainSeriesRef.current?.priceToCoordinate(d.entry);
+                const tpY = mainSeriesRef.current?.priceToCoordinate(d.tp);
+                const slY = mainSeriesRef.current?.priceToCoordinate(d.sl);
+                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(d.time);
+                if (entryY == null || tpY == null || slY == null || startX == null) return null;
+                const boxW = 240;
+                const endX = startX + boxW;
+                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(currentCandle.time) : startX;
+                const progX = currentX != null ? Math.max(startX, Math.min(currentX, endX)) : startX;
+                const traversedW = progX - startX;
+                const remainingW = Math.max(0, endX - progX);
+                const targetH = Math.max(1, entryY - tpY);
+                const stopH = Math.max(1, slY - entryY);
+                const rr = ((d.tp - d.entry) / Math.max(0.000001, d.entry - d.sl)).toFixed(2);
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    {/* Target Box: Traversed part (darker + dashed border) */}
+                    {traversedW > 0 && (
+                      <rect
+                        x={startX}
+                        y={tpY}
+                        width={traversedW}
+                        height={targetH}
+                        fill="#065f46"
+                        fillOpacity={0.55}
+                        stroke="#10b981"
+                        strokeWidth={1.5}
+                        strokeDasharray="4,4"
+                      />
+                    )}
+                    {/* Target Box: Untraversed future part */}
+                    {remainingW > 0 && (
+                      <rect
+                        x={progX}
+                        y={tpY}
+                        width={remainingW}
+                        height={targetH}
+                        fill="#10b981"
+                        fillOpacity={0.16}
+                        stroke="#10b981"
+                        strokeWidth={1}
+                      />
+                    )}
+
+                    {/* Stop Box: Traversed part (darker + dashed border) */}
+                    {traversedW > 0 && (
+                      <rect
+                        x={startX}
+                        y={entryY}
+                        width={traversedW}
+                        height={stopH}
+                        fill="#881337"
+                        fillOpacity={0.55}
+                        stroke="#ef4444"
+                        strokeWidth={1.5}
+                        strokeDasharray="4,4"
+                      />
+                    )}
+                    {/* Stop Box: Untraversed future part */}
+                    {remainingW > 0 && (
+                      <rect
+                        x={progX}
+                        y={entryY}
+                        width={remainingW}
+                        height={stopH}
+                        fill="#ef4444"
+                        fillOpacity={0.16}
+                        stroke="#ef4444"
+                        strokeWidth={1}
+                      />
+                    )}
+
+                    {/* Entry separator line */}
+                    <line x1={startX} y1={entryY} x2={endX} y2={entryY} stroke="#ffffff" strokeWidth={1.5} />
+
+                    {/* Price Progress Indicator line */}
+                    {progX > startX && (
+                      <line x1={progX} y1={tpY} x2={progX} y2={slY} stroke="#facc15" strokeWidth={1.5} strokeDasharray="3,3" />
+                    )}
+
+                    {/* Labels */}
+                    <text x={startX + 6} y={tpY + 14} fill="#6ee7b7" fontSize={10} fontFamily="monospace" fontWeight="bold">
+                      TP: {formatPrice(d.tp)} (Target)
+                    </text>
+                    <text x={startX + 6} y={entryY - 4} fill="#ffffff" fontSize={10} fontFamily="monospace" fontWeight="bold">
+                      Entrée: {formatPrice(d.entry)} · R:R 1:{rr}
+                    </text>
+                    <text x={startX + 6} y={slY - 6} fill="#fca5a5" fontSize={10} fontFamily="monospace" fontWeight="bold">
+                      SL: {formatPrice(d.sl)} (Stop)
+                    </text>
+
+                    {isSelected && (
+                      <circle cx={startX} cy={entryY} r={5} fill="#60a5fa" stroke="#ffffff" strokeWidth={1.5} />
+                    )}
+                  </g>
+                );
+              }
+
+              if (d.type === 'short_position') {
+                const entryY = mainSeriesRef.current?.priceToCoordinate(d.entry);
+                const tpY = mainSeriesRef.current?.priceToCoordinate(d.tp);
+                const slY = mainSeriesRef.current?.priceToCoordinate(d.sl);
+                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(d.time);
+                if (entryY == null || tpY == null || slY == null || startX == null) return null;
+                const boxW = 240;
+                const endX = startX + boxW;
+                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(currentCandle.time) : startX;
+                const progX = currentX != null ? Math.max(startX, Math.min(currentX, endX)) : startX;
+                const traversedW = progX - startX;
+                const remainingW = Math.max(0, endX - progX);
+                const stopH = Math.max(1, entryY - slY);
+                const targetH = Math.max(1, tpY - entryY);
+                const rr = ((d.entry - d.tp) / Math.max(0.000001, d.sl - d.entry)).toFixed(2);
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    {/* Stop Loss Box (Upper, Red) */}
+                    {traversedW > 0 && (
+                      <rect
+                        x={startX}
+                        y={slY}
+                        width={traversedW}
+                        height={stopH}
+                        fill="#881337"
+                        fillOpacity={0.55}
+                        stroke="#ef4444"
+                        strokeWidth={1.5}
+                        strokeDasharray="4,4"
+                      />
+                    )}
+                    {remainingW > 0 && (
+                      <rect
+                        x={progX}
+                        y={slY}
+                        width={remainingW}
+                        height={stopH}
+                        fill="#ef4444"
+                        fillOpacity={0.16}
+                        stroke="#ef4444"
+                        strokeWidth={1}
+                      />
+                    )}
+
+                    {/* Target Box (Lower, Green) */}
+                    {traversedW > 0 && (
+                      <rect
+                        x={startX}
+                        y={entryY}
+                        width={traversedW}
+                        height={targetH}
+                        fill="#065f46"
+                        fillOpacity={0.55}
+                        stroke="#10b981"
+                        strokeWidth={1.5}
+                        strokeDasharray="4,4"
+                      />
+                    )}
+                    {remainingW > 0 && (
+                      <rect
+                        x={progX}
+                        y={entryY}
+                        width={remainingW}
+                        height={targetH}
+                        fill="#10b981"
+                        fillOpacity={0.16}
+                        stroke="#10b981"
+                        strokeWidth={1}
+                      />
+                    )}
+
+                    {/* Entry separator line */}
+                    <line x1={startX} y1={entryY} x2={endX} y2={entryY} stroke="#ffffff" strokeWidth={1.5} />
+
+                    {/* Price Progress Indicator line */}
+                    {progX > startX && (
+                      <line x1={progX} y1={slY} x2={progX} y2={tpY} stroke="#facc15" strokeWidth={1.5} strokeDasharray="3,3" />
+                    )}
+
+                    {/* Labels */}
+                    <text x={startX + 6} y={slY + 14} fill="#fca5a5" fontSize={10} fontFamily="monospace" fontWeight="bold">
+                      SL: {formatPrice(d.sl)} (Stop)
+                    </text>
+                    <text x={startX + 6} y={entryY - 4} fill="#ffffff" fontSize={10} fontFamily="monospace" fontWeight="bold">
+                      Entrée: {formatPrice(d.entry)} · R:R 1:{rr}
+                    </text>
+                    <text x={startX + 6} y={tpY - 6} fill="#6ee7b7" fontSize={10} fontFamily="monospace" fontWeight="bold">
+                      TP: {formatPrice(d.tp)} (Target)
+                    </text>
+
+                    {isSelected && (
+                      <circle cx={startX} cy={entryY} r={5} fill="#60a5fa" stroke="#ffffff" strokeWidth={1.5} />
+                    )}
+                  </g>
+                );
+              }
+
+              return null;
+            })}
+          </svg>
 
           {/* Bottom Bar: Candle Metrics (O, H, L, C, Replay Bar Index) */}
           {currentCandle && (
@@ -1691,7 +2694,7 @@ export default function Backtesting() {
 
         {/* TRADINGVIEW DRAWING TOOLS POPOVER */}
         {activeDrawer === 'tools' && (
-          <aside className="absolute top-12 left-16 w-72 border border-gray-800 bg-[#0d1322] rounded-2xl shadow-2xl z-30 p-4 space-y-3 animate-fadeIn">
+          <aside className="absolute top-12 left-16 w-84 max-w-sm border border-gray-800 bg-[#0d1322] rounded-2xl shadow-2xl z-30 p-4 space-y-4 animate-fadeIn">
             <div className="flex items-center justify-between border-b border-gray-800 pb-2">
               <span className="font-bold text-xs text-white flex items-center gap-2">
                 <PenTool className="h-4 w-4 text-amber-400" /> Outils d'Analyse TradingView
@@ -1701,46 +2704,42 @@ export default function Backtesting() {
               </button>
             </div>
 
-            <div className="space-y-1 text-xs">
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold block mb-1">
-                Lignes & Niveaux
-              </span>
-              <button
-                onClick={() => handleAddDrawing('horizontal')}
-                className="w-full flex items-center justify-between p-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-gray-200 transition"
-              >
-                <span>Ligne Horizontale (Support/Résistance)</span>
-                <span className="text-brand-400 font-mono">+Tracer</span>
-              </button>
-
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold block mt-3 mb-1">
-                Zones Institutionnelles
-              </span>
-              <button
-                onClick={() => handleAddDrawing('supply_zone')}
-                className="w-full flex items-center justify-between p-2 rounded-lg bg-red-950/30 hover:bg-red-900/40 text-red-300 border border-red-800/30 transition"
-              >
-                <span>Rectangle Supply Zone (Order Block)</span>
-                <span className="text-red-400 font-mono">+Zone</span>
-              </button>
-              <button
-                onClick={() => handleAddDrawing('demand_zone')}
-                className="w-full flex items-center justify-between p-2 rounded-lg bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-800/30 transition"
-              >
-                <span>Rectangle Demand Zone (Order Block)</span>
-                <span className="text-emerald-400 font-mono">+Zone</span>
-              </button>
-
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold block mt-3 mb-1">
-                Fibonacci & Mesure
-              </span>
-              <button
-                onClick={() => handleAddDrawing('fibonacci')}
-                className="w-full flex items-center justify-between p-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-gray-200 transition"
-              >
-                <span>Retracement de Fibonacci (OTE 61.8%)</span>
-                <span className="text-amber-400 font-mono">+Fib</span>
-              </button>
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {DRAWING_TOOLS_CATEGORIES.map((cat) => (
+                <div key={cat.id} className="space-y-1.5">
+                  <span className="text-[10px] uppercase tracking-wider text-brand-400 font-bold block">
+                    {cat.nameFr}
+                  </span>
+                  <div className="grid grid-cols-1 gap-1">
+                    {cat.tools.map((tl) => (
+                      <button
+                        key={tl.id}
+                        onClick={() => {
+                          setActiveDrawingTool(tl.id);
+                          setPendingPoints([]);
+                          setActiveDrawer(null);
+                          toast(`Outil ${tl.nameFr} sélectionné. Cliquez sur le graphique pour positionner.`);
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold transition ${
+                          activeDrawingTool === tl.id
+                            ? 'bg-brand-600 text-white font-bold'
+                            : 'bg-gray-800/60 hover:bg-gray-800 text-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-900 border border-gray-700 text-sm font-bold text-amber-400">
+                            {tl.symbol}
+                          </span>
+                          <span>{tl.nameFr}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-mono">
+                          {tl.points === 1 ? '1 clic' : '2 clics'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {drawings.length > 0 && (
@@ -1891,6 +2890,257 @@ export default function Backtesting() {
           </aside>
         )}
       </div>
+
+      {/* DATE RANGE MODAL (Mois, Jour, Année) */}
+      {showDateRangeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-[#0d1322] p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-brand-400" />
+                <h3 className="font-bold text-sm text-white">Délimiter la Période du Backtest</h3>
+              </div>
+              <button onClick={() => setShowDateRangeModal(false)} className="text-gray-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Sélectionnez la période historique de début et de fin pour initialiser le backtest (Mois, Jour, Année).
+            </p>
+
+            {/* Date Inputs */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                  Date de Début
+                </label>
+                <input
+                  type="date"
+                  value={modalStartDate}
+                  onChange={(e) => setModalStartDate(e.target.value)}
+                  className="w-full rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                  Date de Fin
+                </label>
+                <input
+                  type="date"
+                  value={modalEndDate}
+                  onChange={(e) => setModalEndDate(e.target.value)}
+                  className="w-full rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-gray-500">Périodes prédéfinies :</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { label: '30 Jours', days: 30 },
+                  { label: '3 Mois', days: 90 },
+                  { label: '6 Mois', days: 180 },
+                  { label: '1 An', days: 365 },
+                  { label: 'Année 2025', year: 2025 },
+                  { label: 'Année 2026', year: 2026 },
+                ].map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const now = new Date();
+                      if (p.year) {
+                        setModalStartDate(`${p.year}-01-01`);
+                        setModalEndDate(`${p.year}-12-31`);
+                      } else {
+                        const past = new Date();
+                        past.setDate(past.getDate() - p.days);
+                        setModalStartDate(past.toISOString().slice(0, 10));
+                        setModalEndDate(now.toISOString().slice(0, 10));
+                      }
+                    }}
+                    className="rounded-lg border border-gray-800 bg-gray-900/80 px-2 py-1.5 text-center text-[11px] font-semibold text-gray-300 hover:border-brand-500/50 hover:bg-gray-800 hover:text-white transition"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+              <button
+                onClick={() => setShowDateRangeModal(false)}
+                className="px-3 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handleApplyDateRange(modalStartDate, modalEndDate)}
+                className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white shadow-lg shadow-brand-600/30 transition"
+              >
+                Appliquer la période
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOOL SETTINGS MODAL */}
+      {showToolSettings && selectedDrawing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-[#0d1322] p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-800 text-sm font-bold text-amber-400">
+                  {selectedToolMeta?.symbol || '⚙️'}
+                </span>
+                <h3 className="font-bold text-sm text-white">
+                  Paramètres : {selectedToolMeta?.nameFr || selectedDrawing.type}
+                </h3>
+              </div>
+              <button onClick={() => setShowToolSettings(false)} className="text-gray-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Color & Line Appearance */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
+                Couleur & Épaisseur
+              </label>
+              <div className="flex items-center gap-2">
+                {['#3b82f6', '#10b981', '#ef4444', '#eab308', '#a855f7', '#06b6d4', '#ffffff'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => updateDrawingProperty(selectedDrawing.id, { color: c })}
+                    className={`h-6 w-6 rounded-full border transition ${
+                      selectedDrawing.color === c ? 'scale-110 border-white ring-2 ring-brand-400' : 'border-gray-600'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Position Specific Settings (Long / Short) */}
+            {(selectedDrawing.type === 'long_position' || selectedDrawing.type === 'short_position') && (
+              <div className="space-y-3 pt-2 border-t border-gray-800">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                    Prix d'Entrée
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={selectedDrawing.entry}
+                    onChange={(e) =>
+                      updateDrawingProperty(selectedDrawing.id, { entry: parseFloat(e.target.value) || selectedDrawing.entry })
+                    }
+                    className="w-full rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block mb-1">
+                      Take Profit (TP)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={selectedDrawing.tp}
+                      onChange={(e) =>
+                        updateDrawingProperty(selectedDrawing.id, { tp: parseFloat(e.target.value) || selectedDrawing.tp })
+                      }
+                      className="w-full rounded-xl border border-emerald-900/50 bg-emerald-950/20 px-3 py-2 text-xs font-mono font-bold text-emerald-300 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-rose-400 block mb-1">
+                      Stop Loss (SL)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={selectedDrawing.sl}
+                      onChange={(e) =>
+                        updateDrawingProperty(selectedDrawing.id, { sl: parseFloat(e.target.value) || selectedDrawing.sl })
+                      }
+                      className="w-full rounded-xl border border-rose-900/50 bg-rose-950/20 px-3 py-2 text-xs font-mono font-bold text-rose-300 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                {/* Risk / Reward preview */}
+                <div className="rounded-xl bg-gray-900 p-2.5 flex items-center justify-between text-xs">
+                  <span className="text-gray-400">Ratio Risque / Rendement :</span>
+                  <span className="font-mono font-bold text-brand-400">
+                    1 :{' '}
+                    {selectedDrawing.type === 'long_position'
+                      ? (
+                          (selectedDrawing.tp - selectedDrawing.entry) /
+                          Math.max(0.000001, selectedDrawing.entry - selectedDrawing.sl)
+                        ).toFixed(2)
+                      : (
+                          (selectedDrawing.entry - selectedDrawing.tp) /
+                          Math.max(0.000001, selectedDrawing.sl - selectedDrawing.entry)
+                        ).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Fibonacci Levels Config */}
+            {selectedDrawing.type === 'fibonacci' && (
+              <div className="space-y-2 pt-2 border-t border-gray-800">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block">
+                  Niveaux de Fibonacci
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {[0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.618].map((lvl) => {
+                    const currentLvls = selectedDrawing.fibLevels || [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+                    const checked = currentLvls.includes(lvl);
+                    return (
+                      <label key={lvl} className="flex items-center gap-2 p-1.5 rounded-lg bg-gray-800/60 hover:bg-gray-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...currentLvls, lvl].sort((a, b) => a - b)
+                              : currentLvls.filter((x) => x !== lvl);
+                            updateDrawingProperty(selectedDrawing.id, { fibLevels: next });
+                          }}
+                          className="rounded text-brand-500"
+                        />
+                        <span className="font-mono font-bold text-gray-200">{lvl * 100}%</span>
+                        {lvl === 0.618 && <span className="text-[10px] text-amber-400 font-bold">(Golden)</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2 border-t border-gray-800">
+              <button
+                onClick={() => handleDeleteDrawing(selectedDrawing.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/40 border border-rose-900/60 text-xs font-bold text-rose-400 hover:bg-rose-900/50 transition"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Supprimer
+              </button>
+              <button
+                onClick={() => setShowToolSettings(false)}
+                className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white transition"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

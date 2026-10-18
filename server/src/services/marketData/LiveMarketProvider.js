@@ -63,12 +63,36 @@ const SYMBOL_MAP = {
   GBPJPY: 'GBPJPY=X',
   AUDJPY: 'AUDJPY=X',
   EURCAD: 'EURCAD=X',
+  EURCHF: 'EURCHF=X',
+  EURNZD: 'EURNZD=X',
   GBPAUD: 'GBPAUD=X',
+  GBPCAD: 'GBPCAD=X',
+  GBPCHF: 'GBPCHF=X',
+  GBPNZD: 'GBPNZD=X',
+  AUDCAD: 'AUDCAD=X',
+  AUDCHF: 'AUDCHF=X',
   AUDNZD: 'AUDNZD=X',
+  CADCHF: 'CADCHF=X',
   CADJPY: 'CADJPY=X',
   CHFJPY: 'CHFJPY=X',
-  CADCHF: 'CADCHF=X',
-  GBPCHF: 'GBPCHF=X',
+  NZDCAD: 'NZDCAD=X',
+  NZDCHF: 'NZDCHF=X',
+  NZDJPY: 'NZDJPY=X',
+
+  // Forex Exotics
+  USDZAR: 'USDZAR=X',
+  USDMXN: 'USDMXN=X',
+  USDTRY: 'USDTRY=X',
+  USDBRL: 'USDBRL=X',
+  USDSEK: 'USDSEK=X',
+  USDNOK: 'USDNOK=X',
+  USDPLN: 'USDPLN=X',
+  USDSGD: 'USDSGD=X',
+  USDHKD: 'USDHKD=X',
+  USDCNH: 'USDCNH=X',
+  EURTRY: 'EURTRY=X',
+  EURZAR: 'EURZAR=X',
+  GBPZAR: 'GBPZAR=X',
 
   // Commodities & Metals
   XAUUSD: 'GC=F', // Gold Futures
@@ -91,6 +115,8 @@ const SYMBOL_MAP = {
   SOLUSD: 'SOL-USD',
   XRPUSD: 'XRP-USD',
   BNBUSD: 'BNB-USD',
+  ADAUSD: 'ADA-USD',
+  DOGEUSD: 'DOGE-USD',
 };
 
 const decimalsForPrice = (price) => {
