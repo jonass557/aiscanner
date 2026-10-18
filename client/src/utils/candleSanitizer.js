@@ -16,8 +16,8 @@ export const getDecimals = (price) => {
 };
 
 /**
- * Clean, deduplicate, and reconstruct continuous institutional OHLC candles.
- * Eliminates Yahoo Finance `=X` artifacts where `open ≈ close` with wide spread-spike wicks.
+ * Clean, deduplicate, and validate institutional OHLC candles.
+ * Strictly preserves real authentic broker/market prices.
  */
 export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   if (!Array.isArray(rawCandles) || rawCandles.length === 0) return [];
@@ -39,9 +39,7 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
       !Number.isFinite(low) ||
       !Number.isFinite(close) ||
       close <= 0 ||
-      open <= 0 ||
-      high <= 0 ||
-      low <= 0
+      open <= 0
     ) {
       continue;
     }
@@ -61,8 +59,8 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
     parsed.push({
       time: tSec,
       open,
-      high,
-      low,
+      high: Math.max(high, open, close),
+      low: Math.max(0.00001, Math.min(low, open, close)),
       close,
       volume: Number(c.volume) || 0,
     });
@@ -70,7 +68,7 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
 
   if (parsed.length === 0) return [];
 
-  // Sort by time ascending and strictly deduplicate timestamps
+  // Sort by time ascending and strictly deduplicate timestamps for Lightweight Charts
   parsed.sort((a, b) => a.time - b.time);
   const unique = [];
   for (const bar of parsed) {
@@ -80,183 +78,95 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   }
 
   const dp = getDecimals(unique[unique.length - 1]?.close || fallbackBase);
-  const minTick = Math.pow(10, -dp);
-
-  // First pass: enforce continuous open[i] = close[i-1] and drop completely dead rollover ticks
-  const continuous = [];
-  for (let i = 0; i < unique.length; i += 1) {
-    const cur = unique[i];
-    if (i === 0) {
-      continuous.push({ ...cur });
-      continue;
-    }
-    const prev = continuous[continuous.length - 1];
-    if (
-      Math.abs(cur.close - prev.close) < minTick * 0.5 &&
-      Math.abs(cur.high - cur.low) < minTick * 0.5 &&
-      unique.length - continuous.length > 35
-    ) {
-      continue;
-    }
-    const open = prev.close;
-    const close = cur.close;
-    const high = Math.max(cur.high, open, close);
-    const low = Math.min(cur.low, open, close);
-    continuous.push({
-      ...cur,
-      open,
-      high,
-      low,
-      close,
-    });
-  }
-
-  // Compute median active body size
-  const bodies = continuous
-    .map((c) => Math.abs(c.close - c.open))
-    .filter((b) => b > minTick * 2)
-    .sort((a, b) => a - b);
-
-  const refPrice = continuous[continuous.length - 1].close;
-  const medianBody =
-    bodies.length > 5
-      ? bodies[Math.floor(bodies.length * 0.55)]
-      : refPrice * 0.0012;
-  const normalBody = Math.max(medianBody, refPrice * 0.0005);
-
-  // Second pass: eliminate stagnant tiny-body streaks and clamp artificial spread-spike wicks
-  const cleaned = [];
-  for (let i = 0; i < continuous.length; i += 1) {
-    const c = continuous[i];
-    const open = i === 0 ? c.open : cleaned[i - 1].close;
-    let close = c.close;
-    let body = Math.abs(close - open);
-
-    // Fix tiny aligned bodies (< 35% of normalBody) so no horizontal barcode rows ever appear
-    if (body < normalBody * 0.35 && i < continuous.length - 1) {
-      const lookahead = continuous[Math.min(i + 2, continuous.length - 1)].close;
-      const dir =
-        Math.abs(lookahead - open) > minTick
-          ? Math.sign(lookahead - open)
-          : i % 2 === 0
-            ? 1
-            : -1;
-      const stepFactor = 0.45 + ((i * 7) % 5) * 0.12;
-      close = open + dir * normalBody * stepFactor;
-      body = Math.abs(close - open);
-    }
-
-    const bodyTop = Math.max(open, close);
-    const bodyBot = Math.min(open, close);
-
-    let upperWick = Math.max(0, c.high - bodyTop);
-    let lowerWick = Math.max(0, bodyBot - c.low);
-
-    // Clamp excessive fake wicks to proportional institutional wick lengths
-    const maxWick = Math.max(body * 1.25, normalBody * 0.75);
-    if (upperWick > maxWick) {
-      upperWick = body * (0.22 + ((i * 3) % 5) * 0.14);
-    }
-    if (lowerWick > maxWick) {
-      lowerWick = body * (0.22 + ((i * 5) % 5) * 0.14);
-    }
-
-    if (upperWick < body * 0.08) upperWick = body * (0.14 + ((i * 3) % 4) * 0.08);
-    if (lowerWick < body * 0.08) lowerWick = body * (0.14 + ((i * 5) % 4) * 0.08);
-
-    const high = bodyTop + upperWick;
-    const low = Math.max(minTick, bodyBot - lowerWick);
-
-    cleaned.push({
-      time: c.time,
-      open: Number(open.toFixed(dp)),
-      high: Number(high.toFixed(dp)),
-      low: Number(low.toFixed(dp)),
-      close: Number(close.toFixed(dp)),
-      volume: c.volume || 0,
-    });
-  }
-
-  return cleaned;
+  return unique.map((b) => ({
+    time: b.time,
+    open: Number(b.open.toFixed(dp)),
+    high: Number(b.high.toFixed(dp)),
+    low: Number(b.low.toFixed(dp)),
+    close: Number(b.close.toFixed(dp)),
+    volume: b.volume || 0,
+  }));
 };
 
 /**
  * Generate realistic fallback candles when offline or for custom synthetic assets.
+ * Uses realistic market price action (natural trends, pullbacks, and volatility).
  */
-export const generateRealisticCandles = (basePrice = 1.085, timeframe = 'H1', count = 160) => {
+export const generateRealisticCandles = (basePrice = 1.085, timeframe = 'H1', count = 250) => {
   const dp = getDecimals(basePrice);
   const nowSec = Math.floor(Date.now() / 1000);
-  const tfSec =
-    {
-      M1: 60,
-      '1m': 60,
-      M2: 120,
-      '2m': 120,
-      M3: 180,
-      '3m': 180,
-      M5: 300,
-      '5m': 300,
-      M15: 900,
-      '15m': 900,
-      M30: 1800,
-      '30m': 1800,
-      M45: 2700,
-      '45m': 2700,
-      H1: 3600,
-      '1h': 3600,
-      H2: 7200,
-      '2h': 7200,
-      H3: 10800,
-      '3h': 10800,
-      H4: 14400,
-      '4h': 14400,
-      D1: 86400,
-      '1d': 86400,
-      W1: 604800,
-      '1w': 604800,
-      MN: 2592000,
-      '1M': 2592000,
-      '1mo': 2592000,
-      '3M': 7776000,
-      '3mo': 7776000,
-      '3months': 7776000,
-      '6M': 15552000,
-      '6mo': 15552000,
-      '6months': 15552000,
-      '12M': 31104000,
-      '12mo': 31104000,
-      '12months': 31104000,
-      '1Y': 31104000,
-    }[timeframe] || 3600;
+  const tfSec = {
+    M1: 60,
+    '1m': 60,
+    M2: 120,
+    '2m': 120,
+    M3: 180,
+    '3m': 180,
+    M5: 300,
+    '5m': 300,
+    M15: 900,
+    '15m': 900,
+    M30: 1800,
+    '30m': 1800,
+    M45: 2700,
+    '45m': 2700,
+    H1: 3600,
+    '1h': 3600,
+    H2: 7200,
+    '2h': 7200,
+    H3: 10800,
+    '3h': 10800,
+    H4: 14400,
+    '4h': 14400,
+    D1: 86400,
+    '1d': 86400,
+    W1: 604800,
+    '1w': 604800,
+    MN: 2592000,
+    '1M': 2592000,
+    '1mo': 2592000,
+    '3M': 7776000,
+    '6M': 15552000,
+    '12M': 31104000,
+  }[timeframe] || 3600;
 
-  const vol = basePrice > 5000 ? 0.0035 : basePrice > 100 ? 0.0025 : 0.0014;
-  let price = basePrice * 0.992;
+  const volatility = basePrice > 5000 ? 0.002 : basePrice > 100 ? 0.0014 : 0.0008;
   const raw = [];
+  let current = basePrice;
+  let trend = 0;
 
-  for (let i = count; i >= 0; i -= 1) {
-    const idx = count - i;
-    const wave = Math.sin(idx / 14) * 0.55 + Math.cos(idx / 6) * 0.35;
-    const dir = wave >= 0 ? 1 : -1;
-    const bodyMag = (0.45 + ((idx * 13) % 7) * 0.11) * vol * price;
-    const delta = dir * bodyMag + wave * vol * price * 0.3;
+  let seed = 42;
+  const rand = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
 
-    const open = price;
-    const close = open + delta;
+  for (let i = count; i >= 0; i--) {
+    if (i % 20 === 0) {
+      trend = (rand() - 0.5) * volatility * 1.5;
+    }
+    const noise = (rand() - 0.5) * volatility * 2.2;
+    const returnPct = trend + noise;
+    const open = current;
+    const close = Math.max(basePrice * 0.2, open * (1 + returnPct));
+
     const body = Math.abs(close - open);
-    const uWick = body * (0.2 + ((idx * 3) % 5) * 0.12);
-    const lWick = body * (0.2 + ((idx * 7) % 5) * 0.12);
+    const wickHigh = (rand() * 0.7 + 0.15) * (body + open * volatility * 0.5);
+    const wickLow = (rand() * 0.7 + 0.15) * (body + open * volatility * 0.5);
+    const high = Math.max(open, close) + wickHigh;
+    const low = Math.max(0.0001, Math.min(open, close) - wickLow);
 
     raw.push({
       time: nowSec - i * tfSec,
       open: Number(open.toFixed(dp)),
-      high: Number((Math.max(open, close) + uWick).toFixed(dp)),
-      low: Number((Math.min(open, close) - lWick).toFixed(dp)),
+      high: Number(high.toFixed(dp)),
+      low: Number(low.toFixed(dp)),
       close: Number(close.toFixed(dp)),
+      volume: Math.round(500 + rand() * 4500),
     });
-    price = close;
+    current = close;
   }
-
-  return sanitizeCandles(raw, basePrice);
+  return raw;
 };
 
 /**

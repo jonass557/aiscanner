@@ -135,9 +135,11 @@ const decimalsForPrice = (price) => {
 export const sanitizeYahooCandles = (rawBars) => {
   if (!Array.isArray(rawBars) || rawBars.length === 0) return [];
 
-  // 1. Filter valid positive bars & deduplicate timestamps
+  // Filter valid positive bars & deduplicate timestamps strictly ascending
   const valid = [];
   let lastTs = -1;
+  const dp = decimalsForPrice(rawBars[rawBars.length - 1]?.close || 100);
+
   for (const b of rawBars) {
     if (
       b &&
@@ -146,123 +148,28 @@ export const sanitizeYahooCandles = (rawBars) => {
       Number.isFinite(b.low) &&
       Number.isFinite(b.close) &&
       b.close > 0 &&
-      b.open > 0 &&
-      b.high > 0 &&
-      b.low > 0
+      b.open > 0
     ) {
       const ts = typeof b.time === 'number' ? b.time : new Date(b.time).getTime();
       if (ts > lastTs) {
-        valid.push({ ...b, _ts: ts });
+        const open = Number(b.open.toFixed(dp));
+        const close = Number(b.close.toFixed(dp));
+        const high = Number(Math.max(b.high, open, close).toFixed(dp));
+        const low = Number(Math.max(0.00001, Math.min(b.low, open, close)).toFixed(dp));
+        valid.push({
+          time: new Date(ts).toISOString(),
+          open,
+          high,
+          low,
+          close,
+          volume: b.volume || 0,
+        });
         lastTs = ts;
       }
     }
   }
 
-  if (valid.length === 0) return [];
-  const dp = decimalsForPrice(valid[valid.length - 1].close);
-  const minTick = Math.pow(10, -dp);
-
-  // 2. First pass: enforce continuous open[i] = close[i-1] and filter dead duplicate rollover bars
-  const continuous = [];
-  for (let i = 0; i < valid.length; i += 1) {
-    const cur = valid[i];
-    if (i === 0) {
-      continuous.push({ ...cur });
-      continue;
-    }
-    const prev = continuous[continuous.length - 1];
-    // Skip completely dead duplicate bars (open===high===low===close===prev.close)
-    if (
-      Math.abs(cur.close - prev.close) < minTick * 0.5 &&
-      Math.abs(cur.high - cur.low) < minTick * 0.5 &&
-      valid.length - continuous.length > 40
-    ) {
-      continue;
-    }
-
-    const open = prev.close;
-    let close = cur.close;
-    let high = Math.max(cur.high, open, close);
-    let low = Math.min(cur.low, open, close);
-
-    continuous.push({
-      ...cur,
-      open,
-      high,
-      low,
-      close,
-    });
-  }
-
-  // 3. Compute typical active candle body size
-  const bodies = continuous
-    .map((c) => Math.abs(c.close - c.open))
-    .filter((b) => b > minTick * 2)
-    .sort((a, b) => a - b);
-
-  const refPrice = continuous[continuous.length - 1].close;
-  const medianBody =
-    bodies.length > 5
-      ? bodies[Math.floor(bodies.length * 0.55)]
-      : refPrice * 0.0012;
-  const normalBody = Math.max(medianBody, refPrice * 0.0005);
-
-  // 4. Second pass: eliminate stagnant "barcode" tiny-body streaks and clamp fake spread-spike wicks
-  const cleaned = [];
-  for (let i = 0; i < continuous.length; i += 1) {
-    const c = continuous[i];
-    const open = i === 0 ? c.open : cleaned[i - 1].close;
-    let close = c.close;
-    let body = Math.abs(close - open);
-
-    // If this candle has a tiny stagnant body (< 35% of normalBody) while having a wide wick or
-    // sitting in a flat streak, give it a natural micro-structural body progression
-    if (body < normalBody * 0.35 && i < continuous.length - 1) {
-      const nextClose = continuous[Math.min(i + 2, continuous.length - 1)].close;
-      const dir =
-        Math.abs(nextClose - open) > minTick
-          ? Math.sign(nextClose - open)
-          : i % 2 === 0
-            ? 1
-            : -1;
-      const stepFactor = 0.45 + ((i * 7) % 5) * 0.12; // deterministic 0.45..0.93
-      close = open + dir * normalBody * stepFactor;
-      body = Math.abs(close - open);
-    }
-
-    const bodyTop = Math.max(open, close);
-    const bodyBot = Math.min(open, close);
-
-    let upperWick = Math.max(0, c.high - bodyTop);
-    let lowerWick = Math.max(0, bodyBot - c.low);
-
-    // Clamp excessive Yahoo Finance spread-spike wicks (never allow barcode wicks > 1.3x body)
-    const maxWick = Math.max(body * 1.25, normalBody * 0.75);
-    if (upperWick > maxWick) {
-      upperWick = body * (0.25 + ((i * 3) % 5) * 0.14);
-    }
-    if (lowerWick > maxWick) {
-      lowerWick = body * (0.25 + ((i * 5) % 5) * 0.14);
-    }
-
-    // Ensure every candle has at least a subtle natural wick
-    if (upperWick < body * 0.08) upperWick = body * (0.15 + ((i * 3) % 4) * 0.08);
-    if (lowerWick < body * 0.08) lowerWick = body * (0.15 + ((i * 5) % 4) * 0.08);
-
-    const high = bodyTop + upperWick;
-    const low = Math.max(minTick, bodyBot - lowerWick);
-
-    cleaned.push({
-      time: c.time,
-      open: Number(open.toFixed(dp)),
-      high: Number(high.toFixed(dp)),
-      low: Number(low.toFixed(dp)),
-      close: Number(close.toFixed(dp)),
-      volume: c.volume || 0,
-    });
-  }
-
-  return cleaned;
+  return valid;
 };
 
 /**

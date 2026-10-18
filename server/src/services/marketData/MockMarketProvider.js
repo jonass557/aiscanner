@@ -67,28 +67,24 @@ export class MockMarketProvider extends BaseMarketProvider {
     let price = base * (0.985 + rand() * 0.03);
     const now = Date.now();
     const tfMinutes =
-      { M1: 1, M5: 5, M15: 15, M30: 30, H1: 60, H4: 240, D1: 1440, W1: 10080 }[timeframe] || 60;
+      { M1: 1, M2: 2, M3: 3, M5: 5, M15: 15, M30: 30, M45: 45, H1: 60, H2: 120, H3: 180, H4: 240, D1: 1440, W1: 10080 }[timeframe] || 60;
     const tfMs = tfMinutes * 60 * 1000;
 
-    // Multi-wave structure so candles form clear trends, pullbacks, and supply/demand zones
-    let momentum = (rand() - 0.48) * 0.5;
+    let localTrend = 0;
     for (let i = limit - 1; i >= 0; i -= 1) {
-      const idx = limit - 1 - i;
-      const macroWave = Math.sin(idx / 18) * 0.45 + Math.cos(idx / 9) * 0.35;
-      momentum = momentum * 0.65 + (rand() - 0.49 + macroWave * 0.35) * 0.35;
-
-      // Ensure every candle has a clear, visible body (never a flat aligned doji)
-      const sign = momentum >= 0 ? 1 : -1;
-      const bodyMagnitude = (0.35 + rand() * 0.85) * vol * price;
-      const delta = sign * bodyMagnitude + momentum * vol * price * 0.4;
+      if (i % 20 === 0) {
+        localTrend = (rand() - 0.5) * vol * 1.5;
+      }
+      const noise = (rand() - 0.5) * vol * 2.2;
+      const returnPct = localTrend + noise;
 
       const open = price;
-      const close = Math.max(base * 0.2, open + delta);
+      const close = Math.max(base * 0.2, open * (1 + returnPct));
       const body = Math.abs(close - open);
 
-      // Proportional, realistic wicks (20% to 85% of body size)
-      const upperWick = body * (0.18 + rand() * 0.65);
-      const lowerWick = body * (0.18 + rand() * 0.65);
+      // Proportional, realistic wicks
+      const upperWick = (rand() * 0.7 + 0.15) * (body + open * vol * 0.4);
+      const lowerWick = (rand() * 0.7 + 0.15) * (body + open * vol * 0.4);
       const high = Math.max(open, close) + upperWick;
       const low = Math.max(0.00001, Math.min(open, close) - lowerWick);
 
