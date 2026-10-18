@@ -173,13 +173,13 @@ export const sanitizeYahooCandles = (rawBars) => {
 };
 
 /**
- * Aggregate 1h candles into 4h candles when timeframe === 'H4'.
+ * Aggregate candles helper (e.g. 1h into 2h, 3h, 4h, or 1mo into 3M, 6M, 12M).
  */
-const aggregateToH4 = (candles) => {
-  if (candles.length < 4) return candles;
+const aggregateCandles = (candles, count) => {
+  if (!candles || count <= 1 || candles.length < count) return candles;
   const out = [];
-  for (let i = 0; i < candles.length; i += 4) {
-    const chunk = candles.slice(i, i + 4);
+  for (let i = 0; i < candles.length; i += count) {
+    const chunk = candles.slice(i, i + count);
     const first = chunk[0];
     const last = chunk[chunk.length - 1];
     out.push({
@@ -267,7 +267,14 @@ export class LiveMarketProvider extends BaseMarketProvider {
   async getCandles(entry, timeframe = 'H1', limit = 120) {
     const ticker = this._mapSymbol(entry);
     const interval = YAHOO_INTERVAL_MAP[timeframe] || '1h';
-    const fetchLimit = timeframe === 'H4' ? limit * 4 : limit;
+    const factor =
+      timeframe === 'H2' ? 2 :
+      timeframe === 'H3' ? 3 :
+      timeframe === 'H4' ? 4 :
+      timeframe === '3M' ? 3 :
+      timeframe === '6M' ? 6 :
+      timeframe === '12M' ? 12 : 1;
+    const fetchLimit = limit * factor;
 
     let range = '5d';
     if (interval === '1m') range = fetchLimit > 200 ? '7d' : '2d';
@@ -299,7 +306,7 @@ export class LiveMarketProvider extends BaseMarketProvider {
       }
     }
 
-    const aggregated = timeframe === 'H4' ? aggregateToH4(rawCandles) : rawCandles;
+    const aggregated = factor > 1 ? aggregateCandles(rawCandles, factor) : rawCandles;
     const sanitized = sanitizeYahooCandles(aggregated);
 
     if (sanitized.length > limit) {

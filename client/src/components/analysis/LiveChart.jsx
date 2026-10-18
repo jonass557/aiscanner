@@ -98,7 +98,7 @@ export default function LiveChart({
       let source = 'live';
 
       try {
-        const snap = await marketApi.snapshot(activeSymbol, activeTf, 220);
+        const snap = await marketApi.snapshot(activeSymbol, activeTf, 5000);
         const marketData = snap.data?.data?.market;
         const raw = marketData?.candles || snap.data?.data?.candles;
 
@@ -119,7 +119,7 @@ export default function LiveChart({
           activeSymbol.includes('JPY') ? 153.2 :
           activeSymbol.includes('VOL75') ? 325000 : 1.085;
 
-        loadedBars = generateRealisticCandles(basePrice, activeTf, 160);
+        loadedBars = generateRealisticCandles(basePrice, activeTf, 500);
         real = false;
         source = 'simulé';
       }

@@ -293,7 +293,7 @@ export default function Backtesting() {
   const [selectedCategory, setSelectedCategory] = useState('forex');
   const [selectedPair, setSelectedPair] = useState(ALL_PAIRS[0]);
   const [timeframe, setTimeframe] = useState('H1');
-  const [candleLimit, setCandleLimit] = useState(2500); // Unlimited / Deep history
+  const [candleLimit, setCandleLimit] = useState(5000); // Unlimited / Deep history
 
   // Raw dataset and replay pointer
   const [allCandles, setAllCandles] = useState([]);
@@ -446,7 +446,7 @@ export default function Backtesting() {
             const idx = sorted.findIndex((c) => c.time >= curTimestamp);
             newIdx = idx === -1 ? sorted.length : Math.max(1, idx);
           } else {
-            newIdx = Math.max(15, Math.floor(sorted.length * 0.6));
+            newIdx = sorted.length;
             setCutIndex(newIdx);
           }
           setReplayIndex(newIdx);
@@ -470,9 +470,9 @@ export default function Backtesting() {
           }
         }
       } catch (err) {
-        const fallback = generateRealisticCandles(selectedPair.base, timeframe, 300);
+        const fallback = generateRealisticCandles(selectedPair.base, timeframe, 500);
         setAllCandles(fallback);
-        const initCut = Math.max(15, Math.floor(fallback.length * 0.6));
+        const initCut = fallback.length;
         setCutIndex(initCut);
         setReplayIndex(initCut);
         chartInstanceRef.current?.timeScale().fitContent();
