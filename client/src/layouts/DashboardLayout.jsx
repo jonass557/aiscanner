@@ -107,6 +107,9 @@ export default function DashboardLayout() {
     </div>
   );
 
+  const location = useLocation();
+  const isBacktesting = location.pathname.startsWith('/dashboard/backtesting');
+
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sliding Drawer Menu (unfolds when toggled, rolls up automatically on navigation click) */}
@@ -137,7 +140,7 @@ export default function DashboardLayout() {
 
       {/* Main Container - Takes 100% full screen width */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white/90 px-4 py-2.5 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 lg:px-6">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white/90 px-4 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 lg:px-6">
           <div className="flex items-center gap-3">
             {/* Menu Déroulant Button (Works on Desktop & Mobile, auto-rolls up when item clicked) */}
             <button
@@ -149,13 +152,15 @@ export default function DashboardLayout() {
               <span className="hidden sm:inline">{t('featuresMenu')}</span>
             </button>
 
-            {/* Quick logo badge */}
-            <Link to="/" className="flex items-center gap-2 font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-accent-600 text-white">
-                <ScanLine className="h-4 w-4" />
-              </span>
-              <span className="hidden md:inline font-black tracking-tight">AI Scanner</span>
-            </Link>
+            {/* Quick logo badge - hidden on backtesting view to maximize space */}
+            {!isBacktesting && (
+              <Link to="/" className="flex items-center gap-2 font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-accent-600 text-white">
+                  <ScanLine className="h-4 w-4" />
+                </span>
+                <span className="hidden md:inline font-black tracking-tight">AI Scanner</span>
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -184,7 +189,7 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-3 sm:p-5 lg:p-6 w-full max-w-full">
+        <main className={`flex-1 w-full max-w-full ${isBacktesting ? 'p-0 overflow-hidden' : 'p-3 sm:p-5 lg:p-6'}`}>
           <Outlet />
         </main>
       </div>

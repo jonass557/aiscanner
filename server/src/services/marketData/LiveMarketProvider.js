@@ -15,15 +15,37 @@ import { BaseMarketProvider } from './BaseMarketProvider.js';
 
 const YAHOO_INTERVAL_MAP = {
   M1: '1m',
+  '1m': '1m',
+  M2: '2m',
+  '2m': '2m',
+  M3: '1m', // Aggregated or 1m
+  '3m': '1m',
   M5: '5m',
+  '5m': '5m',
   M15: '15m',
+  '15m': '15m',
   M30: '30m',
+  '30m': '30m',
+  M45: '15m',
+  '45m': '15m',
   H1: '1h',
+  '1h': '1h',
   H2: '1h',
+  '2h': '1h',
+  H3: '1h',
+  '3h': '1h',
   H4: '1h', // Aggregated 4x 1h -> 4h
+  '4h': '1h',
   D1: '1d',
+  '1d': '1d',
   W1: '1wk',
+  '1w': '1wk',
   MN: '1mo',
+  '1M': '1mo',
+  '1mo': '1mo',
+  '3M': '1mo',
+  '6M': '1mo',
+  '12M': '1mo',
 };
 
 const SYMBOL_MAP = {
