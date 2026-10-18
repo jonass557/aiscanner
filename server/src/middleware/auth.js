@@ -40,6 +40,11 @@ export const authorize = (...roles) =>
   };
 
 /**
+ * Admin guard. Requires user to have 'admin' role.
+ */
+export const requireAdmin = authorize('admin');
+
+/**
  * Requires a verified email. Use after `protect` on sensitive actions.
  * No-op when email verification is disabled (config.features.requireEmailVerification),
  * so the product works without an email provider configured.
