@@ -1,14 +1,18 @@
 import axios from 'axios';
 
 /**
- * Central axios instance. Attaches the access token to every request and
- * transparently refreshes it once on a 401 before retrying.
+ * Central axios instance.
+ * Uses relative `/api/v1` by default so requests go through:
+ *  - Vite dev proxy in local development (`localhost:3000` -> `127.0.0.1:5000`)
+ *  - Vercel Edge Rewrites in production (`vercel.json` -> `aiscanner-id5q.onrender.com`)
+ * Routing through Vercel's same-origin proxy avoids ISP TLS resets
+ * (`net::ERR_CONNECTION_RESET`) on direct `*.onrender.com` connections.
  */
 const rawBase = (import.meta.env.VITE_API_URL || '').trim();
 const cleanBaseUrl = rawBase.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+
 const api = axios.create({
-  // If VITE_API_URL is provided, use it; otherwise fallback to relative /api/v1 (Vite proxy in dev)
-  baseURL: cleanBaseUrl ? `${cleanBaseUrl}/api/v1` : '/api/v1',
+  baseURL: '/api/v1',
   timeout: 90000,
 });
 
@@ -43,13 +47,32 @@ const flushQueue = (error, token = null) => {
 };
 
 api.interceptors.response.use(
-  (res) => res,
+  async (res) => {
+    // If a static host without Vercel rewrites returns index.html for /api/v1/*,
+    // transparently retry against VITE_API_URL if configured.
+    if (
+      typeof res.data === 'string' &&
+      res.data.toLowerCase().includes('<!doctype html>') &&
+      cleanBaseUrl &&
+      !res.config._directRetried
+    ) {
+      res.config._directRetried = true;
+      res.config.baseURL = `${cleanBaseUrl}/api/v1`;
+      return api(res.config);
+    }
+    return res;
+  },
   async (error) => {
-    const original = error.config;
+    const original = error.config || {};
     const status = error.response?.status;
 
-    // Attempt a single token refresh on 401 (but never for the refresh call itself).
-    if (status === 401 && !original._retry && !original.url.includes('/auth/refresh')) {
+    // Attempt a single token refresh on 401 (but never for the refresh call itself or login).
+    if (
+      status === 401 &&
+      !original._retry &&
+      !original.url?.includes('/auth/refresh') &&
+      !original.url?.includes('/auth/login')
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           pendingQueue.push({ resolve, reject });
@@ -65,6 +88,7 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         tokenStore.clear();
+        isRefreshing = false;
         return Promise.reject(error);
       }
 
@@ -85,10 +109,10 @@ api.interceptors.response.use(
       }
     }
 
-    // Auto-retry once on transient network drop (weak mobile connection)
+    // Auto-retry once on transient network drop or cold start (502/503/504)
     if (!original._netRetried && (!error.response || [502, 503, 504].includes(status))) {
       original._netRetried = true;
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 1500));
       return api(original);
     }
 
@@ -102,20 +126,19 @@ export const getErrorMessage = (error) => {
     return "Délai d'attente dépassé (timeout). Le serveur backend prend plus de temps que prévu à répondre ou le réseau est saturé. Veuillez réessayer.";
   }
 
-  // Detect missing VITE_API_URL on Vercel or cloud deployment
-  const isVercelOrRemote = typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname);
-  if (isVercelOrRemote && !import.meta.env.VITE_API_URL) {
-    return "L'URL du serveur backend (Render) n'est pas renseignée dans Vercel (variable VITE_API_URL manquante). Veuillez ajouter VITE_API_URL=<URL_BACKEND_RENDER> dans Vercel -> Settings -> Environment Variables puis redéployer.";
-  }
+  const isVercelOrRemote =
+    typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname);
 
-  // Detect HTML returned by Vercel rewrites when API endpoint doesn't exist on static host
-  if (typeof error.response?.data === 'string' && error.response.data.includes('<!doctype html>')) {
-    return "Le serveur frontend (Vercel) a renvoyé une page HTML au lieu de l'API. Assurez-vous que la variable VITE_API_URL est bien configurée avec l'URL de votre backend Render.";
+  if (
+    typeof error.response?.data === 'string' &&
+    error.response.data.toLowerCase().includes('<!doctype html>')
+  ) {
+    return "Le serveur frontend a renvoyé une page HTML au lieu de l'API. Vérifiez que le redéploiement Vercel est terminé.";
   }
 
   if (!error.response && error.message === 'Network Error') {
     if (isVercelOrRemote) {
-      return "Impossible de joindre le serveur backend (Render). Si vous utilisez l'offre gratuite de Render, le serveur s'endort après 15 min d'inactivité et prend 40 à 50 secondes pour démarrer (démarrage à froid). Patientez une minute et réessayez, ou vérifiez l'état de votre service sur le tableau de bord Render.";
+      return "Impossible de joindre le serveur backend (Render). Si le serveur était en veille (offre gratuite Render), patientez 30 à 40 secondes et réessayez.";
     }
     return 'Impossible de joindre le serveur backend. Vérifiez que le serveur est bien démarré sur le port 5000 (npm run dev dans le dossier server).';
   }

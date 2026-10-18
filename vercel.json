@@ -4,6 +4,14 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/v1/:path*",
+      "destination": "https://aiscanner-id5q.onrender.com/api/v1/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://aiscanner-id5q.onrender.com/health"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
