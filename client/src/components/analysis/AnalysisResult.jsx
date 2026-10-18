@@ -54,9 +54,8 @@ export default function AnalysisResult({ analysis, market, onExportPdf, exportin
   }, [cancelSpeech]);
 
   const hasAnnotations = Array.isArray(analysis.annotations) && analysis.annotations.length > 0;
-  // Show the live chart whenever we can identify the instrument (either from the
-  // scan's snapshot or the analysis symbol — LiveChart will fetch on its own).
-  const canShowLive = Boolean(market?.candles?.length || (analysis.symbol && analysis.symbol !== 'Unknown'));
+  // Always display the live interactive chart with strategic overlays synchronized to the user strategy
+  const canShowLive = true;
 
   return (
     <div className="space-y-6">
@@ -114,14 +113,17 @@ export default function AnalysisResult({ analysis, market, onExportPdf, exportin
         />
       )}
 
-      {/* Real-time chart of the detected pair + timeframe, with the trade-plan
-          levels drawn on the live price. */}
+      {/* Real-time interactive chart of the scanned pair + timeframe, with strategic
+          Supply/Demand zones, Liquidity pools, Entry, SL and TP synchronized with the chosen strategy. */}
       {canShowLive && (
         <LiveChart
           market={market}
           symbol={analysis.symbol}
           timeframe={analysis.timeframe}
           tradePlan={analysis.tradePlan}
+          decision={analysis.decision}
+          strategy={analysis.customStrategy || analysis.strategy}
+          analysis={analysis}
         />
       )}
 

