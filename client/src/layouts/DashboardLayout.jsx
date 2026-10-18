@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ScanLine, History, CreditCard, User, Settings,
   Menu, X, LogOut, Moon, Sun, ShieldCheck, Layers, Radar, GraduationCap,
-  CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe,
+  CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe, Eye,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -13,10 +13,11 @@ import VoiceAssistantButton from '../components/voice/VoiceAssistantButton.jsx';
 
 const NAV_ITEMS = [
   { to: '/dashboard', key: 'overview', icon: LayoutDashboard, end: true },
-  { to: '/dashboard/assistant', key: 'aiAssistant', icon: Bot },
+  { to: '/dashboard/chart-vision', key: 'chartVision', icon: Eye },
+  { to: '/dashboard/opportunities', key: 'opportunities', icon: Bot },
   { to: '/dashboard/scanner', key: 'aiScanner', icon: ScanLine },
+  { to: '/dashboard/assistant', key: 'aiAssistant', icon: Bot },
   { to: '/dashboard/multi-timeframe', key: 'multiTimeframe', icon: Layers },
-  { to: '/dashboard/opportunities', key: 'opportunities', icon: Radar },
   { to: '/dashboard/journal', key: 'tradingJournal', icon: BookOpen },
   { to: '/dashboard/backtesting', key: 'backtesting', icon: Zap },
   { to: '/dashboard/mentor', key: 'aiMentor', icon: GraduationCap },

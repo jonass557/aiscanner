@@ -15,6 +15,7 @@ const VerifyEmail = lazy(() => import('./pages/auth/VerifyEmail.jsx'));
 
 const DashboardLayout = lazy(() => import('./layouts/DashboardLayout.jsx'));
 const Overview = lazy(() => import('./pages/dashboard/Overview.jsx'));
+const ChartVision = lazy(() => import('./pages/dashboard/ChartVision.jsx'));
 const AssistantChat = lazy(() => import('./pages/dashboard/AssistantChat.jsx'));
 const Scanner = lazy(() => import('./pages/dashboard/Scanner.jsx'));
 const MultiTimeframe = lazy(() => import('./pages/dashboard/MultiTimeframe.jsx'));
@@ -34,6 +35,7 @@ const Settings = lazy(() => import('./pages/dashboard/Settings.jsx'));
 const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview.jsx'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
+const AdminStrategies = lazy(() => import('./pages/admin/AdminStrategies.jsx'));
 const AdminPlans = lazy(() => import('./pages/admin/AdminPlans.jsx'));
 const AdminLogs = lazy(() => import('./pages/admin/AdminLogs.jsx'));
 const AdminAIConfig = lazy(() => import('./pages/admin/AdminAIConfig.jsx'));
@@ -62,6 +64,7 @@ export default function App() {
           }
         >
           <Route index element={<Overview />} />
+          <Route path="chart-vision" element={<ChartVision />} />
           <Route path="assistant" element={<AssistantChat />} />
           <Route path="scanner" element={<Scanner />} />
           <Route path="multi-timeframe" element={<MultiTimeframe />} />
@@ -90,6 +93,7 @@ export default function App() {
         >
           <Route index element={<AdminOverview />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="strategies" element={<AdminStrategies />} />
           <Route path="plans" element={<AdminPlans />} />
           <Route path="logs" element={<AdminLogs />} />
           <Route path="ai-config" element={<AdminAIConfig />} />

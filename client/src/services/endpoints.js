@@ -149,6 +149,14 @@ export const adminApi = {
   deletePlan: (id) => api.delete(`/admin/plans/${id}`),
 };
 
+export const strategyApi = {
+  list: () => api.get('/strategies'),
+  adminList: () => api.get('/strategies/admin'),
+  create: (payload) => api.post('/strategies', payload),
+  update: (id, payload) => api.put(`/strategies/${id}`, payload),
+  remove: (id) => api.delete(`/strategies/${id}`),
+};
+
 /** Triggers a browser download from a blob response. */
 export const downloadBlob = (blob, filename) => {
   const url = window.URL.createObjectURL(blob);

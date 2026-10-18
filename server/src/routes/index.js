@@ -14,6 +14,7 @@ import assistantRoutes from './assistantRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 import marketRoutes from './marketRoutes.js';
 import journalRoutes from './journalRoutes.js';
+import strategyRoutes from './strategyRoutes.js';
 
 /**
  * Root API router. Mounts each domain's routes under /api/v1.
@@ -34,6 +35,7 @@ router.use('/admin', requireDbConnection, adminRoutes);
 router.use('/mentor', requireDbConnection, mentorRoutes);
 router.use('/opportunities', requireDbConnection, opportunityRoutes);
 router.use('/journal', requireDbConnection, journalRoutes);
+router.use('/strategies', requireDbConnection, strategyRoutes);
 router.use('/voice', requireDbConnection, voiceRoutes);
 router.use('/assistant', requireDbConnection, assistantRoutes);
 router.use('/payments', requireDbConnection, paymentRoutes);

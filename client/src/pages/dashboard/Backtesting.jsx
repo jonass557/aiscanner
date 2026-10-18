@@ -112,10 +112,10 @@ const CHART_TYPES = [
 ];
 
 const THEME_COLORS = [
-  { id: 'dark', label: 'TradingView Dark', bg: '#131722', text: '#d1d4dc', grid: '#1e222d' },
+  { id: 'dark', label: 'Dark Pro', bg: '#131722', text: '#d1d4dc', grid: '#1e222d' },
   { id: 'black', label: 'OLED Black', bg: '#000000', text: '#9ca3af', grid: '#111827' },
   { id: 'slate', label: 'Navy Slate', bg: '#0b0f19', text: '#94a3b8', grid: '#1e293b' },
-  { id: 'light', label: 'TradingView Light', bg: '#ffffff', text: '#191919', grid: '#f0f3fa' },
+  { id: 'light', label: 'Light Pro', bg: '#ffffff', text: '#191919', grid: '#f0f3fa' },
 ];
 
 // Return lot step, minimum and contract specifications per category
@@ -349,7 +349,18 @@ export default function Backtesting() {
     return res;
   };
 
-  // Build and Initialize TradingView Lightweight Chart
+  // Persistent refs to avoid recreating chart when cutMode or candles change
+  const cutModeRef = useRef(false);
+  useEffect(() => {
+    cutModeRef.current = cutMode;
+  }, [cutMode]);
+
+  const allCandlesRef = useRef([]);
+  useEffect(() => {
+    allCandlesRef.current = allCandles;
+  }, [allCandles]);
+
+  // Build and Initialize Interactive Pro Chart
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -416,6 +427,18 @@ export default function Backtesting() {
     }
     mainSeriesRef.current = series;
 
+    // Immediately load available candles so chart is never blank
+    if (allCandlesRef.current.length > 0) {
+      const visibleData = allCandlesRef.current.slice(0, replayIndex);
+      if (visibleData.length > 0) {
+        if (chartType === 'line' || chartType === 'area') {
+          series.setData(visibleData.map((c) => ({ time: c.time, value: c.close })));
+        } else {
+          series.setData(visibleData);
+        }
+      }
+    }
+
     // Optional EMA lines
     if (showEMA9) {
       ema9SeriesRef.current = chart.addSeries(LineSeries, { color: '#eab308', lineWidth: 1.5, title: 'EMA 9' });
@@ -430,11 +453,11 @@ export default function Backtesting() {
       ema200SeriesRef.current = chart.addSeries(LineSeries, { color: '#a855f7', lineWidth: 2, title: 'EMA 200' });
     }
 
-    // Handle Click on Chart for Cut Replay Tool
+    // Handle Click on Chart for Cut Replay Tool (reads cutModeRef without rebuilding chart)
     chart.subscribeClick((param) => {
-      if (!cutMode || !param.time) return;
+      if (!cutModeRef.current || !param.time) return;
       const clickedTime = param.time;
-      const idx = allCandles.findIndex((c) => c.time === clickedTime);
+      const idx = allCandlesRef.current.findIndex((c) => c.time === clickedTime);
       if (idx !== -1) {
         const newCut = idx + 1;
         setCutIndex(newCut);
@@ -464,7 +487,7 @@ export default function Backtesting() {
         chartInstanceRef.current = null;
       }
     };
-  }, [chartTheme, chartType, upColor, downColor, showEMA9, showEMA21, showEMA50, showEMA200, cutMode, allCandles, isEn]);
+  }, [chartTheme, chartType, upColor, downColor, showEMA9, showEMA21, showEMA50, showEMA200, isEn]);
 
   // Adjust chart width whenever user switches back to 'chart' tab
   useEffect(() => {
@@ -934,7 +957,7 @@ export default function Backtesting() {
           <div className="flex items-center justify-between border-b border-gray-200 pb-2.5 dark:border-gray-800">
             <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Sliders className="h-4 w-4 text-brand-500" />
-              {isEn ? 'TradingView Chart Customization' : 'Personnalisation du Graphique TradingView'}
+              {isEn ? 'Chart Customization' : 'Personnalisation du Graphique'}
             </h3>
             <button
               onClick={() => setSettingsOpen(false)}
@@ -1340,7 +1363,7 @@ export default function Backtesting() {
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-sm">
               <Spinner />
               <p className="mt-2 text-xs font-semibold text-cyan-300">
-                {isEn ? 'Rendering TradingView engine...' : 'Chargement du moteur TradingView...'}
+                {isEn ? 'Loading real-time market data...' : 'Chargement du flux en temps réel...'}
               </p>
             </div>
           )}

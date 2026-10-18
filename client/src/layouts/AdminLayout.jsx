@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, ScrollText, Cpu, Menu, LogOut, ArrowLeft, ShieldCheck, Moon, Sun, CreditCard,
+  LayoutDashboard, Users, ScrollText, Cpu, Menu, LogOut, ArrowLeft, ShieldCheck, Moon, Sun, CreditCard, Layers,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -9,6 +9,7 @@ import { useTheme } from '../context/ThemeContext.jsx';
 const NAV = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/strategies', label: 'Stratégies', icon: Layers },
   { to: '/admin/plans', label: 'Plans', icon: CreditCard },
   { to: '/admin/logs', label: 'Logs', icon: ScrollText },
   { to: '/admin/ai-config', label: 'AI Config', icon: Cpu },

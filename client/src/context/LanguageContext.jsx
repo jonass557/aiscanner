@@ -13,7 +13,8 @@ const translations = {
     aiAssistant: 'Assistant IA',
     aiScanner: 'AI Scanner',
     multiTimeframe: 'Multi-Timeframe',
-    opportunities: 'Opportunités',
+    chartVision: 'Chart Vision',
+    opportunities: 'Robot',
     aiMentor: 'Mentor IA',
     tradeValidator: 'Validateur de Trade',
     tradingJournal: 'Journal de Trading',
@@ -88,7 +89,7 @@ const translations = {
 
     // Backtesting Station
     backtestTitle: 'Station de Backtesting & Replay de Marché',
-    backtestSubtitle: 'Replay 100% manuel contrôlé par le trader. Découpez le temps (Cut Tool), analysez avec le moteur TradingView et passez vos ordres réels.',
+    backtestSubtitle: 'Replay 100% manuel contrôlé par le trader. Découpez le temps (Cut Tool), analysez avec le moteur graphique institutionnel et passez vos ordres réels.',
     play: 'Replay (Lecture)',
     pause: 'Pause',
     stepForward: 'Avancer (+1 Bougie)',
@@ -141,9 +142,29 @@ const translations = {
     unlimitedBars: 'Bougies Illimitées (Max)',
     featuresMenu: 'Menu des Fonctionnalités',
 
-    // Opportunities Scanner
-    oppTitle: 'Scanner d\'Opportunités Haute Probabilité',
-    oppSubtitle: 'Détection automatisée en temps réel selon vos stratégies personnalisées et les concepts institutionnels SMC/ICT.',
+    // Chart Vision
+    chartVisionTitle: 'Chart Vision — Analyse Stratégique en Temps Réel',
+    chartVisionSubtitle: 'Tracés visuels automatiques en direct des zones de Supply/Demand, supports/résistances, liquidités et signaux selon votre stratégie.',
+    selectStrategy: 'Sélectionner une Stratégie',
+    systemStrategies: 'Stratégies Système',
+    adminStrategies: 'Stratégies Administrateur',
+    mySavedStrategy: 'Ma Stratégie Enregistrée',
+    manageStrategies: 'Gestion des Stratégies',
+    addStrategy: 'Ajouter une Stratégie',
+    supplyZone: 'Zone de Supply (Offre)',
+    demandZone: 'Zone de Demand (Demande)',
+    liquidityPools: 'Poches de Liquidité',
+    buySideLiquidity: 'Liquidité Acheteuse (BSL)',
+    sellSideLiquidity: 'Liquidité Vendeuse (SSL)',
+    marketStructure: 'Structure de Marché',
+    trendLabel: 'Tendance',
+    bullish: 'Haussière',
+    bearish: 'Baissière',
+    confluencesList: 'Confluences Validées',
+
+    // Opportunities / Robot
+    oppTitle: 'Robot de Trading Haute Probabilité',
+    oppSubtitle: 'Détection automatisée en temps réel du robot selon vos stratégies personnalisées et les concepts institutionnels SMC/ICT.',
     activeSignalsTab: 'Signaux en Cours (Live)',
     closedSignalsTab: 'Résultats & Rapport de Performance',
     reportTitle: 'Rapport Statistiques des Signaux Clôturés',
@@ -167,7 +188,8 @@ const translations = {
     aiAssistant: 'AI Assistant',
     aiScanner: 'AI Scanner',
     multiTimeframe: 'Multi-Timeframe',
-    opportunities: 'Opportunities',
+    chartVision: 'Chart Vision',
+    opportunities: 'Robot',
     aiMentor: 'AI Mentor',
     tradeValidator: 'Trade Validator',
     tradingJournal: 'Trading Journal',
@@ -242,7 +264,7 @@ const translations = {
 
     // Backtesting Station
     backtestTitle: 'Market Replay & Backtesting Station',
-    backtestSubtitle: '100% Trader-controlled replay. Cut time (Cut Tool), analyze with the TradingView engine, and execute orders in live market conditions.',
+    backtestSubtitle: '100% Trader-controlled replay. Cut time (Cut Tool), analyze with the institutional chart engine, and execute orders in live market conditions.',
     play: 'Play Replay',
     pause: 'Pause',
     stepForward: 'Step Forward (+1 Bar)',
@@ -295,9 +317,29 @@ const translations = {
     unlimitedBars: 'Unlimited Bars (Max)',
     featuresMenu: 'Features Menu',
 
-    // Opportunities Scanner
-    oppTitle: 'High-Probability Opportunity Scanner',
-    oppSubtitle: 'Real-time automated detection based on your custom trading strategies and SMC/ICT concepts.',
+    // Chart Vision
+    chartVisionTitle: 'Chart Vision — Real-Time Strategic Analysis',
+    chartVisionSubtitle: 'Automated real-time visual plotting of Supply/Demand zones, supports/resistances, liquidity, trend, and trade setups based on your chosen strategy.',
+    selectStrategy: 'Select a Strategy',
+    systemStrategies: 'System Strategies',
+    adminStrategies: 'Admin Strategies',
+    mySavedStrategy: 'My Saved Strategy',
+    manageStrategies: 'Strategy Management',
+    addStrategy: 'Add Strategy',
+    supplyZone: 'Supply Zone',
+    demandZone: 'Demand Zone',
+    liquidityPools: 'Liquidity Pools',
+    buySideLiquidity: 'Buy-Side Liquidity (BSL)',
+    sellSideLiquidity: 'Sell-Side Liquidity (SSL)',
+    marketStructure: 'Market Structure',
+    trendLabel: 'Trend',
+    bullish: 'Bullish',
+    bearish: 'Bearish',
+    confluencesList: 'Validated Confluences',
+
+    // Opportunities / Robot
+    oppTitle: 'High-Probability Trading Robot',
+    oppSubtitle: 'Real-time automated detection and signals by the trading robot based on your custom trading strategies and SMC/ICT concepts.',
     activeSignalsTab: 'Live Active Signals',
     closedSignalsTab: 'Results & Performance Report',
     reportTitle: 'Closed Signals Performance Report',
