@@ -209,12 +209,13 @@ const ALL_TIMEFRAMES = [
   { value: 'H4', label: '4h', group: 'Heures' },
   { value: 'D1', label: '1j', group: 'Jours' },
   { value: 'W1', label: '1s', group: 'Semaines' },
+  { value: 'MN', label: 'Monthly', group: 'Mois' },
   { value: '3M', label: '3 mois', group: 'Mois' },
   { value: '6M', label: '6 mois', group: 'Mois' },
   { value: '12M', label: '12 mois', group: 'Mois' },
 ];
 
-const QUICK_TIMEFRAMES = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1'];
+const QUICK_TIMEFRAMES = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1', 'MN'];
 
 const CHART_TYPES = [
   { id: 'candlestick', labelFr: 'Bougies Japonaises', labelEn: 'Candlesticks' },
@@ -224,7 +225,7 @@ const CHART_TYPES = [
 ];
 
 const THEME_COLORS = [
-  { id: 'dark', label: 'Dark Pro', bg: '#090d16', text: '#94a3b8', grid: '#1e293b' },
+  { id: 'dark', label: 'Dark Pro', bg: '#090d16', text: '#94a3b8', grid: 'rgba(30, 41, 59, 0.4)' },
   { id: 'black', label: 'OLED Black', bg: '#000000', text: '#9ca3af', grid: '#111827' },
   { id: 'slate', label: 'Navy Slate', bg: '#0f172a', text: '#94a3b8', grid: '#1e293b' },
   { id: 'light', label: 'Light Pro', bg: '#ffffff', text: '#191919', grid: '#f0f3fa' },
@@ -431,28 +432,41 @@ export default function Backtesting() {
       setIsPlaying(false);
       try {
         const curTimestamp = allCandlesRef.current[replayIndexRef.current - 1]?.time || null;
-        const { data } = await marketApi.snapshot(selectedPair.symbol, timeframe, candleLimit);
-        const raw = data?.data?.market?.candles || [];
+        const snap = await marketApi.snapshot(selectedPair.symbol, timeframe, candleLimit);
+        const rawBars = snap.data?.data?.market?.candles || snap.data?.data?.candles || [];
         const sorted =
-          raw.length > 0
-            ? sanitizeCandles(raw, selectedPair.base)
-            : generateRealisticCandles(selectedPair.base, timeframe, 300);
+          rawBars.length > 0
+            ? sanitizeCandles(rawBars, selectedPair.base)
+            : generateRealisticCandles(selectedPair.base, timeframe, 500);
 
         if (sorted.length > 0) {
           setAllCandles(sorted);
 
-          let newIdx;
+          let newIdx = sorted.length;
           if (preserveCurrentTime && curTimestamp) {
-            const idx = sorted.findIndex((c) => c.time >= curTimestamp);
-            newIdx = idx === -1 ? sorted.length : Math.max(1, idx);
+            let closestIdx = -1;
+            let minDiff = Infinity;
+            for (let i = 0; i < sorted.length; i++) {
+              const diff = Math.abs(sorted[i].time - curTimestamp);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+              }
+            }
+            if (closestIdx !== -1 && minDiff < 86400 * 7) {
+              newIdx = Math.max(15, closestIdx + 1);
+            } else {
+              newIdx = sorted.length;
+              setCutIndex(0);
+            }
           } else {
             newIdx = sorted.length;
-            setCutIndex(newIdx);
+            setCutIndex(0);
           }
           setReplayIndex(newIdx);
 
-          const dp = getDecimals(sorted[sorted.length - 1]?.close || selectedPair.base);
           if (mainSeriesRef.current) {
+            const dp = getDecimals(sorted[sorted.length - 1]?.close || selectedPair.base);
             mainSeriesRef.current.applyOptions({
               priceFormat: {
                 type: 'price',
@@ -466,17 +480,14 @@ export default function Backtesting() {
             } else {
               mainSeriesRef.current.setData(visible);
             }
-            chartInstanceRef.current?.timeScale().fitContent();
           }
         }
       } catch (err) {
         console.warn('Backtest snapshot fetch error, using realistic fallback:', err);
         const fallback = generateRealisticCandles(selectedPair.base, timeframe, 500);
         setAllCandles(fallback);
-        const initCut = fallback.length;
-        setCutIndex(initCut);
-        setReplayIndex(initCut);
-        chartInstanceRef.current?.timeScale().fitContent();
+        setCutIndex(0);
+        setReplayIndex(fallback.length);
       } finally {
         setLoading(false);
       }
@@ -516,10 +527,8 @@ export default function Backtesting() {
     const filtered = allCandles.filter((c) => c.time >= startSec && c.time <= endSec);
     if (filtered.length >= 5) {
       setAllCandles(filtered);
-      const initCut = Math.max(1, Math.floor(filtered.length * 0.25));
-      setCutIndex(initCut);
-      setReplayIndex(initCut);
-      chartInstanceRef.current?.timeScale().fitContent();
+      setCutIndex(0);
+      setReplayIndex(filtered.length);
       setShowDateRangeModal(false);
       toast.success(
         isEn
@@ -530,7 +539,7 @@ export default function Backtesting() {
       marketApi
         .snapshot(selectedPair.symbol, timeframe, 5000)
         .then(({ data }) => {
-          const raw = data?.data?.market?.candles || [];
+          const raw = data?.data?.market?.candles || data?.data?.candles || [];
           const sorted =
             raw.length > 0
               ? sanitizeCandles(raw, selectedPair.base)
@@ -538,9 +547,8 @@ export default function Backtesting() {
           const f = sorted.filter((c) => c.time >= startSec && c.time <= endSec);
           if (f.length > 0) {
             setAllCandles(f);
-            setCutIndex(1);
-            setReplayIndex(Math.max(1, Math.min(15, f.length)));
-            chartInstanceRef.current?.timeScale().fitContent();
+            setCutIndex(0);
+            setReplayIndex(f.length);
             setShowDateRangeModal(false);
             toast.success(`Période délimitée : ${sDate} au ${eDate} (${f.length} bougies)`);
           } else {
@@ -592,65 +600,289 @@ export default function Backtesting() {
     return res;
   };
 
-  // Initialize Lightweight Charts v5 Instance
+  // Initialize Lightweight Charts v5 Instance (Single Persistent Instance, identical to ChartVision)
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.remove();
-      chartInstanceRef.current = null;
-    }
+    if (!chartInstanceRef.current) {
+      const chart = createChart(chartContainerRef.current, {
+        width: chartContainerRef.current.clientWidth,
+        height: chartContainerRef.current.clientHeight || 740,
+        layout: {
+          background: { type: ColorType.Solid, color: chartTheme.bg },
+          textColor: chartTheme.text,
+          fontSize: 12,
+        },
+        watermark: {
+          visible: false,
+        },
+        grid: {
+          vertLines: { color: chartTheme.grid },
+          horzLines: { color: chartTheme.grid },
+        },
+        crosshair: {
+          mode: CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+          borderColor: chartTheme.grid,
+          scaleMargins: { top: 0.1, bottom: 0.1 },
+          autoScale: true,
+        },
+        timeScale: {
+          borderColor: chartTheme.grid,
+          timeVisible: true,
+          secondsVisible: false,
+          barSpacing: 8,
+          minBarSpacing: 1,
+        },
+      });
 
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight || 740,
-      layout: {
-        background: { type: ColorType.Solid, color: chartTheme.bg },
-        textColor: chartTheme.text,
-        fontSize: 12,
-      },
-      watermark: {
-        visible: false,
-      },
-      grid: {
-        vertLines: { color: chartTheme.grid },
-        horzLines: { color: chartTheme.grid },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-      },
-      rightPriceScale: {
-        borderColor: chartTheme.grid,
-        autoScale: true,
-      },
-      timeScale: {
-        borderColor: chartTheme.grid,
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
+      chartInstanceRef.current = chart;
 
-    chartInstanceRef.current = chart;
-
-    // Add Main Series
-    let series;
-    if (chartType === 'candlestick') {
-      series = chart.addSeries(CandlestickSeries, {
+      const baseDec = getDecimals(selectedPair.base);
+      const series = chart.addSeries(CandlestickSeries, {
         upColor: upColor,
         downColor: downColor,
         borderVisible: false,
         wickUpColor: upColor,
         wickDownColor: downColor,
+        priceFormat: {
+          type: 'price',
+          precision: baseDec,
+          minMove: Math.pow(10, -baseDec),
+        },
+      });
+      mainSeriesRef.current = series;
+
+      // Replay Bar-Cut mode & Interactive Tool placement click handler
+      chart.subscribeClick((param) => {
+        if (!param || !param.time) return;
+
+        // 1. Cut Mode: set replay cut point
+        if (cutModeRef.current) {
+          const clickedTime = param.time;
+          const idx = allCandlesRef.current.findIndex((c) => c.time === clickedTime);
+          if (idx !== -1) {
+            const newCut = idx + 1;
+            setCutIndex(newCut);
+            setReplayIndex(newCut);
+            setCutMode(false);
+            toast.success(
+              isEn
+                ? `Chart cut at bar #${newCut}. Replay initialized!`
+                : `Graphique découpé à la bougie #${newCut}. Replay prêt !`
+            );
+          }
+          return;
+        }
+
+        // 2. Interactive Tool Placement
+        const activeTool = activeDrawingToolRef.current;
+        if (activeTool && activeTool !== 'none') {
+          const clickedTime = param.time;
+          const clickedPrice =
+            mainSeriesRef.current?.coordinateToPrice(param.point?.y) || currentCandle?.close || selectedPair.base;
+          const id = Date.now().toString(36);
+          const dp = getDecimals(clickedPrice);
+
+          if (activeTool === 'horizontal') {
+            const newDrawing = {
+              id,
+              symbol: selectedPair.symbol,
+              type: 'horizontal',
+              price: Number(clickedPrice.toFixed(dp)),
+              time: clickedTime,
+              color: '#3b82f6',
+              lineWidth: 2,
+              lineStyle: 'solid',
+              label: `Ligne @ ${formatPrice(clickedPrice)}`,
+            };
+            setDrawings((prev) => [...prev, newDrawing]);
+            setSelectedDrawingId(id);
+            setActiveDrawingTool('none');
+            toast.success('Ligne Horizontale positionnée');
+          } else if (activeTool === 'vertical') {
+            const newDrawing = {
+              id,
+              symbol: selectedPair.symbol,
+              type: 'vertical',
+              price: Number(clickedPrice.toFixed(dp)),
+              time: clickedTime,
+              color: '#3b82f6',
+              lineWidth: 2,
+              lineStyle: 'solid',
+              label: 'Ligne Verticale',
+            };
+            setDrawings((prev) => [...prev, newDrawing]);
+            setSelectedDrawingId(id);
+            setActiveDrawingTool('none');
+            toast.success('Ligne Verticale positionnée');
+          } else if (activeTool === 'long_position') {
+            const delta = clickedPrice * 0.015;
+            const tp = Number((clickedPrice + delta).toFixed(dp));
+            const sl = Number((clickedPrice - delta * 0.5).toFixed(dp));
+            const newDrawing = {
+              id,
+              symbol: selectedPair.symbol,
+              type: 'long_position',
+              entry: Number(clickedPrice.toFixed(dp)),
+              tp,
+              sl,
+              time: clickedTime,
+              color: '#10b981',
+              lineWidth: 1,
+              lineStyle: 'solid',
+            };
+            setDrawings((prev) => [...prev, newDrawing]);
+            setSelectedDrawingId(id);
+            setActiveDrawingTool('none');
+            toast.success('Position Longue configurée avec suivi du prix');
+          } else if (activeTool === 'short_position') {
+            const delta = clickedPrice * 0.015;
+            const tp = Number((clickedPrice - delta).toFixed(dp));
+            const sl = Number((clickedPrice + delta * 0.5).toFixed(dp));
+            const newDrawing = {
+              id,
+              symbol: selectedPair.symbol,
+              type: 'short_position',
+              entry: Number(clickedPrice.toFixed(dp)),
+              tp,
+              sl,
+              time: clickedTime,
+              color: '#ef4444',
+              lineWidth: 1,
+              lineStyle: 'solid',
+            };
+            setDrawings((prev) => [...prev, newDrawing]);
+            setSelectedDrawingId(id);
+            setActiveDrawingTool('none');
+            toast.success('Position Courte configurée avec suivi du prix');
+          } else {
+            // 2-point tools: trendline, ray, fibonacci, gann_box, fib_channel
+            const pts = pendingPointsRef.current;
+            if (pts.length === 0) {
+              setPendingPoints([{ time: clickedTime, price: Number(clickedPrice.toFixed(dp)) }]);
+              toast('Point 1 posé. Cliquez sur le graphique pour poser le Point 2.', { icon: '📍' });
+            } else {
+              const p1 = pts[0];
+              const p2 = { time: clickedTime, price: Number(clickedPrice.toFixed(dp)) };
+              const newDrawing = {
+                id,
+                symbol: selectedPair.symbol,
+                type: activeTool,
+                time: p1.time,
+                price: p1.price,
+                time2: p2.time,
+                price2: p2.price,
+                color: activeTool === 'fibonacci' ? '#eab308' : '#3b82f6',
+                lineWidth: 2,
+                lineStyle: 'solid',
+                fibLevels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0],
+              };
+              setDrawings((prev) => [...prev, newDrawing]);
+              setSelectedDrawingId(id);
+              setPendingPoints([]);
+              setActiveDrawingTool('none');
+              toast.success(`Outil tracé sur le graphique.`);
+            }
+          }
+        }
+      });
+
+      chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+        setRenderTick((t) => t + 1);
+      });
+      chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+        setRenderTick((t) => t + 1);
+      });
+
+      const handleResize = () => {
+        if (chartContainerRef.current && chartInstanceRef.current) {
+          chartInstanceRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight || 740,
+          });
+        }
+      };
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        if (chartInstanceRef.current) {
+          chartInstanceRef.current.remove();
+          chartInstanceRef.current = null;
+          mainSeriesRef.current = null;
+        }
+      };
+    }
+  }, []);
+
+  // Update Chart Theme dynamically without destroying chart
+  useEffect(() => {
+    if (!chartInstanceRef.current) return;
+    chartInstanceRef.current.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: chartTheme.bg },
+        textColor: chartTheme.text,
+      },
+      grid: {
+        vertLines: { color: chartTheme.grid },
+        horzLines: { color: chartTheme.grid },
+      },
+      rightPriceScale: {
+        borderColor: chartTheme.grid,
+      },
+      timeScale: {
+        borderColor: chartTheme.grid,
+      },
+    });
+  }, [chartTheme]);
+
+  // Update Main Series Type or Colors dynamically without destroying chart
+  useEffect(() => {
+    if (!chartInstanceRef.current) return;
+    const chart = chartInstanceRef.current;
+    if (mainSeriesRef.current) {
+      try {
+        chart.removeSeries(mainSeriesRef.current);
+      } catch {}
+      mainSeriesRef.current = null;
+    }
+
+    const baseDec = getDecimals(selectedPair.base);
+    let series;
+    if (chartType === 'candlestick') {
+      series = chart.addSeries(CandlestickSeries, {
+        upColor,
+        downColor,
+        borderVisible: false,
+        wickUpColor: upColor,
+        wickDownColor: downColor,
+        priceFormat: {
+          type: 'price',
+          precision: baseDec,
+          minMove: Math.pow(10, -baseDec),
+        },
       });
     } else if (chartType === 'bar') {
       series = chart.addSeries(BarSeries, {
-        upColor: upColor,
-        downColor: downColor,
+        upColor,
+        downColor,
+        priceFormat: {
+          type: 'price',
+          precision: baseDec,
+          minMove: Math.pow(10, -baseDec),
+        },
       });
     } else if (chartType === 'line') {
       series = chart.addSeries(LineSeries, {
         color: '#2563eb',
         lineWidth: 2,
+        priceFormat: {
+          type: 'price',
+          precision: baseDec,
+          minMove: Math.pow(10, -baseDec),
+        },
       });
     } else {
       series = chart.addSeries(AreaSeries, {
@@ -658,210 +890,89 @@ export default function Backtesting() {
         bottomColor: 'rgba(37, 99, 235, 0.0)',
         lineColor: '#2563eb',
         lineWidth: 2,
+        priceFormat: {
+          type: 'price',
+          precision: baseDec,
+          minMove: Math.pow(10, -baseDec),
+        },
       });
     }
     mainSeriesRef.current = series;
 
-    // Load available visible candles
-    if (allCandlesRef.current.length > 0) {
-      const visibleData = allCandlesRef.current.slice(0, replayIndex);
-      if (visibleData.length > 0) {
-        if (chartType === 'line' || chartType === 'area') {
-          series.setData(visibleData.map((c) => ({ time: c.time, value: c.close })));
-        } else {
-          series.setData(visibleData);
-        }
+    const visibleData = allCandlesRef.current.slice(0, replayIndexRef.current);
+    if (visibleData.length > 0) {
+      if (chartType === 'line' || chartType === 'area') {
+        series.setData(visibleData.map((c) => ({ time: c.time, value: c.close })));
+      } else {
+        series.setData(visibleData);
       }
     }
+  }, [chartType, upColor, downColor]);
 
-    // Indicators
-    if (showEMA9) {
+  // Handle Indicator Series dynamically without destroying chart
+  useEffect(() => {
+    if (!chartInstanceRef.current) return;
+    const chart = chartInstanceRef.current;
+
+    // EMA 9
+    if (showEMA9 && !ema9SeriesRef.current) {
       ema9SeriesRef.current = chart.addSeries(LineSeries, { color: '#eab308', lineWidth: 1.5, title: 'EMA 9' });
+    } else if (!showEMA9 && ema9SeriesRef.current) {
+      try { chart.removeSeries(ema9SeriesRef.current); } catch {}
+      ema9SeriesRef.current = null;
     }
-    if (showEMA21) {
+
+    // EMA 21
+    if (showEMA21 && !ema21SeriesRef.current) {
       ema21SeriesRef.current = chart.addSeries(LineSeries, { color: '#f97316', lineWidth: 1.5, title: 'EMA 21' });
+    } else if (!showEMA21 && ema21SeriesRef.current) {
+      try { chart.removeSeries(ema21SeriesRef.current); } catch {}
+      ema21SeriesRef.current = null;
     }
-    if (showEMA50) {
+
+    // EMA 50
+    if (showEMA50 && !ema50SeriesRef.current) {
       ema50SeriesRef.current = chart.addSeries(LineSeries, { color: '#06b6d4', lineWidth: 1.5, title: 'EMA 50' });
+    } else if (!showEMA50 && ema50SeriesRef.current) {
+      try { chart.removeSeries(ema50SeriesRef.current); } catch {}
+      ema50SeriesRef.current = null;
     }
-    if (showEMA200) {
+
+    // EMA 200
+    if (showEMA200 && !ema200SeriesRef.current) {
       ema200SeriesRef.current = chart.addSeries(LineSeries, { color: '#a855f7', lineWidth: 2, title: 'EMA 200' });
+    } else if (!showEMA200 && ema200SeriesRef.current) {
+      try { chart.removeSeries(ema200SeriesRef.current); } catch {}
+      ema200SeriesRef.current = null;
     }
-    if (showSMA20) {
+
+    // SMA 20
+    if (showSMA20 && !sma20SeriesRef.current) {
       sma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 1.5, title: 'SMA 20' });
+    } else if (!showSMA20 && sma20SeriesRef.current) {
+      try { chart.removeSeries(sma20SeriesRef.current); } catch {}
+      sma20SeriesRef.current = null;
     }
-    if (showSMA50) {
+
+    // SMA 50
+    if (showSMA50 && !sma50SeriesRef.current) {
       sma50SeriesRef.current = chart.addSeries(LineSeries, { color: '#10b981', lineWidth: 1.5, title: 'SMA 50' });
+    } else if (!showSMA50 && sma50SeriesRef.current) {
+      try { chart.removeSeries(sma50SeriesRef.current); } catch {}
+      sma50SeriesRef.current = null;
     }
 
-    // Replay Bar-Cut mode & Interactive Tool placement click handler
-    chart.subscribeClick((param) => {
-      if (!param || !param.time) return;
-
-      // 1. Cut Mode: set replay cut point
-      if (cutModeRef.current) {
-        const clickedTime = param.time;
-        const idx = allCandlesRef.current.findIndex((c) => c.time === clickedTime);
-        if (idx !== -1) {
-          const newCut = idx + 1;
-          setCutIndex(newCut);
-          setReplayIndex(newCut);
-          setCutMode(false);
-          toast.success(
-            isEn
-              ? `Chart cut at bar #${newCut}. Replay initialized!`
-              : `Graphique découpé à la bougie #${newCut}. Replay prêt !`
-          );
-        }
-        return;
-      }
-
-      // 2. Interactive Tool Placement
-      const activeTool = activeDrawingToolRef.current;
-      if (activeTool && activeTool !== 'none') {
-        const clickedTime = param.time;
-        const clickedPrice =
-          mainSeriesRef.current?.coordinateToPrice(param.point?.y) || currentCandle?.close || selectedPair.base;
-        const id = Date.now().toString(36);
-        const dp = getDecimals(clickedPrice);
-
-        if (activeTool === 'horizontal') {
-          const newDrawing = {
-            id,
-            type: 'horizontal',
-            price: Number(clickedPrice.toFixed(dp)),
-            time: clickedTime,
-            color: '#3b82f6',
-            lineWidth: 2,
-            lineStyle: 'solid',
-            label: `Ligne @ ${formatPrice(clickedPrice)}`,
-          };
-          setDrawings((prev) => [...prev, newDrawing]);
-          setSelectedDrawingId(id);
-          setActiveDrawingTool('none');
-          toast.success('Ligne Horizontale positionnée');
-        } else if (activeTool === 'vertical') {
-          const newDrawing = {
-            id,
-            type: 'vertical',
-            price: Number(clickedPrice.toFixed(dp)),
-            time: clickedTime,
-            color: '#3b82f6',
-            lineWidth: 2,
-            lineStyle: 'solid',
-            label: 'Ligne Verticale',
-          };
-          setDrawings((prev) => [...prev, newDrawing]);
-          setSelectedDrawingId(id);
-          setActiveDrawingTool('none');
-          toast.success('Ligne Verticale positionnée');
-        } else if (activeTool === 'long_position') {
-          const delta = clickedPrice * 0.015;
-          const tp = Number((clickedPrice + delta).toFixed(dp));
-          const sl = Number((clickedPrice - delta * 0.5).toFixed(dp));
-          const newDrawing = {
-            id,
-            type: 'long_position',
-            entry: Number(clickedPrice.toFixed(dp)),
-            tp,
-            sl,
-            time: clickedTime,
-            color: '#10b981',
-            lineWidth: 1,
-            lineStyle: 'solid',
-          };
-          setDrawings((prev) => [...prev, newDrawing]);
-          setSelectedDrawingId(id);
-          setActiveDrawingTool('none');
-          toast.success('Position Longue configurée avec suivi du prix');
-        } else if (activeTool === 'short_position') {
-          const delta = clickedPrice * 0.015;
-          const tp = Number((clickedPrice - delta).toFixed(dp));
-          const sl = Number((clickedPrice + delta * 0.5).toFixed(dp));
-          const newDrawing = {
-            id,
-            type: 'short_position',
-            entry: Number(clickedPrice.toFixed(dp)),
-            tp,
-            sl,
-            time: clickedTime,
-            color: '#ef4444',
-            lineWidth: 1,
-            lineStyle: 'solid',
-          };
-          setDrawings((prev) => [...prev, newDrawing]);
-          setSelectedDrawingId(id);
-          setActiveDrawingTool('none');
-          toast.success('Position Courte configurée avec suivi du prix');
-        } else {
-          // 2-point tools: trendline, ray, fibonacci, gann_box, fib_channel
-          const pts = pendingPointsRef.current;
-          if (pts.length === 0) {
-            setPendingPoints([{ time: clickedTime, price: Number(clickedPrice.toFixed(dp)) }]);
-            toast('Point 1 posé. Cliquez sur le graphique pour poser le Point 2.', { icon: '📍' });
-          } else {
-            const p1 = pts[0];
-            const p2 = { time: clickedTime, price: Number(clickedPrice.toFixed(dp)) };
-            const newDrawing = {
-              id,
-              type: activeTool,
-              time: p1.time,
-              price: p1.price,
-              time2: p2.time,
-              price2: p2.price,
-              color: activeTool === 'fibonacci' ? '#eab308' : '#3b82f6',
-              lineWidth: 2,
-              lineStyle: 'solid',
-              fibLevels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0],
-            };
-            setDrawings((prev) => [...prev, newDrawing]);
-            setSelectedDrawingId(id);
-            setPendingPoints([]);
-            setActiveDrawingTool('none');
-            toast.success(`Outil tracé sur le graphique.`);
-          }
-        }
-      }
-    });
-
-    // Subscribe to chart visible range change to update SVG overlay coordinates in real-time
-    chart.timeScale().subscribeVisibleTimeRangeChange(() => {
-      setRenderTick((t) => t + 1);
-    });
-    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-      setRenderTick((t) => t + 1);
-    });
-
-    const handleResize = () => {
-      if (chartContainerRef.current && chartInstanceRef.current) {
-        chartInstanceRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight || 740,
-        });
-      }
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.remove();
-        chartInstanceRef.current = null;
-      }
-    };
-  }, [
-    chartTheme,
-    chartType,
-    upColor,
-    downColor,
-    showEMA9,
-    showEMA21,
-    showEMA50,
-    showEMA200,
-    showSMA20,
-    showSMA50,
-    isEn,
-  ]);
+    // Update indicator data
+    const visibleData = allCandlesRef.current.slice(0, replayIndexRef.current);
+    if (visibleData.length > 0) {
+      if (showEMA9 && ema9SeriesRef.current) ema9SeriesRef.current.setData(calculateEMA(visibleData, 9));
+      if (showEMA21 && ema21SeriesRef.current) ema21SeriesRef.current.setData(calculateEMA(visibleData, 21));
+      if (showEMA50 && ema50SeriesRef.current) ema50SeriesRef.current.setData(calculateEMA(visibleData, 50));
+      if (showEMA200 && ema200SeriesRef.current) ema200SeriesRef.current.setData(calculateEMA(visibleData, 200));
+      if (showSMA20 && sma20SeriesRef.current) sma20SeriesRef.current.setData(calculateSMA(visibleData, 20));
+      if (showSMA50 && sma50SeriesRef.current) sma50SeriesRef.current.setData(calculateSMA(visibleData, 50));
+    }
+  }, [showEMA9, showEMA21, showEMA50, showEMA200, showSMA20, showSMA50]);
 
   // Update chart data when replayIndex or allCandles changes
   useEffect(() => {
@@ -869,6 +980,15 @@ export default function Backtesting() {
 
     const visibleData = allCandles.slice(0, replayIndex);
     if (visibleData.length === 0) return;
+
+    const dp = getDecimals(visibleData[visibleData.length - 1]?.close || selectedPair.base);
+    mainSeriesRef.current.applyOptions({
+      priceFormat: {
+        type: 'price',
+        precision: dp,
+        minMove: Math.pow(10, -dp),
+      },
+    });
 
     if (chartType === 'line' || chartType === 'area') {
       mainSeriesRef.current.setData(visibleData.map((c) => ({ time: c.time, value: c.close })));
@@ -895,7 +1015,7 @@ export default function Backtesting() {
       sma50SeriesRef.current.setData(calculateSMA(visibleData, 50));
     }
 
-    // Update Price Lines for Orders on the series
+    // Update Price Lines for Orders on the series (STRICTLY ISOLATED BY SYMBOL)
     priceLinesRef.current.forEach((line) => {
       try {
         mainSeriesRef.current.removePriceLine(line);
@@ -903,136 +1023,108 @@ export default function Backtesting() {
     });
     priceLinesRef.current = [];
 
-    // Draw active positions
-    activePositions.forEach((pos) => {
-      const line = mainSeriesRef.current.createPriceLine({
-        price: pos.entry,
-        color: pos.type === 'BUY' ? '#10b981' : '#ef4444',
-        lineWidth: 2,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: `${pos.type} ${pos.lots}L`,
-      });
-      priceLinesRef.current.push(line);
-
-      if (pos.sl) {
-        const slLine = mainSeriesRef.current.createPriceLine({
-          price: Number(pos.sl),
-          color: '#f43f5e',
-          lineWidth: 1.5,
-          lineStyle: LineStyle.Dotted,
-          axisLabelVisible: true,
-          title: `SL (${pos.type})`,
-        });
-        priceLinesRef.current.push(slLine);
-      }
-      if (pos.tp) {
-        const tpLine = mainSeriesRef.current.createPriceLine({
-          price: Number(pos.tp),
-          color: '#10b981',
-          lineWidth: 1.5,
-          lineStyle: LineStyle.Dotted,
-          axisLabelVisible: true,
-          title: `TP (${pos.type})`,
-        });
-        priceLinesRef.current.push(tpLine);
-      }
-    });
-
-    // Draw pending orders
-    pendingOrders.forEach((order) => {
-      const line = mainSeriesRef.current.createPriceLine({
-        price: order.entry,
-        color: '#38bdf8',
-        lineWidth: 1.5,
-        lineStyle: LineStyle.LargeDashed,
-        axisLabelVisible: true,
-        title: `${order.type} @ ${order.entry}`,
-      });
-      priceLinesRef.current.push(line);
-    });
-
-    // Draw interactive user drawings (Horizontal lines, Zones, etc.)
-    drawings.forEach((d) => {
-      if (d.type === 'horizontal' || d.type === 'ray') {
+    // Draw active positions for current pair
+    activePositions
+      .filter((pos) => pos.symbol === selectedPair.symbol)
+      .forEach((pos) => {
         const line = mainSeriesRef.current.createPriceLine({
-          price: d.price,
-          color: d.color || '#3b82f6',
+          price: pos.entry,
+          color: pos.type === 'BUY' ? '#10b981' : '#ef4444',
           lineWidth: 2,
-          lineStyle: LineStyle.Solid,
+          lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: d.label || 'Ligne Horizontale',
+          title: `${pos.type} ${pos.lots}L`,
         });
         priceLinesRef.current.push(line);
-      } else if (d.type === 'fibonacci') {
-        // Plot Key Fib Levels
-        [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1].forEach((ratio) => {
-          const fibPrice = d.low + (d.high - d.low) * ratio;
-          const fibLine = mainSeriesRef.current.createPriceLine({
-            price: Number(fibPrice.toFixed(4)),
-            color: ratio === 0.618 || ratio === 0.5 ? '#eab308' : '#94a3b8',
-            lineWidth: ratio === 0.618 ? 2 : 1,
+
+        if (pos.sl) {
+          const slLine = mainSeriesRef.current.createPriceLine({
+            price: Number(pos.sl),
+            color: '#f43f5e',
+            lineWidth: 1.5,
             lineStyle: LineStyle.Dotted,
             axisLabelVisible: true,
-            title: `Fib ${(ratio * 100).toFixed(1)}%`,
+            title: `SL (${pos.type})`,
           });
-          priceLinesRef.current.push(fibLine);
-        });
-      } else if (d.type === 'supply_zone') {
-        const top = mainSeriesRef.current.createPriceLine({
-          price: d.top,
-          color: '#ef4444',
-          lineWidth: 2,
-          lineStyle: LineStyle.Solid,
-          axisLabelVisible: true,
-          title: 'SUPPLY ZONE TOP',
-        });
-        const btm = mainSeriesRef.current.createPriceLine({
-          price: d.bottom,
-          color: 'rgba(239, 68, 68, 0.7)',
-          lineWidth: 1.5,
-          lineStyle: LineStyle.Dashed,
-          axisLabelVisible: true,
-          title: 'SUPPLY ZONE BTM',
-        });
-        priceLinesRef.current.push(top, btm);
-      } else if (d.type === 'demand_zone') {
-        const top = mainSeriesRef.current.createPriceLine({
-          price: d.top,
-          color: 'rgba(16, 185, 129, 0.7)',
-          lineWidth: 1.5,
-          lineStyle: LineStyle.Dashed,
-          axisLabelVisible: true,
-          title: 'DEMAND ZONE TOP',
-        });
-        const btm = mainSeriesRef.current.createPriceLine({
-          price: d.bottom,
-          color: '#10b981',
-          lineWidth: 2,
-          lineStyle: LineStyle.Solid,
-          axisLabelVisible: true,
-          title: 'DEMAND ZONE BTM',
-        });
-        priceLinesRef.current.push(top, btm);
-      }
-    });
-
-    // Position Markers
-    const markers = [];
-    activePositions.forEach((pos) => {
-      markers.push({
-        time: pos.openTime,
-        position: pos.type === 'BUY' ? 'belowBar' : 'aboveBar',
-        color: pos.type === 'BUY' ? '#10b981' : '#ef4444',
-        shape: pos.type === 'BUY' ? 'arrowUp' : 'arrowDown',
-        text: `${pos.type} ${pos.lots}L`,
+          priceLinesRef.current.push(slLine);
+        }
+        if (pos.tp) {
+          const tpLine = mainSeriesRef.current.createPriceLine({
+            price: Number(pos.tp),
+            color: '#10b981',
+            lineWidth: 1.5,
+            lineStyle: LineStyle.Dotted,
+            axisLabelVisible: true,
+            title: `TP (${pos.type})`,
+          });
+          priceLinesRef.current.push(tpLine);
+        }
       });
-    });
+
+    // Draw pending orders for current pair
+    pendingOrders
+      .filter((order) => order.symbol === selectedPair.symbol)
+      .forEach((order) => {
+        const line = mainSeriesRef.current.createPriceLine({
+          price: order.entry,
+          color: '#38bdf8',
+          lineWidth: 1.5,
+          lineStyle: LineStyle.LargeDashed,
+          axisLabelVisible: true,
+          title: `${order.type} @ ${order.entry}`,
+        });
+        priceLinesRef.current.push(line);
+      });
+
+    // Draw interactive user drawings for current pair
+    drawings
+      .filter((d) => !d.symbol || d.symbol === selectedPair.symbol)
+      .forEach((d) => {
+        if (d.type === 'horizontal' || d.type === 'ray') {
+          const line = mainSeriesRef.current.createPriceLine({
+            price: d.price,
+            color: d.color || '#3b82f6',
+            lineWidth: 2,
+            lineStyle: LineStyle.Solid,
+            axisLabelVisible: true,
+            title: d.label || 'Ligne Horizontale',
+          });
+          priceLinesRef.current.push(line);
+        } else if (d.type === 'fibonacci') {
+          [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1].forEach((ratio) => {
+            const fibPrice = d.low + (d.high - d.low) * ratio;
+            const fibLine = mainSeriesRef.current.createPriceLine({
+              price: Number(fibPrice.toFixed(4)),
+              color: ratio === 0.618 || ratio === 0.5 ? '#eab308' : '#94a3b8',
+              lineWidth: ratio === 0.618 ? 2 : 1,
+              lineStyle: LineStyle.Dotted,
+              axisLabelVisible: true,
+              title: `Fib ${(ratio * 100).toFixed(1)}%`,
+            });
+            priceLinesRef.current.push(fibLine);
+          });
+        }
+      });
+
+    // Position Markers for current pair
+    const markers = [];
+    activePositions
+      .filter((pos) => pos.symbol === selectedPair.symbol)
+      .forEach((pos) => {
+        markers.push({
+          time: pos.openTime,
+          position: pos.type === 'BUY' ? 'belowBar' : 'aboveBar',
+          color: pos.type === 'BUY' ? '#10b981' : '#ef4444',
+          shape: pos.type === 'BUY' ? 'arrowUp' : 'arrowDown',
+          text: `${pos.type} ${pos.lots}L`,
+        });
+      });
     createSeriesMarkers(mainSeriesRef.current, markers);
   }, [
     replayIndex,
     allCandles,
     chartType,
+    selectedPair,
     showEMA9,
     showEMA21,
     showEMA50,
@@ -1579,6 +1671,7 @@ export default function Backtesting() {
               <option value="W1">1 semaine (W1)</option>
             </optgroup>
             <optgroup label="Mois & Long Terme">
+              <option value="MN">1 mois (Mensuel / Monthly)</option>
               <option value="3M">3 mois (Trimestriel)</option>
               <option value="6M">6 mois (Semestriel)</option>
               <option value="12M">12 mois (Annuel)</option>
@@ -1987,7 +2080,7 @@ export default function Backtesting() {
 
           {/* SVG Overlay for Interactive Drawings & Live Setup Tracking */}
           <svg className="absolute inset-0 h-full w-full pointer-events-none z-10" style={{ overflow: 'hidden' }}>
-            {drawings.map((d) => {
+            {drawings.filter((d) => !d.symbol || d.symbol === selectedPair.symbol).map((d) => {
               const isSelected = selectedDrawingId === d.id;
 
               if (d.type === 'horizontal') {
