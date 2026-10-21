@@ -61,7 +61,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import { marketApi } from '../../services/endpoints.js';
 import { formatPrice } from '../../utils/format.js';
-import { sanitizeCandles, generateRealisticCandles } from '../../utils/candleSanitizer.js';
+import { sanitizeCandles, generateRealisticCandles, getDecimals } from '../../utils/candleSanitizer.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
 const INITIAL_CAPITAL = 10000;
