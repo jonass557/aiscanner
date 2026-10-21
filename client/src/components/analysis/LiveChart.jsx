@@ -98,7 +98,7 @@ export default function LiveChart({
       let source = 'live';
 
       try {
-        const snap = await marketApi.snapshot(activeSymbol, activeTf, 5000);
+        const snap = await marketApi.snapshot(activeSymbol, activeTf, 1500);
         const marketData = snap.data?.data?.market;
         const raw = marketData?.candles || snap.data?.data?.candles;
 

@@ -293,7 +293,7 @@ export default function Backtesting() {
   const [selectedCategory, setSelectedCategory] = useState('forex');
   const [selectedPair, setSelectedPair] = useState(ALL_PAIRS[0]);
   const [timeframe, setTimeframe] = useState('H1');
-  const [candleLimit, setCandleLimit] = useState(5000); // Unlimited / Deep history
+  const [candleLimit, setCandleLimit] = useState(1500); // 1500 deep historical bars (fast & reliable load)
 
   // Raw dataset and replay pointer
   const [allCandles, setAllCandles] = useState([]);
@@ -470,6 +470,7 @@ export default function Backtesting() {
           }
         }
       } catch (err) {
+        console.warn('Backtest snapshot fetch error, using realistic fallback:', err);
         const fallback = generateRealisticCandles(selectedPair.base, timeframe, 500);
         setAllCandles(fallback);
         const initCut = fallback.length;

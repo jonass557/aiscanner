@@ -130,41 +130,75 @@ export const generateRealisticCandles = (basePrice = 1.085, timeframe = 'H1', co
     '12M': 31104000,
   }[timeframe] || 3600;
 
-  const volatility = basePrice > 5000 ? 0.002 : basePrice > 100 ? 0.0014 : 0.0008;
+  const baseVol = basePrice > 50000 ? 0.0035 : basePrice > 1000 ? 0.0025 : basePrice > 100 ? 0.0018 : 0.0009;
   const raw = [];
-  let current = basePrice;
-  let trend = 0;
+  const startSec = nowSec - count * tfSec;
+  let prevClose = basePrice * (0.97 + (Math.sin(basePrice * 17) * 0.5 + 0.5) * 0.06);
 
-  let seed = 42;
+  let seed = Math.floor(basePrice * 10000) % 100000 + 1337;
   const rand = () => {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
+    seed = (seed * 16807 + 7) % 2147483647;
+    return (seed - 1) / 2147483646;
   };
 
-  for (let i = count; i >= 0; i--) {
-    if (i % 20 === 0) {
-      trend = (rand() - 0.5) * volatility * 1.5;
-    }
-    const noise = (rand() - 0.5) * volatility * 2.2;
-    const returnPct = trend + noise;
-    const open = current;
-    const close = Math.max(basePrice * 0.2, open * (1 + returnPct));
+  let regime = 0; // -1: bear, 0: range, 1: bull
+  let regimeDuration = 0;
 
+  for (let i = 0; i < count; i++) {
+    if (regimeDuration <= 0) {
+      const r = rand();
+      regime = r < 0.35 ? -1 : r < 0.70 ? 1 : 0;
+      regimeDuration = Math.floor(18 + rand() * 35);
+    }
+    regimeDuration--;
+
+    const drift = regime === 1 ? baseVol * 0.22 : regime === -1 ? -baseVol * 0.22 : 0;
+
+    const u1 = Math.max(1e-6, rand());
+    const u2 = rand();
+    const normalNoise = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+    const volType = rand();
+    const candleVol = volType > 0.95 ? baseVol * 2.8 : volType > 0.80 ? baseVol * 1.7 : baseVol * (0.6 + rand() * 0.8);
+
+    const returnPct = drift + normalNoise * candleVol;
+    const open = prevClose;
+    const close = Math.max(basePrice * 0.2, open * (1 + returnPct));
     const body = Math.abs(close - open);
-    const wickHigh = (rand() * 0.7 + 0.15) * (body + open * volatility * 0.5);
-    const wickLow = (rand() * 0.7 + 0.15) * (body + open * volatility * 0.5);
-    const high = Math.max(open, close) + wickHigh;
-    const low = Math.max(0.0001, Math.min(open, close) - wickLow);
+
+    const shapeRand = rand();
+    let upperWick, lowerWick;
+
+    if (shapeRand < 0.08) {
+      // Pinbar / shooting star
+      upperWick = body * (2.2 + rand() * 2.5) + open * candleVol * 0.6;
+      lowerWick = body * (0.1 + rand() * 0.3);
+    } else if (shapeRand < 0.16) {
+      // Hammer / rejection low
+      lowerWick = body * (2.2 + rand() * 2.5) + open * candleVol * 0.6;
+      upperWick = body * (0.1 + rand() * 0.3);
+    } else if (shapeRand < 0.25) {
+      // Doji / spinning top
+      upperWick = open * candleVol * (0.8 + rand() * 1.2);
+      lowerWick = open * candleVol * (0.8 + rand() * 1.2);
+    } else {
+      // Standard trading candle
+      upperWick = (body * 0.35 + open * candleVol * 0.35) * (0.4 + rand());
+      lowerWick = (body * 0.35 + open * candleVol * 0.35) * (0.4 + rand());
+    }
+
+    const high = Math.max(open, close) + upperWick;
+    const low = Math.max(0.00001, Math.min(open, close) - lowerWick);
 
     raw.push({
-      time: nowSec - i * tfSec,
+      time: startSec + i * tfSec,
       open: Number(open.toFixed(dp)),
       high: Number(high.toFixed(dp)),
       low: Number(low.toFixed(dp)),
       close: Number(close.toFixed(dp)),
-      volume: Math.round(500 + rand() * 4500),
+      volume: Math.round(800 + rand() * 7500),
     });
-    current = close;
+    prevClose = close;
   }
   return raw;
 };

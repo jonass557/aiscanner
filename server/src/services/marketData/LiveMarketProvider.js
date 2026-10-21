@@ -194,6 +194,9 @@ const aggregateCandles = (candles, count) => {
   return out;
 };
 
+const chartCache = new Map();
+const CACHE_TTL_MS = 60 * 1000; // 60s memory cache for high-frequency chart re-renders
+
 export class LiveMarketProvider extends BaseMarketProvider {
   constructor(config = {}) {
     super(config);
@@ -225,13 +228,19 @@ export class LiveMarketProvider extends BaseMarketProvider {
   }
 
   async _fetchChart(ticker, interval = '1h', range = '5d') {
+    const cacheKey = `${ticker}_${interval}_${range}`;
+    const cached = chartCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return cached.data;
+    }
+
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}&includePrePost=false`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        Accept: 'application/json, text/plain, */*',
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(30000), // 30s timeout so real broker data never aborts prematurely
     });
 
     if (!res.ok) {
@@ -243,11 +252,30 @@ export class LiveMarketProvider extends BaseMarketProvider {
     if (!result) {
       throw new Error(`LiveMarket: no chart data returned for ${ticker}`);
     }
+
+    chartCache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   }
 
   async getQuote(entry) {
     const ticker = this._mapSymbol(entry);
+
+    // Reuse recent cached chart quote if available
+    for (const [key, cached] of chartCache.entries()) {
+      if (key.startsWith(ticker) && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        const meta = cached.data.meta || {};
+        const price = meta.regularMarketPrice ?? meta.previousClose ?? null;
+        if (price != null && Number.isFinite(price)) {
+          return {
+            symbol: entry.symbol,
+            price: Number(price),
+            timestamp: new Date().toISOString(),
+            source: 'live-market',
+          };
+        }
+      }
+    }
+
     const result = await this._fetchChart(ticker, '1h', '1d');
     const meta = result.meta || {};
     const price = meta.regularMarketPrice ?? meta.previousClose ?? null;
@@ -278,9 +306,10 @@ export class LiveMarketProvider extends BaseMarketProvider {
 
     let range = '5d';
     if (interval === '1m') range = fetchLimit > 200 ? '7d' : '2d';
-    else if (interval === '5m' || interval === '15m' || interval === '30m') range = fetchLimit > 200 ? '60d' : '10d';
-    else if (interval === '1h') range = fetchLimit > 200 ? '730d' : '1mo';
-    else if (interval === '1d') range = fetchLimit > 200 ? '10y' : '1y';
+    else if (interval === '2m' || interval === '5m') range = fetchLimit > 300 ? '30d' : '5d';
+    else if (interval === '15m' || interval === '30m') range = fetchLimit > 1000 ? '60d' : fetchLimit > 300 ? '30d' : '10d';
+    else if (interval === '1h') range = fetchLimit > 3000 ? '1y' : fetchLimit > 1500 ? '6mo' : fetchLimit > 500 ? '3mo' : '1mo';
+    else if (interval === '1d') range = fetchLimit > 500 ? '5y' : '2y';
     else if (interval === '1wk' || interval === '1mo') range = 'max';
 
     const result = await this._fetchChart(ticker, interval, range);

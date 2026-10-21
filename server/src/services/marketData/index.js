@@ -63,14 +63,18 @@ export const getMarketSnapshot = async (symbolText, timeframe = 'H1', candleLimi
 
   for (const provider of realProviders) {
     try {
-      const [quote, candles] = await Promise.all([
-        provider.getQuote(entry),
-        provider.getCandles(entry, timeframe, candleLimit),
-      ]);
-      if (candles?.length && quote?.price != null && Number.isFinite(quote.price)) {
+      const candles = await provider.getCandles(entry, timeframe, candleLimit);
+      if (candles?.length > 0) {
+        const lastBar = candles[candles.length - 1];
+        const quote = {
+          symbol: entry.symbol,
+          price: Number(lastBar.close),
+          timestamp: lastBar.time,
+          source: provider.name,
+        };
         return { ...base, quote, candles, source: provider.name, isRealData: true };
       }
-      logger.warn(`Market data: ${provider.name} returned empty candles/quote for ${entry.symbol}; trying next real provider.`);
+      logger.warn(`Market data: ${provider.name} returned empty candles for ${entry.symbol}; trying next real provider.`);
     } catch (err) {
       logger.warn(`Market data: ${provider.name} failed for ${entry.symbol} (${err.message}); trying next real provider.`);
     }

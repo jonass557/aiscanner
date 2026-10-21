@@ -235,7 +235,7 @@ export default function ChartVision() {
       let real = false;
 
       try {
-        const snap = await marketApi.snapshot(selectedPair.symbol, selectedTf, 5000);
+        const snap = await marketApi.snapshot(selectedPair.symbol, selectedTf, 1500);
         const rawBars = snap.data?.data?.market?.candles || snap.data?.data?.candles;
         if (Array.isArray(rawBars) && rawBars.length > 25) {
           finalCandles = sanitizeCandles(rawBars, selectedPair.base);
