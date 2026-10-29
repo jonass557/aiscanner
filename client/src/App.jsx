@@ -25,6 +25,7 @@ const Backtesting = lazy(() => import('./pages/dashboard/Backtesting.jsx'));
 const Mentor = lazy(() => import('./pages/dashboard/Mentor.jsx'));
 const TradeValidator = lazy(() => import('./pages/dashboard/TradeValidator.jsx'));
 const PositionCalculator = lazy(() => import('./pages/dashboard/PositionCalculator.jsx'));
+const ManagedTrading = lazy(() => import('./pages/dashboard/ManagedTrading.jsx'));
 const EconomicNews = lazy(() => import('./pages/dashboard/EconomicNews.jsx'));
 const VoiceAssistant = lazy(() => import('./pages/dashboard/VoiceAssistant.jsx'));
 const History = lazy(() => import('./pages/dashboard/History.jsx'));
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="mentor" element={<Mentor />} />
           <Route path="trade-validator" element={<TradeValidator />} />
           <Route path="calculator" element={<PositionCalculator />} />
+          <Route path="managed-trading" element={<ManagedTrading />} />
           <Route path="economic-news" element={<EconomicNews />} />
           <Route path="voice-assistant" element={<VoiceAssistant />} />
           <Route path="history" element={<History />} />

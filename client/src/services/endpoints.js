@@ -157,6 +157,21 @@ export const strategyApi = {
   remove: (id) => api.delete(`/strategies/${id}`),
 };
 
+export const managedTradingApi = {
+  getConfig: () => api.get('/managed-trading/config'),
+  updateConfig: (payload) => api.put('/managed-trading/config', payload),
+  activateAutomation: (payload) => api.post('/managed-trading/activate-automation', payload),
+  emergencyStop: (reason) => api.post('/managed-trading/emergency-stop', { reason }),
+  resetEmergency: () => api.post('/managed-trading/emergency-stop/reset'),
+  getBrokerAccounts: () => api.get('/managed-trading/broker-accounts'),
+  connectBrokerAccount: (payload) => api.post('/managed-trading/broker-accounts', payload),
+  deleteBrokerAccount: (id) => api.delete(`/managed-trading/broker-accounts/${id}`),
+  executeManualOrder: (payload) => api.post('/managed-trading/orders/execute-manual', payload),
+  getOrders: (params) => api.get('/managed-trading/orders', { params }),
+  getPositions: () => api.get('/managed-trading/positions'),
+  closePosition: (id) => api.post(`/managed-trading/positions/${id}/close`),
+};
+
 export const calculatorApi = {
   calculate: (payload) => api.post('/calculator/position-size', payload),
   specs: (symbol, params) =>

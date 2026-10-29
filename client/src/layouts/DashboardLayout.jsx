@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-do
 import {
   LayoutDashboard, ScanLine, History, CreditCard, User, Settings,
   Menu, X, LogOut, Moon, Sun, ShieldCheck, Layers, Radar, GraduationCap,
-  CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe, Eye, Calculator,
+  CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe, Eye, Calculator, Cpu,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/mentor', key: 'aiMentor', icon: GraduationCap },
   { to: '/dashboard/trade-validator', key: 'tradeValidator', icon: ClipboardCheck },
   { to: '/dashboard/calculator', key: 'positionCalculator', icon: Calculator },
+  { to: '/dashboard/managed-trading', key: 'managedTrading', icon: Cpu },
   { to: '/dashboard/economic-news', key: 'economicNews', icon: CalendarClock },
   { to: '/dashboard/voice-assistant', key: 'voiceAssistant', icon: Mic },
   { to: '/dashboard/history', key: 'history', icon: History },
