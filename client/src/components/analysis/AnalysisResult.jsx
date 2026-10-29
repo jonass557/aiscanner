@@ -142,7 +142,7 @@ export default function AnalysisResult({ analysis, market, onExportPdf, exportin
           )}
         </div>
         <div className="lg:col-span-2">
-          <TradePlanCard tradePlan={analysis.tradePlan} decision={analysis.decision} />
+          <TradePlanCard tradePlan={analysis.tradePlan} decision={analysis.decision} symbol={analysis.symbol} />
         </div>
       </div>
 

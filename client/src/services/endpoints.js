@@ -157,6 +157,12 @@ export const strategyApi = {
   remove: (id) => api.delete(`/strategies/${id}`),
 };
 
+export const calculatorApi = {
+  calculate: (payload) => api.post('/calculator/position-size', payload),
+  specs: (symbol, params) =>
+    api.get(`/calculator/specs${symbol ? `/${encodeURIComponent(symbol)}` : ''}`, { params }),
+};
+
 /** Triggers a browser download from a blob response. */
 export const downloadBlob = (blob, filename) => {
   const url = window.URL.createObjectURL(blob);

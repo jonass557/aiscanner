@@ -15,6 +15,7 @@ import paymentRoutes from './paymentRoutes.js';
 import marketRoutes from './marketRoutes.js';
 import journalRoutes from './journalRoutes.js';
 import strategyRoutes from './strategyRoutes.js';
+import calculatorRoutes from './calculatorRoutes.js';
 
 /**
  * Root API router. Mounts each domain's routes under /api/v1.
@@ -27,6 +28,7 @@ router.get('/', (req, res) => {
 
 // Market snapshot does not require the DB (connects directly to Binance/TwelveData)
 router.use('/', marketRoutes); // /market/snapshot
+router.use('/calculator', calculatorRoutes); // /calculator/position-size + /calculator/specs
 
 // All routes below require an active MongoDB connection
 router.use('/auth', requireDbConnection, authRoutes);

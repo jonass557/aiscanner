@@ -29,6 +29,32 @@ export const protect = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * Optional auth guard. If a Bearer token is present and valid, attaches user to req.user.
+ * Otherwise proceeds without error.
+ */
+export const optionalAuth = asyncHandler(async (req, res, next) => {
+  let token;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  }
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const decoded = verifyAccessToken(token);
+    const user = await User.findById(decoded.id);
+    req.user = user || null;
+  } catch {
+    req.user = null;
+  }
+  next();
+});
+
+/**
  * Role guard. Use after `protect`. Restricts access to given roles.
  */
 export const authorize = (...roles) =>

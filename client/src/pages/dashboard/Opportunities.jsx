@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Radar,
@@ -17,6 +18,7 @@ import {
   Award,
   Layers,
   Crosshair,
+  Calculator,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -617,6 +619,31 @@ export default function Opportunities() {
                   <p className="mt-1 font-mono text-sm font-bold">{formatPrice(val)}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Position Size Calculator CTA */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl border border-brand-200 bg-brand-50/50 dark:border-brand-900/60 dark:bg-brand-950/20">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+                  <Calculator className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-gray-900 dark:text-white">
+                    {isEn ? 'Calculate Position Size' : 'Calculateur de Taille de Position'}
+                  </p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {isEn
+                      ? 'Adjust lot size to your risk & account equity'
+                      : 'Adaptez votre volume au capital et aux spécifications réelles'}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to={`/dashboard/calculator?symbol=${encodeURIComponent(selected.symbol)}&entry=${selected.entry}&sl=${selected.stopLoss}&tp=${selected.takeProfit1 || selected.takeProfit2 || ''}&direction=${selected.direction}&market=${selected.market || ''}`}
+                className="px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition shadow-sm"
+              >
+                {isEn ? 'Calculate' : 'Calculer'}
+              </Link>
             </div>
 
             {/* Strategic Zones Detected (Order Block, FVG, Liquidity) */}

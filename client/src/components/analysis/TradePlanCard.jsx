@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { Calculator } from 'lucide-react';
 import { formatPrice } from '../../utils/format.js';
 
 /**
@@ -5,7 +7,7 @@ import { formatPrice } from '../../utils/format.js';
  * New scans are always directional with a complete plan. The legacy WAIT /
  * NO_TRADE branches below only trigger for old records kept in history.
  */
-export default function TradePlanCard({ tradePlan, decision }) {
+export default function TradePlanCard({ tradePlan, decision, symbol }) {
   if (!tradePlan || decision === 'NO_TRADE') {
     return (
       <div className="card p-6">
@@ -68,6 +70,18 @@ export default function TradePlanCard({ tradePlan, decision }) {
           </div>
         ))}
       </div>
+
+      {tradePlan.entry != null && tradePlan.stopLoss != null && (
+        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <Link
+            to={`/dashboard/calculator?symbol=${encodeURIComponent(symbol || '')}&entry=${tradePlan.entry}&sl=${tradePlan.stopLoss}&tp=${tradePlan.takeProfit1 || tradePlan.takeProfit2 || ''}&direction=${decision === 'SELL' ? 'SELL' : 'BUY'}`}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:hover:bg-brand-950/70 dark:text-brand-300 text-xs font-bold transition shadow-sm"
+          >
+            <Calculator className="h-4 w-4" />
+            Calculer la taille de position
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
