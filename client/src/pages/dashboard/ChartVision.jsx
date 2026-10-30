@@ -166,8 +166,29 @@ export default function ChartVision() {
 
   // Strategy list from API + user preferences
   const [availableStrategies, setAvailableStrategies] = useState([]);
-  const [selectedStratKey, setSelectedStratKey] = useState('smc');
-  const [userSavedStrategy, setUserSavedStrategy] = useState(null);
+  const [selectedStratKey, setSelectedStratKey] = useState(() => {
+    return localStorage.getItem('chartvision_active_strat') || 'smc';
+  });
+  const [userSavedStrategy, setUserSavedStrategy] = useState(() => {
+    try {
+      const saved = localStorage.getItem('chartvision_custom_strat_obj');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Custom Strategy Modal State
+  const [customStratModalOpen, setCustomStratModalOpen] = useState(false);
+  const [customStratTitle, setCustomStratTitle] = useState(() => {
+    return localStorage.getItem('chartvision_custom_strat_title') || 'Ma Stratégie Personnalisée';
+  });
+  const [customStratRules, setCustomStratRules] = useState(() => {
+    return (
+      localStorage.getItem('chartvision_custom_strat_rules') ||
+      '• Analyse de la structure de marché (H4 / H1) : repérage des Highs et Lows majeurs\n• Balayage de liquidité (Sweep Buy-side ou Sell-side)\n• Zone d\'intérêt : Order Block institutionnel non-mitigé ou Fair Value Gap (FVG)\n• Déclencheur d\'entrée : ChoCH ou Break of Structure (BOS) avec bougie de rejet\n• Gestion du risque : Stop Loss au-delà de la zone, TP1 à 1:1.5 et TP2 final à 1:3'
+    );
+  });
 
   // Market & Overlay state
   const [candles, setCandles] = useState([]);
@@ -589,6 +610,29 @@ export default function ChartVision() {
     return list;
   }, [availableStrategies, userSavedStrategy]);
 
+  const handleApplyCustomStrategy = () => {
+    if (!customStratRules.trim()) {
+      toast.error('Veuillez rédiger les critères de votre stratégie.');
+      return;
+    }
+
+    const stratObj = {
+      name: customStratTitle.trim() || 'Ma Stratégie Personnalisée',
+      rules: customStratRules.split('\n').map((l) => l.trim()).filter(Boolean),
+    };
+
+    localStorage.setItem('chartvision_custom_strat_title', customStratTitle);
+    localStorage.setItem('chartvision_custom_strat_rules', customStratRules);
+    localStorage.setItem('chartvision_custom_strat_obj', JSON.stringify(stratObj));
+    localStorage.setItem('chartvision_active_strat', 'user_saved');
+
+    setUserSavedStrategy(stratObj);
+    setSelectedStratKey('user_saved');
+    setCustomStratModalOpen(false);
+
+    toast.success(`Stratégie « ${stratObj.name} » appliquée immédiatement sur le graphique !`);
+  };
+
   const lastCandle = candles[candles.length - 1];
 
   // Toggle drawer helper
@@ -665,7 +709,10 @@ export default function ChartVision() {
             </span>
             <select
               value={selectedStratKey}
-              onChange={(e) => setSelectedStratKey(e.target.value)}
+              onChange={(e) => {
+                setSelectedStratKey(e.target.value);
+                localStorage.setItem('chartvision_active_strat', e.target.value);
+              }}
               className="rounded-xl border border-purple-500/50 bg-purple-50/50 dark:bg-purple-950/40 px-3 py-1.5 text-xs font-bold text-purple-700 dark:text-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer shadow-sm max-w-[210px] truncate"
             >
               {mergedStrategies.map((strat) => (
@@ -674,6 +721,16 @@ export default function ChartVision() {
                 </option>
               ))}
             </select>
+
+            {/* Custom Strategy Config Button */}
+            <button
+              onClick={() => setCustomStratModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-purple-500/60 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white px-2.5 py-1.5 text-xs font-bold transition shadow-sm"
+              title="Rédiger votre propre stratégie de trading pour que l'IA l'applique directement au graphique"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Ma Stratégie IA</span>
+            </button>
           </div>
         </div>
 
@@ -1048,65 +1105,6 @@ export default function ChartVision() {
               </div>
             )}
 
-            {/* AUTOMATIC TRADINGVIEW LONG / SHORT POSITION TOOL ON CANVAS */}
-            {autoTrace && positionBox && (
-              <div className="pointer-events-none absolute left-[30%] right-16 z-20 transition-all">
-                {/* Target / Profit Zone (Green Box) */}
-                <div
-                  className="absolute left-0 right-0 rounded-t border-2 border-emerald-500/80 bg-emerald-500/20 backdrop-blur-[1px] flex items-start justify-between px-3 py-1 shadow-lg"
-                  style={{
-                    top: `${positionBox.targetTop}px`,
-                    height: `${positionBox.targetHeight}px`,
-                  }}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-[11px] font-black tracking-wide text-emerald-300 uppercase">
-                      TP1 (Objectif) · {positionBox.tpPrice}
-                    </span>
-                  </div>
-                  <span className="rounded bg-emerald-950/90 px-2 py-0.5 text-[10px] font-black text-emerald-300 border border-emerald-500/50 shadow">
-                    Zone de Profit (Target)
-                  </span>
-                </div>
-
-                {/* Central Entry Line */}
-                <div
-                  className="absolute left-0 right-0 border-t-2 border-dashed border-blue-400 z-20 flex items-center justify-between px-3"
-                  style={{
-                    top: `${positionBox.entryY}px`,
-                    transform: 'translateY(-1px)',
-                  }}
-                >
-                  <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow">
-                    {positionBox.isBuy ? '▲ ORDRE LONG (ACHAT)' : '▼ ORDRE SHORT (VENTE)'} @ {positionBox.entryPrice}
-                  </span>
-                  <span className="rounded bg-blue-950/95 px-2 py-0.5 text-[10px] font-bold text-blue-200 border border-blue-500/60 shadow">
-                    Ratio R:R {positionBox.rr} · {positionBox.winRate}% Biais
-                  </span>
-                </div>
-
-                {/* Stop Loss / Risk Zone (Red Box) */}
-                <div
-                  className="absolute left-0 right-0 rounded-b border-2 border-red-500/80 bg-red-500/20 backdrop-blur-[1px] flex items-end justify-between px-3 py-1 shadow-lg"
-                  style={{
-                    top: `${positionBox.stopTop}px`,
-                    height: `${positionBox.stopHeight}px`,
-                  }}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
-                    <span className="text-[11px] font-black tracking-wide text-red-300 uppercase">
-                      SL (Stop Loss) · {positionBox.slPrice}
-                    </span>
-                  </div>
-                  <span className="rounded bg-red-950/90 px-2 py-0.5 text-[10px] font-black text-red-300 border border-red-500/50 shadow">
-                    Zone de Risque (Stop)
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* The Lightweight Charts DOM element */}
             <div ref={chartContainerRef} className="h-full min-h-[580px] lg:min-h-[700px] w-full" />
           </div>
@@ -1128,6 +1126,84 @@ export default function ChartVision() {
           )}
         </div>
       </div>
+
+      {/* Modal Personnalisation de Stratégie */}
+      {customStratModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="max-w-xl w-full rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl p-6 overflow-hidden">
+            <div className="flex items-center justify-between border-b pb-3 dark:border-gray-800">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                  <SlidersHorizontal className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                    Configurer votre Stratégie Personnalisée
+                  </h3>
+                  <p className="text-[11px] text-gray-500">
+                    L'IA analysera le graphique et tracera immédiatement les niveaux correspondants.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCustomStratModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Nom / Titre de votre Stratégie
+                </label>
+                <input
+                  type="text"
+                  value={customStratTitle}
+                  onChange={(e) => setCustomStratTitle(e.target.value)}
+                  placeholder="ex: Mon Setup Liquidity Grab & Rejet OB M15"
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-semibold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                    Critères, Règles & Déclencheurs de la Stratégie
+                  </label>
+                  <span className="text-[10px] text-gray-400">
+                    Rédigez vos règles ligne par ligne
+                  </span>
+                </div>
+                <textarea
+                  rows={6}
+                  value={customStratRules}
+                  onChange={(e) => setCustomStratRules(e.target.value)}
+                  placeholder="Rédigez ici tous vos critères pour que l'IA les applique directement sur le graphique :&#10;• Définition de la tendance et de la structure de marché (H4 / H1)&#10;• Balayages de liquidité (Buy-side / Sell-side Liquidity)&#10;• Zones d'intérêt (Fair Value Gaps, Order Blocks, Rejets)&#10;• Déclencheur d'entrée précis (BOS, ChoCH, rejet de mèche)&#10;• Plan de sortie : Stop Loss protégé, TP1 à 1:1.5 et TP2 final à 1:3"
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-xs font-medium leading-relaxed text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2 border-t pt-3 dark:border-gray-800">
+              <button
+                onClick={() => setCustomStratModalOpen(false)}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleApplyCustomStrategy}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 transition shadow-md flex items-center gap-1.5"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Appliquer ma stratégie sur le graphique</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

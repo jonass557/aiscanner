@@ -47,24 +47,8 @@ export default function AssistantChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const scrollRef = useRef(null);
 
-  const loadList = useCallback(async () => {
-    try {
-      const { data } = await assistantApi.conversations();
-      setConversations(data.data.conversations || []);
-    } catch {
-      /* non-blocking */
-    }
-  }, []);
-
-  useEffect(() => {
-    loadList();
-  }, [loadList]);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages.length, sending]);
-
   const [ttsOn, setTtsOn] = useState(true);
+  const sendRef = useRef(null);
 
   const {
     supported: micSupported,
@@ -80,7 +64,7 @@ export default function AssistantChat() {
     cancelSpeech,
   } = useSpeech({
     lang: isEn ? 'en-US' : 'fr-FR',
-    onResult: (t) => send(t),
+    onResult: (t) => sendRef.current?.(t),
   });
 
   const send = useCallback(
@@ -88,7 +72,7 @@ export default function AssistantChat() {
       const clean = String(text || '').trim();
       if (!clean || sending) return;
 
-      setMessages((m) => [...m, { role: 'user', content: clean }]);
+      setMessages((m) => [...(Array.isArray(m) ? m : []), { role: 'user', content: clean }]);
       setInput('');
       setSending(true);
       try {
@@ -96,16 +80,16 @@ export default function AssistantChat() {
         let id = conversationId;
         if (!id) {
           const { data } = await assistantApi.createConversation({});
-          id = data.data.conversation._id;
+          id = data?.data?.conversation?._id;
           setConversationId(id);
         }
         const { data } = await assistantApi.sendMessage(id, { content: clean, language: lang });
-        const res = data.data;
+        const res = data?.data || {};
         setMessages((m) => [
-          ...m,
+          ...(Array.isArray(m) ? m : []),
           {
             role: 'assistant',
-            content: res.reply,
+            content: res.reply || 'Analyse effectuée.',
             action: res.action,
             analysisId: res.analysisId,
             analysisIds: res.analysisIds,
@@ -120,29 +104,37 @@ export default function AssistantChat() {
       } catch (err) {
         toast.error(getErrorMessage(err));
         setMessages((m) => [
-          ...m,
+          ...(Array.isArray(m) ? m : []),
           { role: 'assistant', content: `Désolé — ${getErrorMessage(err)}` },
         ]);
       } finally {
         setSending(false);
       }
     },
-    [conversationId, sending, loadList, ttsOn, speak]
+    [conversationId, sending, loadList, ttsOn, speak, lang]
   );
 
-  const newConversation = () => {
-    setConversationId(null);
-    setMessages([]);
-    setSidebarOpen(false);
-  };
+  sendRef.current = send;
+
+  const loadList = useCallback(async () => {
+    try {
+      const { data } = await assistantApi.conversations();
+      setConversations(data?.data?.conversations || []);
+    } catch {
+      /* non-blocking */
+      setConversations([]);
+    }
+  }, []);
 
   const openConversation = async (id) => {
     setSidebarOpen(false);
     try {
       const { data } = await assistantApi.getConversation(id);
-      const conv = data.data.conversation;
-      setConversationId(conv._id);
-      setMessages(conv.messages || []);
+      const conv = data?.data?.conversation;
+      if (conv) {
+        setConversationId(conv._id);
+        setMessages(conv.messages || []);
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
@@ -152,7 +144,7 @@ export default function AssistantChat() {
     e.stopPropagation();
     try {
       await assistantApi.deleteConversation(id);
-      setConversations((c) => c.filter((x) => x._id !== id));
+      setConversations((c) => (Array.isArray(c) ? c.filter((x) => x._id !== id) : []));
       if (id === conversationId) newConversation();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -177,10 +169,10 @@ export default function AssistantChat() {
           </button>
         </div>
         <div className="flex-1 space-y-1 overflow-y-auto p-2">
-          {conversations.length === 0 ? (
+          {(!conversations || conversations.length === 0) ? (
             <p className="p-3 text-center text-sm text-gray-500">Aucune conversation.</p>
           ) : (
-            conversations.map((c) => (
+            (conversations || []).map((c) => (
               <button
                 key={c._id}
                 onClick={() => openConversation(c._id)}
@@ -259,7 +251,7 @@ export default function AssistantChat() {
         <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
           <NewsBanner withinHours={24} />
 
-          {messages.length === 0 && (
+          {(!messages || messages.length === 0) && (
             <div className="mx-auto max-w-xl pt-6 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-accent-500 text-white">
                 <Bot className="h-8 w-8" />
@@ -288,7 +280,7 @@ export default function AssistantChat() {
             </div>
           )}
 
-          {messages.map((m, i) => (
+          {(messages || []).map((m, i) => (
             <AssistantMessage key={i} message={m} />
           ))}
 

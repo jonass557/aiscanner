@@ -159,58 +159,145 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
     });
   }, [startListening, stopListening]);
 
+  const [isPaused, setIsPaused] = useState(false);
+  const queueRef = useRef([]);
+  const keepAliveTimerRef = useRef(null);
+
+  const startKeepAlive = () => {
+    if (keepAliveTimerRef.current) clearInterval(keepAliveTimerRef.current);
+    keepAliveTimerRef.current = setInterval(() => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }
+    }, 10000);
+  };
+
+  const stopKeepAlive = () => {
+    if (keepAliveTimerRef.current) {
+      clearInterval(keepAliveTimerRef.current);
+      keepAliveTimerRef.current = null;
+    }
+  };
+
+  const cancelSpeech = useCallback(() => {
+    stopKeepAlive();
+    queueRef.current = [];
+    if (synthSupported) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeaking(false);
+    setIsPaused(false);
+    speakingRef.current = false;
+  }, [synthSupported]);
+
+  const pauseSpeech = useCallback(() => {
+    if (synthSupported && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      setIsPaused(true);
+    }
+  }, [synthSupported]);
+
+  const resumeSpeech = useCallback(() => {
+    if (synthSupported && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
+    }
+  }, [synthSupported]);
+
   const speak = useCallback(
-    (text) => {
+    (text, customLang) => {
       if (!synthSupported || !text) return;
 
-      // Suspendre l'écoute pendant la parole pour éviter le retour audio
-      try {
-        if (recognitionRef.current) recognitionRef.current.abort();
-      } catch {}
+      cancelSpeech();
 
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = lang;
-      utter.rate = 1.05; // Débit naturel et fluide
-      utter.pitch = 1.0;
+      // Clean markdown, brackets, and code blocks for fluid spoken output
+      const clean = String(text)
+        .replace(/```[\s\S]*?```/g, '') // strip full code blocks
+        .replace(/[#*_~`]/g, '')
+        .replace(/\[.*?\]\(.*?\)/g, '')
+        .replace(/\[.*?\]/g, '')
+        .replace(/(\r\n|\n|\r)/gm, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-      utter.onstart = () => {
-        setSpeaking(true);
-        speakingRef.current = true;
-      };
+      if (!clean) return;
 
-      const onDone = () => {
-        setSpeaking(false);
-        speakingRef.current = false;
-        // Si le mode mains-libres est actif, relancer l'écoute dès que l'IA a terminé de parler !
-        if (shouldListenRef.current && handsFreeRef.current) {
-          setTimeout(() => {
-            if (shouldListenRef.current && handsFreeRef.current) {
-              startListening();
-            }
-          }, 350);
+      // Break into natural sentences for continuous, non-stopping speech
+      const sentenceRegex = /[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g;
+      const rawSentences = clean.match(sentenceRegex) || [clean];
+      const sentences = rawSentences.map((s) => s.trim()).filter((s) => s.length > 0);
+
+      if (sentences.length === 0) return;
+
+      queueRef.current = [...sentences];
+      setSpeaking(true);
+      setIsPaused(false);
+      speakingRef.current = true;
+      startKeepAlive();
+
+      // Detect English vs French if not explicitly passed
+      const targetLang =
+        customLang ||
+        (/^[a-zA-Z0-9\s,.'!?-]+$/.test(clean) &&
+        (clean.includes('the ') || clean.includes('is ') || clean.includes('trading ') || clean.includes('market '))
+          ? 'en-US'
+          : lang || 'fr-FR');
+
+      const playNextSentence = () => {
+        if (!queueRef.current || queueRef.current.length === 0) {
+          stopKeepAlive();
+          setSpeaking(false);
+          setIsPaused(false);
+          speakingRef.current = false;
+
+          // If hands-free mode is on, resume listening automatically
+          if (shouldListenRef.current && handsFreeRef.current) {
+            setTimeout(() => {
+              if (shouldListenRef.current && handsFreeRef.current) {
+                startListening();
+              }
+            }, 400);
+          }
+          return;
+        }
+
+        const sentence = queueRef.current.shift();
+        const utter = new SpeechSynthesisUtterance(sentence);
+        utter.lang = targetLang;
+        utter.rate = 1.05; // clear, comfortable educational cadence
+        utter.pitch = 1.0;
+
+        utter.onend = () => {
+          playNextSentence();
+        };
+
+        utter.onerror = (e) => {
+          if (e.error !== 'canceled' && e.error !== 'interrupted') {
+            playNextSentence();
+          }
+        };
+
+        try {
+          window.speechSynthesis.speak(utter);
+        } catch {
+          playNextSentence();
         }
       };
 
-      utter.onend = onDone;
-      utter.onerror = onDone;
-
-      window.speechSynthesis.speak(utter);
+      playNextSentence();
     },
-    [synthSupported, lang, startListening]
+    [synthSupported, lang, startListening, cancelSpeech]
   );
-
-  const cancelSpeech = useCallback(() => {
-    if (synthSupported) window.speechSynthesis.cancel();
-    setSpeaking(false);
-    speakingRef.current = false;
-  }, [synthSupported]);
 
   return {
     supported,
     synthSupported,
     listening,
     speaking,
+    isPaused,
     interim,
     handsFree,
     toggleHandsFree,
@@ -218,6 +305,8 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
     stopListening,
     speak,
     cancelSpeech,
+    pauseSpeech,
+    resumeSpeech,
   };
 }
 

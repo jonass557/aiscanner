@@ -21,9 +21,16 @@ import {
   FileText,
   AlertCircle,
   Zap,
+  Download,
+  Pause,
+  Play,
+  RotateCcw,
+  Globe,
+  TrendingUp,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
+import CandlestickDiagram from '../../components/mentor/CandlestickDiagram.jsx';
 import { mentorApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { renderMarkdown } from '../../utils/markdown.jsx';
@@ -54,6 +61,13 @@ export default function Mentor() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [curriculumTabOpen, setCurriculumTabOpen] = useState(false);
 
+  // Multilingual & Japanese Candlestick Diagram states
+  const [mentorLang, setMentorLang] = useState(() => {
+    return localStorage.getItem('mentor_language') || 'fr';
+  });
+  const [showDiagram, setShowDiagram] = useState(false);
+  const [diagramPreset, setDiagramPreset] = useState('bos_continuation');
+
   // Exercise modal & state
   const [exerciseModalOpen, setExerciseModalOpen] = useState(false);
   const [exerciseAnswer, setExerciseAnswer] = useState('');
@@ -63,11 +77,13 @@ export default function Mentor() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   const scrollRef = useRef(null);
+  const sendRef = useRef(null);
 
-  // Bi-directional Speech hook
+  // Bi-directional Speech hook with continuous sentence queue
   const {
     listening,
     speaking,
+    isPaused,
     supported: speechSupported,
     handsFree,
     startListening,
@@ -75,38 +91,21 @@ export default function Mentor() {
     toggleHandsFree,
     speak,
     cancelSpeech,
+    pauseSpeech,
+    resumeSpeech,
   } = useSpeech({
-    lang: 'fr-FR',
+    lang: mentorLang === 'en' ? 'en-US' : 'fr-FR',
     onResult: (spokenText) => {
       if (spokenText && spokenText.trim()) {
-        send(spokenText.trim());
+        sendRef.current?.(spokenText.trim());
       }
     },
   });
 
-  const loadList = useCallback(async () => {
-    try {
-      const { data } = await mentorApi.conversations();
-      setConversations(data.data.conversations);
-    } catch {
-      /* non-blocking */
-    } finally {
-      setLoadingList(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadList();
-  }, [loadList]);
-
-  // Auto-scroll to latest message
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [active?.messages?.length, sending]);
-
   const openConversation = async (id) => {
     cancelSpeech();
     setActiveId(id);
+    localStorage.setItem('mentor_last_active_conv', id);
     setSidebarOpen(false);
     try {
       const { data } = await mentorApi.getConversation(id);
@@ -116,6 +115,36 @@ export default function Mentor() {
       toast.error(getErrorMessage(err));
     }
   };
+
+  const loadList = useCallback(async () => {
+    try {
+      const { data } = await mentorApi.conversations();
+      const list = data?.data?.conversations || [];
+      setConversations(list);
+
+      // Auto-restore last active lesson / session so student can resume
+      if (!activeId && list.length > 0) {
+        const lastSavedId = localStorage.getItem('mentor_last_active_conv');
+        const target = list.find((c) => c._id === lastSavedId) || list[0];
+        if (target) {
+          openConversation(target._id);
+        }
+      }
+    } catch {
+      /* non-blocking */
+    } finally {
+      setLoadingList(false);
+    }
+  }, [activeId]);
+
+  useEffect(() => {
+    loadList();
+  }, [loadList]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [active?.messages?.length, sending]);
 
   const newConversation = async () => {
     cancelSpeech();
@@ -162,23 +191,23 @@ export default function Mentor() {
       let convId = activeId;
       if (!convId) {
         const { data } = await mentorApi.createConversation({ level });
-        convId = data.data.conversation._id;
+        convId = data?.data?.conversation?._id;
         setActiveId(convId);
+        localStorage.setItem('mentor_last_active_conv', convId);
       }
 
-      const { data } = await mentorApi.sendMessage(convId, { content, level });
-      const updatedConv = data.data.conversation;
+      const { data } = await mentorApi.sendMessage(convId, {
+        content,
+        level,
+        lang: mentorLang,
+      });
+      const updatedConv = data?.data?.conversation;
       setActive((prev) => ({ ...prev, ...updatedConv }));
       await loadList();
 
-      // Read reply aloud if voice output is enabled
-      if (voiceEnabled && data.data.reply) {
-        // Strip markdown markers for clean speech synthesis
-        const cleanSpeakText = data.data.reply
-          .replace(/[#*_`]/g, '')
-          .replace(/\[.*?\]/g, '')
-          .slice(0, 450);
-        speak(cleanSpeakText);
+      // Read reply aloud continuously with sentence queue (no abrupt cutoff)
+      if (voiceEnabled && data?.data?.reply) {
+        speak(data.data.reply, mentorLang === 'en' ? 'en-US' : 'fr-FR');
       }
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -191,6 +220,8 @@ export default function Mentor() {
     }
   };
 
+  sendRef.current = send;
+
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -198,14 +229,17 @@ export default function Mentor() {
     }
   };
 
-  // Submit exercise to professor
+  // Submit exercise to professor with automatic next module launching
   const submitCurrentExercise = async () => {
     if (!exerciseAnswer.trim() || evaluatingExercise) return;
     setEvaluatingExercise(true);
 
     try {
-      const { data } = await mentorApi.submitExercise(active._id, { answer: exerciseAnswer.trim() });
-      const { evaluation, conversation: updatedConv } = data.data;
+      const { data } = await mentorApi.submitExercise(active._id, {
+        answer: exerciseAnswer.trim(),
+        lang: mentorLang,
+      });
+      const { evaluation, conversation: updatedConv, nextLessonLaunched, nextLessonText } = data.data;
 
       setActive(updatedConv);
       setExerciseModalOpen(false);
@@ -213,23 +247,52 @@ export default function Mentor() {
       await loadList();
 
       if (evaluation.passed) {
-        toast.success(`Module validé avec succès (${evaluation.score}/100) !`);
-      } else {
-        toast.error(`Exercice non validé (${evaluation.score}/100). Consultez les remarques du professeur.`);
-      }
-
-      if (voiceEnabled && evaluation.feedback) {
-        speak(
-          evaluation.passed
-            ? `Félicitations, votre exercice a été validé avec une note de ${evaluation.score} sur 100.`
-            : `Exercice corrigé avec une note de ${evaluation.score} sur 100. Veuillez réviser vos arguments.`
+        toast.success(
+          mentorLang === 'en'
+            ? `Module passed (${evaluation.score}/100)! Next module launched automatically.`
+            : `Module validé (${evaluation.score}/100) ! Le module suivant est lancé automatiquement.`
         );
+
+        if (voiceEnabled) {
+          const speechMsg =
+            mentorLang === 'en'
+              ? `Congratulations! Your exercise was validated with a score of ${evaluation.score} out of 100. We are now advancing immediately to the next module. ` +
+                (nextLessonText || '')
+              : `Félicitations ! Votre exercice a été validé avec une note de ${evaluation.score} sur 100. Nous passons immédiatement au module suivant. ` +
+                (nextLessonText || '');
+
+          speak(speechMsg, mentorLang === 'en' ? 'en-US' : 'fr-FR');
+        }
+      } else {
+        toast.error(
+          mentorLang === 'en'
+            ? `Exercise not passed (${evaluation.score}/100). Please check professor notes.`
+            : `Exercice non validé (${evaluation.score}/100). Consultez les remarques du professeur.`
+        );
+
+        if (voiceEnabled && evaluation.feedback) {
+          speak(
+            mentorLang === 'en'
+              ? `Exercise graded: score ${evaluation.score} out of 100. Please revise your arguments.`
+              : `Exercice corrigé avec une note de ${evaluation.score} sur 100. Veuillez réviser vos arguments.`,
+            mentorLang === 'en' ? 'en-US' : 'fr-FR'
+          );
+        }
       }
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
       setEvaluatingExercise(false);
     }
+  };
+
+  // Export Course to PDF via printable academic syllabus
+  const handleExportCoursePdf = () => {
+    if (!active) {
+      toast.error('Veuillez sélectionner un cours pour exporter le PDF.');
+      return;
+    }
+    window.print();
   };
 
   // Select a lesson from curriculum
@@ -338,11 +401,51 @@ export default function Mentor() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Language Switcher */}
+            <button
+              onClick={() => {
+                const nextLang = mentorLang === 'fr' ? 'en' : 'fr';
+                setMentorLang(nextLang);
+                localStorage.setItem('mentor_language', nextLang);
+                toast.success(nextLang === 'en' ? 'English course mode activated' : 'Mode cours en Français activé');
+              }}
+              className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-xs font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm"
+              title="Changer la langue du Professeur (FR / EN)"
+            >
+              <Globe className="h-3.5 w-3.5 text-brand-500" />
+              <span>{mentorLang === 'fr' ? 'FR 🇫🇷' : 'EN 🇬🇧'}</span>
+            </button>
+
+            {/* Japanese Candlestick Diagram Toggle */}
+            <button
+              onClick={() => setShowDiagram(!showDiagram)}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition shadow-sm ${
+                showDiagram
+                  ? 'bg-emerald-600 text-white shadow-emerald-500/20'
+                  : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+              title="Afficher les vrais schémas de bougies japonaises et empreintes institutionnelles"
+            >
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Schémas Bougies</span>
+            </button>
+
+            {/* Export Course to PDF */}
+            <button
+              onClick={handleExportCoursePdf}
+              disabled={!active}
+              className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm"
+              title="Télécharger le cours et l'historique complet en PDF"
+            >
+              <Download className="h-3.5 w-3.5 text-brand-500" />
+              <span className="hidden md:inline">PDF</span>
+            </button>
+
             {/* Curriculum Progress Toggle */}
             <button
               onClick={() => setCurriculumTabOpen(!curriculumTabOpen)}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
                 curriculumTabOpen
                   ? 'bg-brand-600 text-white shadow-sm'
                   : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -356,6 +459,18 @@ export default function Mentor() {
                 </span>
               )}
             </button>
+
+            {/* Voice Pause / Resume control if actively speaking */}
+            {speaking && (
+              <button
+                onClick={isPaused ? resumeSpeech : pauseSpeech}
+                className="flex items-center gap-1 rounded-lg bg-emerald-100 dark:bg-emerald-950 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 animate-pulse"
+                title={isPaused ? 'Reprendre la lecture vocale' : 'Mettre la voix en pause'}
+              >
+                {isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+                <span className="hidden sm:inline">{isPaused ? 'Reprendre' : 'Pause'}</span>
+              </button>
+            )}
 
             {/* Voice Mute / Speak Toggle */}
             <button
@@ -403,6 +518,13 @@ export default function Mentor() {
             </select>
           </div>
         </div>
+
+        {/* Japanese Candlestick Visual Demonstration Panel */}
+        {showDiagram && (
+          <div className="border-b border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-gray-900/90 animate-fadeIn no-print">
+            <CandlestickDiagram initialPreset={diagramPreset} />
+          </div>
+        )}
 
         {/* Current Active Lesson & Exercise Header Banner */}
         {currentLesson && (
@@ -487,6 +609,23 @@ export default function Mentor() {
                         Score : {les.submission.score}/100
                       </p>
                     )}
+                    <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-gray-100 dark:border-gray-800">
+                      <span className="text-[10px] text-gray-400">
+                        {isDone ? 'Terminé & Validé' : isLocked ? 'Verrouillé' : 'En cours'}
+                      </span>
+                      {!isLocked && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectLesson(idx);
+                          }}
+                          className="text-[10px] font-bold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
+                        >
+                          <Play className="h-2.5 w-2.5" />
+                          <span>Reprendre ce cours</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -534,7 +673,22 @@ export default function Mentor() {
                   }`}
                 >
                   {m.role === 'assistant' ? (
-                    <div className="prose-sm">{renderMarkdown(m.content)}</div>
+                    <div>
+                      <div className="prose-sm">{renderMarkdown(m.content)}</div>
+                      <div className="mt-2.5 flex items-center justify-between border-t border-gray-200/50 dark:border-gray-700/50 pt-2 text-[11px] text-gray-500">
+                        <button
+                          onClick={() => speak(m.content, mentorLang === 'en' ? 'en-US' : 'fr-FR')}
+                          className="flex items-center gap-1.5 text-brand-600 dark:text-brand-400 hover:underline font-semibold"
+                          title="Écouter l'intégralité de cette leçon en lecture vocale continue"
+                        >
+                          <Volume2 className="h-3.5 w-3.5" />
+                          <span>Écouter le cours</span>
+                        </button>
+                        <span className="text-[10px] opacity-70">
+                          {new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
                   ) : (
                     <p className="whitespace-pre-wrap">{m.content}</p>
                   )}
@@ -653,13 +807,21 @@ export default function Mentor() {
                 )}
               </div>
 
-              {/* Chart Illustration if present */}
-              {currentLesson.chartIllustration && (
-                <div className="rounded-xl bg-black/90 p-4 font-mono text-xs text-emerald-400 overflow-x-auto">
-                  <div className="text-[10px] text-gray-400 mb-1">// Schéma Technique du Professeur</div>
-                  <pre>{currentLesson.chartIllustration.trim()}</pre>
-                </div>
-              )}
+              {/* Real Japanese Candlestick Diagram for Practical Exercise */}
+              <div className="mt-3">
+                <CandlestickDiagram
+                  initialPreset={
+                    currentLesson.title.toLowerCase().includes('choch')
+                      ? 'choch_reversal'
+                      : currentLesson.title.toLowerCase().includes('fvg')
+                      ? 'fvg_imbalance'
+                      : currentLesson.title.toLowerCase().includes('order block')
+                      ? 'order_block_mitigation'
+                      : 'bos_continuation'
+                  }
+                  customTitle={`Schéma Technique du Devoir : ${currentLesson.title}`}
+                />
+              </div>
 
               {/* Last Submission Feedback if available */}
               {currentLesson.submission?.feedback && (
@@ -712,6 +874,74 @@ export default function Mentor() {
           </div>
         </div>
       )}
+
+      {/* Printable PDF Syllabus Document (Visible when printing / Export PDF) */}
+      <div className="hidden print:block p-8 bg-white text-black font-serif">
+        <div className="border-b-2 border-black pb-4 mb-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-black uppercase tracking-wider">
+              AI SCANNER — CHAIRE ACADÉMIQUE DE TRADING
+            </h1>
+            <span className="text-xs font-bold border border-black px-2 py-1">
+              CURSUS {level.toUpperCase()}
+            </span>
+          </div>
+          <p className="text-xs text-gray-600 mt-1">
+            Relevé officiel des cours magistraux, devoirs et évaluations de trading institutionnel.
+          </p>
+          <div className="mt-3 flex items-center justify-between text-xs font-semibold">
+            <span>Séance : {active?.title || 'Formation Professionnelle'}</span>
+            <span>Date d'édition : {new Date().toLocaleDateString('fr-FR')}</span>
+            <span>Score Moyen : {active?.studentProgress?.overallScore || 0}/100</span>
+          </div>
+        </div>
+
+        {/* Cursus Progression */}
+        <div className="mb-6">
+          <h2 className="text-base font-bold border-b border-gray-300 pb-1 mb-3 uppercase">
+            1. Programme d'Études & Notes Validées
+          </h2>
+          <div className="space-y-3">
+            {(active?.curriculum || []).map((les, idx) => (
+              <div key={les.id || idx} className="border border-gray-300 p-3 rounded">
+                <div className="flex items-center justify-between font-bold text-xs">
+                  <span>Module {idx + 1} : {les.title}</span>
+                  <span>
+                    {les.status === 'completed'
+                      ? `VALIDÉ (${les.submission?.score}/100)`
+                      : les.status === 'in_progress'
+                      ? 'EN COURS D\'ÉTUDE'
+                      : 'VERROUILLÉ'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-700 mt-0.5">{les.description}</p>
+                {les.submission?.feedback && (
+                  <div className="text-[11px] bg-gray-50 p-2 mt-2 border-l-2 border-black italic">
+                    Évaluation du Professeur : {les.submission.feedback}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Full Lesson & Question Transcript */}
+        <div>
+          <h2 className="text-base font-bold border-b border-gray-300 pb-1 mb-3 uppercase">
+            2. Transcription Intégrale des Enseignements & Questions
+          </h2>
+          <div className="space-y-4 mt-3">
+            {(active?.messages || []).map((msg, idx) => (
+              <div key={idx} className="text-xs leading-relaxed border-b border-gray-100 pb-2">
+                <span className="font-bold uppercase tracking-wide">
+                  {msg.role === 'user' ? 'Étudiant :' : 'Professeur Agrégé en Trading :'}
+                </span>
+                <p className="mt-1 whitespace-pre-wrap">{msg.content.replace(/[#*_`]/g, '')}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

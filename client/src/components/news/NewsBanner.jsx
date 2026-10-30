@@ -23,13 +23,16 @@ export default function NewsBanner({ withinHours = 12 }) {
   useEffect(() => {
     economicNewsApi
       .upcoming(withinHours)
-      .then(({ data }) => setEvents(data.data.events || []))
-      .catch(() => {});
+      .then(({ data }) => setEvents(data?.data?.events || []))
+      .catch(() => {
+        setEvents([]);
+      });
   }, [withinHours]);
 
-  if (dismissed || events.length === 0) return null;
+  if (dismissed || !Array.isArray(events) || events.length === 0) return null;
 
   const next = events[0];
+  if (!next || !next.title) return null;
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/30">

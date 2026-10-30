@@ -228,6 +228,7 @@ export const submitExercise = asyncHandler(async (req, res) => {
   };
 
   // If passed, mark current lesson completed and unlock next lesson
+  let nextLessonIntro = null;
   if (evaluation.passed) {
     currentLesson.status = 'completed';
     currentLesson.completedAt = new Date();
@@ -236,6 +237,31 @@ export const submitExercise = asyncHandler(async (req, res) => {
     if (nextIndex < conversation.curriculum.length) {
       conversation.curriculum[nextIndex].status = 'in_progress';
       conversation.activeLessonIndex = nextIndex;
+
+      const nextLesson = conversation.curriculum[nextIndex];
+      const userLang = req.body.lang || 'fr';
+
+      try {
+        const { reply } = await mentorReply({
+          messages: [
+            {
+              role: 'user',
+              content:
+                userLang === 'en'
+                  ? `The student has successfully passed the previous module test with score ${evaluation.score}/100. Immediately introduce and teach the full, in-depth lesson for the next module: "${nextLesson.title} - ${nextLesson.description}". Cover all institutional concepts, candlestick price action mechanics, entry criteria, and practical market applications in detail.`
+                  : `L'élève a validé l'exercice précédent avec succès avec la note de ${evaluation.score}/100. Lancez et enseignez immédiatement le cours complet, approfondi et détaillé du module suivant : "${nextLesson.title} - ${nextLesson.description}". Détaillez les objectifs, la mécanique institutionnelle, l'action des bougies japonaises et les règles de validation du devoir.`,
+            },
+          ],
+          level: conversation.level,
+          lang: userLang,
+        });
+
+        if (reply) {
+          nextLessonIntro = reply;
+        }
+      } catch (err) {
+        logger.warn(`Could not auto-generate next lesson lecture: ${err.message}`);
+      }
     }
   } else {
     currentLesson.status = 'in_progress';
@@ -255,8 +281,42 @@ export const submitExercise = asyncHandler(async (req, res) => {
 
   // Add notification message from professor to the conversation transcript
   const verdictMsg = evaluation.passed
-    ? `🎓 **Félicitations de votre Professeur !** Vous avez validé l'exercice du **${currentLesson.title}** avec une note de **${evaluation.score}/100**.\n\n${evaluation.feedback}\n\n*Le module suivant est désormais débloqué.*`
+    ? `🎓 **Félicitations de votre Professeur !** Vous avez validé l'exercice du **${currentLesson.title}** avec une note de **${evaluation.score}/100**.\n\n${evaluation.feedback}\n\n*Le module suivant est désormais débloqué et lancé automatiquement ci-dessous.*`
     : `📝 **Correction de l'exercice - ${currentLesson.title}** (Note : **${evaluation.score}/100** - Seuil requis : **${exercise.passingScore || 70}/100**).\n\n${evaluation.feedback}\n\n*Veuillez réviser vos arguments et soumettre à nouveau votre réponse pour valider la leçon.*`;
+
+  conversation.messages.push({
+    role: 'assistant',
+    content: verdictMsg,
+    createdAt: new Date(),
+  });
+
+  if (nextLessonIntro) {
+    conversation.messages.push({
+      role: 'assistant',
+      content: nextLessonIntro,
+      createdAt: new Date(),
+    });
+  }
+
+  await conversation.save();
+
+  return sendSuccess(res, {
+    message: evaluation.passed ? 'Exercice validé ! Module suivant lancé.' : 'Exercice évalué.',
+    data: {
+      evaluation,
+      nextLessonLaunched: Boolean(nextLessonIntro),
+      nextLessonText: nextLessonIntro,
+      conversation: {
+        _id: conversation._id,
+        title: conversation.title,
+        level: conversation.level,
+        messages: conversation.messages,
+        curriculum: conversation.curriculum,
+        activeLessonIndex: conversation.activeLessonIndex,
+        studentProgress: conversation.studentProgress,
+      },
+    },
+  });
 
   conversation.messages.push({
     role: 'assistant',
