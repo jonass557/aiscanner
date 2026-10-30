@@ -172,6 +172,19 @@ export const managedTradingApi = {
   closePosition: (id) => api.post(`/managed-trading/positions/${id}/close`),
 };
 
+export const delegateApi = {
+  getConfig: () => api.get('/delegate/config'),
+  updateConfig: (payload) => api.put('/delegate/config', payload),
+  toggle: () => api.post('/delegate/toggle'),
+  passiveMode: (payload) => api.post('/delegate/passive-mode', payload),
+  getOpportunities: (params) => api.get('/delegate/opportunities', { params }),
+  getOpportunityDetail: (id) => api.get(`/delegate/opportunities/${id}`),
+  getNotifications: (params) => api.get('/delegate/notifications', { params }),
+  markNotificationRead: (id) => api.patch(`/delegate/notifications/${id}/read`),
+  markAllNotificationsRead: () => api.post('/delegate/notifications/read-all'),
+  triggerSweep: () => api.post('/delegate/sweep'),
+};
+
 export const calculatorApi = {
   calculate: (payload) => api.post('/calculator/position-size', payload),
   specs: (symbol, params) =>

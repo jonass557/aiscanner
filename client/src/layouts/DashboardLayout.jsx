@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/trade-validator', key: 'tradeValidator', icon: ClipboardCheck },
   { to: '/dashboard/calculator', key: 'positionCalculator', icon: Calculator },
   { to: '/dashboard/managed-trading', key: 'managedTrading', icon: Cpu },
+  { to: '/dashboard/delegate', key: 'tradingDelegate', icon: Radar },
   { to: '/dashboard/economic-news', key: 'economicNews', icon: CalendarClock },
   { to: '/dashboard/voice-assistant', key: 'voiceAssistant', icon: Mic },
   { to: '/dashboard/history', key: 'history', icon: History },

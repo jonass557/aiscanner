@@ -3,6 +3,7 @@ import config from './config/index.js';
 import logger from './config/logger.js';
 import { connectDB, disconnectDB } from './config/database.js';
 import { startScanner, stopScanner } from './services/opportunityScanner.js';
+import { startDelegateScheduler, stopDelegateScheduler } from './services/tradingDelegateService.js';
 import { startCalendarRefresh, stopCalendarRefresh } from './services/economicCalendarService.js';
 import { seedPlans } from './services/planService.js';
 import { hydrate as hydrateSettings } from './services/settings/settingsService.js';
@@ -54,6 +55,7 @@ const start = async () => {
         // Start background jobs (skipped in test env).
         if (!config.isTest) {
           startScanner();
+          startDelegateScheduler();
           startCalendarRefresh();
         }
         isInitialized = true;
@@ -70,6 +72,7 @@ const start = async () => {
     const shutdown = async (signal) => {
       logger.info(`${signal} received, shutting down gracefully...`);
       stopScanner();
+      stopDelegateScheduler();
       stopCalendarRefresh();
       server.close(async () => {
         await disconnectDB();

@@ -31,11 +31,23 @@ const opportunitySchema = new mongoose.Schema(
     stopLoss: Number,
     takeProfit1: Number,
     takeProfit2: Number,
+    takeProfit3: Number,
     riskRewardRatio: String,
 
     rationale: String,
     confluences: [String],
     strategyMatched: { type: String, default: 'SMC' }, // SMC, ICT, Price-Action, or Nom de la Stratégie Personnalisée
+    contributingEngines: {
+      type: [String],
+      default: ['Market Structure (SMC)', 'Order Block & FVG Engine', 'Multi-Timeframe Confluence', 'AI Capital Manager'],
+    },
+    identifiedRisks: { type: [String], default: [] },
+    marketDataState: {
+      isRealData: { type: Boolean, default: true },
+      source: { type: String, default: 'LiveMarket' },
+      lastUpdate: { type: Date, default: Date.now },
+    },
+    invalidationReason: { type: String, default: null },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -46,8 +58,20 @@ const opportunitySchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['active', 'expired', 'triggered', 'closed'],
-      default: 'active',
+      enum: [
+        'active',
+        'expired',
+        'triggered',
+        'closed',
+        'SETUP_FORMING',
+        'NEW_OPPORTUNITY',
+        'CONFIRMED',
+        'TRIGGERED',
+        'ACTIVE',
+        'INVALIDATED',
+        'EXPIRED',
+      ],
+      default: 'NEW_OPPORTUNITY',
       index: true,
     },
     outcome: {
@@ -81,9 +105,10 @@ const opportunitySchema = new mongoose.Schema(
 opportunitySchema.index({ status: 1, confidenceScore: -1 });
 opportunitySchema.index({ market: 1, timeframe: 1, confidenceScore: -1 });
 
-// Virtual: whether this opportunity is still fresh.
+// Virtual: whether this opportunity is still fresh and actionable.
 opportunitySchema.virtual('isActive').get(function () {
-  return this.status === 'active' && (!this.expiresAt || this.expiresAt > new Date());
+  const activeStatuses = ['active', 'NEW_OPPORTUNITY', 'CONFIRMED', 'TRIGGERED', 'ACTIVE', 'SETUP_FORMING'];
+  return activeStatuses.includes(this.status) && (!this.expiresAt || this.expiresAt > new Date());
 });
 
 const Opportunity = mongoose.model('Opportunity', opportunitySchema);
