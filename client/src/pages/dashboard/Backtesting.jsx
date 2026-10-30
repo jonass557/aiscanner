@@ -290,11 +290,36 @@ export default function Backtesting() {
   // Active drawer overlay: null | 'order' | 'positions' | 'history' | 'indicators' | 'tools' | 'settings' | 'speed'
   const [activeDrawer, setActiveDrawer] = useState(null);
 
-  // Pair & Category dropdown state
-  const [selectedCategory, setSelectedCategory] = useState('forex');
-  const [selectedPair, setSelectedPair] = useState(ALL_PAIRS[0]);
-  const [timeframe, setTimeframe] = useState('H1');
+  // Pair & Category dropdown state (persisted across sessions & reloads)
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    return localStorage.getItem('backtest_category') || 'forex';
+  });
+  const [selectedPair, setSelectedPair] = useState(() => {
+    const saved = localStorage.getItem('backtest_pair');
+    if (saved) {
+      const found = ALL_PAIRS.find((p) => p.symbol === saved);
+      if (found) return found;
+    }
+    return ALL_PAIRS[0];
+  });
+  const [timeframe, setTimeframe] = useState(() => {
+    return localStorage.getItem('backtest_timeframe') || 'H1';
+  });
   const [candleLimit, setCandleLimit] = useState(1500); // 1500 deep historical bars (fast & reliable load)
+
+  useEffect(() => {
+    localStorage.setItem('backtest_category', selectedCategory);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (selectedPair?.symbol) {
+      localStorage.setItem('backtest_pair', selectedPair.symbol);
+    }
+  }, [selectedPair]);
+
+  useEffect(() => {
+    localStorage.setItem('backtest_timeframe', timeframe);
+  }, [timeframe]);
 
   // Raw dataset and replay pointer
   const [allCandles, setAllCandles] = useState([]);
@@ -337,13 +362,29 @@ export default function Backtesting() {
   const [showSMA50, setShowSMA50] = useState(false);
   const [showBollinger, setShowBollinger] = useState(false);
 
-  // TradingView Drawing Tools state
+  // TradingView Drawing Tools state (persisted across sessions & reloads)
   const [activeDrawingTool, setActiveDrawingTool] = useState('none');
   const [pendingPoints, setPendingPoints] = useState([]);
   const [selectedDrawingId, setSelectedDrawingId] = useState(null);
   const [showToolSettings, setShowToolSettings] = useState(false);
-  const [drawings, setDrawings] = useState([]); // [{ id, type, price, time, ... }]
+  const [drawings, setDrawings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('backtest_drawings');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }); // [{ id, type, price, time, ... }]
   const [renderTick, setRenderTick] = useState(0);
+
+  // Automatically save drawings so graphical analysis remains intact after disconnect/reconnect
+  useEffect(() => {
+    try {
+      localStorage.setItem('backtest_drawings', JSON.stringify(drawings));
+    } catch (e) {
+      console.warn('Failed to save backtest drawings:', e);
+    }
+  }, [drawings]);
 
   // Account Capital & Realistic Trade Simulation ($10,000 initial balance)
   const [balance, setBalance] = useState(() => {
@@ -364,10 +405,40 @@ export default function Backtesting() {
   const [stopLoss, setStopLoss] = useState('');
   const [takeProfit, setTakeProfit] = useState('');
 
-  // Active positions & Pending Orders & Execution Logs
-  const [activePositions, setActivePositions] = useState([]);
+  // Active positions & Pending Orders & Execution Logs (persisted)
+  const [activePositions, setActivePositions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('backtest_positions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [pendingOrders, setPendingOrders] = useState([]);
-  const [tradeLogs, setTradeLogs] = useState([]);
+  const [tradeLogs, setTradeLogs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('backtest_trade_logs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('backtest_positions', JSON.stringify(activePositions));
+    } catch (e) {
+      console.warn('Failed to save backtest positions:', e);
+    }
+  }, [activePositions]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('backtest_trade_logs', JSON.stringify(tradeLogs));
+    } catch (e) {
+      console.warn('Failed to save backtest trade logs:', e);
+    }
+  }, [tradeLogs]);
 
   // Chart container refs
   const chartContainerRef = useRef(null);
