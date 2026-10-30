@@ -38,6 +38,8 @@ export const updateConfig = asyncHandler(async (req, res) => {
   const allowedFields = [
     'isEnabled',
     'isPassiveMode',
+    'isConfigured',
+    'customStrategy',
     'markets',
     'symbols',
     'timeframes',
@@ -76,11 +78,13 @@ export const toggleDelegate = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   let config = await TradingDelegateConfig.findOne({ userId });
   if (!config) {
-    config = await TradingDelegateConfig.create({ userId });
+    config = await TradingDelegateConfig.create({ userId, isConfigured: true });
   }
 
   config.isEnabled = !config.isEnabled;
   config.serverStatus = config.isEnabled ? 'active' : 'paused';
+  config.isConfigured = true;
+  config.ensureDailyReset();
   await config.save();
 
   logger.info(`Trading Delegate ${config.isEnabled ? 'ACTIVATED' : 'PAUSED'} for user ${userId}`);
@@ -88,7 +92,7 @@ export const toggleDelegate = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, {
     config,
     message: config.isEnabled
-      ? 'Délégation de surveillance activée côté serveur.'
+      ? 'Délégation de surveillance activée côté serveur avec succès.'
       : 'Délégation de surveillance mise en pause.',
   });
 });

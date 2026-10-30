@@ -46,7 +46,13 @@ export default function TradingDelegate() {
   // Selected Opportunity for Detailed Sheet Modal
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
 
-  // Form State for Delegate Settings
+  // Form State for Delegate Settings & Custom Strategy
+  const [strategyName, setStrategyName] = useState('Smart Money Concepts & Order Block Rejection');
+  const [strategyDescription, setStrategyDescription] = useState('Surveiller les balayages de liquidité (liquidity grabs) sur les sommets/creux de session, le rejet sur Fair Value Gaps (FVG) et Order Blocks (OB) avec confirmation en clôture de bougie.');
+  const [tradingPlan, setTradingPlan] = useState('Risque maîtrisé de 1% max du capital par trade. Déplacement du Stop Loss à Breakeven après atteinte de TP1 (1:1.5) et sortie finale sur TP2 (1:2.5).');
+  const [riskRules, setRiskRules] = useState('Risque max 1% par trade, ratio R:R mini 1:2');
+  const [showConfigSection, setShowConfigSection] = useState(true);
+
   const [selectedMarkets, setSelectedMarkets] = useState(['forex', 'commodities', 'indices', 'synthetic']);
   const [selectedTimeframes, setSelectedTimeframes] = useState(['H1', 'H4']);
   const [selectedStrategies, setSelectedStrategies] = useState(['SMC', 'ICT']);
@@ -75,6 +81,15 @@ export default function TradingDelegate() {
       if (cfgRes?.data?.data?.config) {
         const c = cfgRes.data.data.config;
         setConfig(c);
+        if (c.customStrategy) {
+          if (c.customStrategy.name) setStrategyName(c.customStrategy.name);
+          if (c.customStrategy.description) setStrategyDescription(c.customStrategy.description);
+          if (c.customStrategy.tradingPlan) setTradingPlan(c.customStrategy.tradingPlan);
+          if (c.customStrategy.riskRules) setRiskRules(c.customStrategy.riskRules);
+        }
+        if (c.isEnabled) {
+          setShowConfigSection(false); // collapse if already active
+        }
         setSelectedMarkets(c.markets || ['forex', 'commodities']);
         setSelectedTimeframes(c.timeframes || ['H1']);
         setSelectedStrategies(c.strategies || ['SMC']);
@@ -115,12 +130,79 @@ export default function TradingDelegate() {
 
   // Toggle Global Delegation State
   const handleToggleDelegate = async () => {
+    // If not enabled yet and user hasn't opened/saved config, show config section
+    if (!config?.isEnabled && !config?.isConfigured) {
+      setShowConfigSection(true);
+      toast(
+        isEn
+          ? 'Please review or enter your strategy & trading plan below before starting surveillance.'
+          : 'Veuillez configurer et valider votre stratégie et plan de trading ci-dessous avant de lancer la surveillance.',
+        { icon: 'ℹ️', duration: 4000 }
+      );
+      return;
+    }
+
     try {
       const { data } = await delegateApi.toggle();
       setConfig(data.data.config);
       toast.success(data.message);
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Erreur lors du basculement');
+    }
+  };
+
+  // Save Strategy & Start Surveillance in one single robust action
+  const handleSaveAndLaunchSurveillance = async (e) => {
+    if (e) e.preventDefault();
+    if (!strategyDescription.trim()) {
+      toast.error(isEn ? 'Please describe your strategy criteria.' : 'Veuillez rédiger les critères de votre stratégie.');
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      const payload = {
+        customStrategy: {
+          name: strategyName,
+          description: strategyDescription,
+          tradingPlan: tradingPlan,
+          riskRules: riskRules,
+        },
+        isConfigured: true,
+        isEnabled: true,
+        markets: selectedMarkets,
+        timeframes: selectedTimeframes,
+        strategies: selectedStrategies,
+        sessions: [selectedSession],
+        minConfidenceScore: Number(minConfidence),
+        minRiskReward: Number(minRR),
+        maxRiskPerTradePercent: Number(maxRisk),
+        maxSignalsPerDay: Number(maxSignalsDay),
+        operatingHours: {
+          enabled: hoursEnabled,
+          start: startTime,
+          end: endTime,
+        },
+        notifications: {
+          inApp: notifyInApp,
+          email: notifyEmail,
+          minScoreForEmail: 80,
+        },
+      };
+
+      const { data } = await delegateApi.updateConfig(payload);
+      setConfig(data.data.config);
+      setShowConfigSection(false);
+      setActiveTab('feed');
+      toast.success(
+        isEn
+          ? 'Strategy saved and Autonomous Surveillance successfully started!'
+          : 'Stratégie enregistrée et Surveillance Autonome activée avec succès !'
+      );
+      loadData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Erreur lors de l\'activation');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -313,6 +395,203 @@ export default function TradingDelegate() {
               : isEn ? 'Activate Passive Mode' : 'Activer le Mode Passif'}
           </button>
         </div>
+      </div>
+
+      {/* STEP 1: CONFIGURATION OF STRATEGY & TRADING PLAN */}
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 dark:bg-brand-950/60 text-brand-600 dark:text-brand-300 font-black text-sm">
+              1
+            </span>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+                {isEn ? 'Configuration & Custom Trading Strategy' : 'Configuration & Rédaction de votre Stratégie de Trading'}
+              </h2>
+              <p className="text-xs text-gray-500">
+                {isEn
+                  ? 'Define your technical rules, risk plan, and monitored markets before activating the autonomous server watch.'
+                  : 'Définissez vos règles techniques, votre plan de risque et vos marchés avant de lancer la surveillance.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowConfigSection(!showConfigSection)}
+            className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            {showConfigSection ? (isEn ? 'Masquer' : 'Masquer') : (isEn ? 'Edit Strategy & Preferences' : 'Modifier ma Stratégie')}
+          </button>
+        </div>
+
+        {showConfigSection && (
+          <form onSubmit={handleSaveAndLaunchSurveillance} className="mt-4 space-y-4">
+            {/* Strategy Name & Rules */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1">
+                  {isEn ? 'Strategy Name' : 'Nom de votre Stratégie'}
+                </label>
+                <input
+                  type="text"
+                  value={strategyName}
+                  onChange={(e) => setStrategyName(e.target.value)}
+                  placeholder="ex: SMC Order Block & Liquidity Grab"
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1">
+                  {isEn ? 'Risk & Money Management Rule' : 'Règle de Gestion du Risque'}
+                </label>
+                <input
+                  type="text"
+                  value={riskRules}
+                  onChange={(e) => setRiskRules(e.target.value)}
+                  placeholder="ex: Risque max 1% par trade, ratio R:R mini 1:2"
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+
+            {/* Description & Technical Rules */}
+            <div>
+              <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1">
+                {isEn ? 'Technical Rules & Entry Conditions (Observed by AI)' : 'Règles Techniques & Conditions d\'Entrée (Surveillées par l\'IA)'}
+              </label>
+              <textarea
+                rows={3}
+                value={strategyDescription}
+                onChange={(e) => setStrategyDescription(e.target.value)}
+                placeholder="Décrivez précisément les conditions d'entrée (balayage de liquidité, rejet de Fair Value Gap, Order Block, cassure de structure BOS/ChoCH)..."
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-xs leading-relaxed text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            {/* Trading Plan & Exit Criteria */}
+            <div>
+              <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1">
+                {isEn ? 'Trading Plan & Exit Strategy' : 'Plan de Trading & Règles de Sortie (SL, TP, BE)'}
+              </label>
+              <textarea
+                rows={2}
+                value={tradingPlan}
+                onChange={(e) => setTradingPlan(e.target.value)}
+                placeholder="ex: Stop Loss au-dessus du dernier swing, TP1 à 1:1.5 avec sécurisation à Break-Even, TP2 à 1:2.5 pour clôture intégrale."
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-xs leading-relaxed text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            {/* Markets, Timeframes, Confluence & R:R in concise row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+              <div>
+                <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5">
+                  {isEn ? 'Monitored Markets' : 'Marchés'}
+                </label>
+                <div className="flex flex-wrap gap-1">
+                  {MARKET_OPTIONS.map((m) => {
+                    const isChecked = selectedMarkets.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          if (isChecked) setSelectedMarkets(selectedMarkets.filter((x) => x !== m.id));
+                          else setSelectedMarkets([...selectedMarkets, m.id]);
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition ${
+                          isChecked
+                            ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-500'
+                        }`}
+                      >
+                        {isChecked ? '✓ ' : '+ '} {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5">
+                  {isEn ? 'Timeframes' : 'Unités de Temps'}
+                </label>
+                <div className="flex flex-wrap gap-1">
+                  {TIMEFRAME_OPTIONS.map((tf) => (
+                    <button
+                      key={tf}
+                      type="button"
+                      onClick={() => {
+                        if (selectedTimeframes.includes(tf)) setSelectedTimeframes(selectedTimeframes.filter((x) => x !== tf));
+                        else setSelectedTimeframes([...selectedTimeframes, tf]);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+                        selectedTimeframes.includes(tf)
+                          ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-500'
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1">
+                  {isEn ? 'Min Confluence' : 'Confluence Mini'}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="70"
+                    max="95"
+                    step="5"
+                    value={minConfidence}
+                    onChange={(e) => setMinConfidence(Number(e.target.value))}
+                    className="w-full accent-brand-600"
+                  />
+                  <span className="font-mono font-bold text-xs text-brand-600 w-10 text-right">{minConfidence}%</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1">
+                  {isEn ? 'Min Risk/Reward' : 'Ratio R:R Mini'}
+                </label>
+                <select
+                  value={minRR}
+                  onChange={(e) => setMinRR(Number(e.target.value))}
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-xs font-bold dark:text-white"
+                >
+                  <option value={1.5}>1:1.5 (Standard)</option>
+                  <option value={2.0}>1:2.0 (Recommandé)</option>
+                  <option value={2.5}>1:2.5 (Élevé)</option>
+                  <option value={3.0}>1:3.0 (Strict)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Launch & Save CTA Button */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="submit"
+                disabled={savingSettings}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md transition transform active:scale-95"
+              >
+                <Play className="h-4 w-4 fill-white" />
+                <span>
+                  {savingSettings
+                    ? isEn ? 'Saving & Starting...' : 'Enregistrement en cours...'
+                    : isEn ? 'Save Strategy & Start Autonomous Surveillance' : 'Enregistrer ma Stratégie & Lancer la Surveillance'}
+                </span>
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* METRICS & SURVEILLANCE KPI BAR */}

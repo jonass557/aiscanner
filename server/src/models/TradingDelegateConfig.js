@@ -50,6 +50,25 @@ const tradingDelegateConfigSchema = new mongoose.Schema(
       type: [String],
       default: ['SMC', 'ICT', 'Price-Action', 'Supply-Demand'],
     },
+    // User custom written strategy & trading plan
+    customStrategy: {
+      name: { type: String, default: 'Smart Money Concepts & Liquidity Sweep' },
+      description: {
+        type: String,
+        default: 'Surveiller les balayages de liquidités (liquidity sweeps), les Fair Value Gaps (FVG) et les Order Blocks institutionnels en alignement de structure.',
+      },
+      tradingPlan: {
+        type: String,
+        default: 'Risque maîtrisé de 1% max par position. Sécurisation à BE après TP1 (1:1.5) et prise de profit finale à TP2 (1:2.5).',
+      },
+      riskRules: { type: String, default: 'Risque max 1% par trade, ratio R:R mini 1:2' },
+    },
+    // Whether user confirmed and validated their configuration
+    isConfigured: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
     // Preferred trading sessions
     sessions: {
       type: [String],

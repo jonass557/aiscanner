@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import {
   Calculator, AlertTriangle, CheckCircle, ShieldAlert, DollarSign,
   TrendingUp, TrendingDown, ArrowRightLeft, Layers, Percent,
-  Sliders, Copy, RotateCcw, BookOpen, ExternalLink, Info, Check,
+  Sliders, Copy, RotateCcw, BookOpen, ExternalLink, Info, Check, Cpu,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -40,6 +40,10 @@ export default function PositionCalculator() {
   const [entryPrice, setEntryPrice] = useState(1.0850);
   const [stopLossPrice, setStopLossPrice] = useState(1.0800);
   const [takeProfitPrice, setTakeProfitPrice] = useState(1.1000);
+  const [slInputMode, setSlInputMode] = useState('price'); // 'price' | 'pips' | 'amount'
+  const [slPips, setSlPips] = useState(50);
+  const [tpInputMode, setTpInputMode] = useState('price'); // 'price' | 'pips' | 'amount'
+  const [tpPips, setTpPips] = useState(100);
   const [riskMode, setRiskMode] = useState('percent'); // 'percent' | 'amount'
   const [riskPercent, setRiskPercent] = useState(1.0);
   const [riskAmount, setRiskAmount] = useState(100);
@@ -152,6 +156,44 @@ export default function PositionCalculator() {
       setRiskAmount(Number(((c * riskPercent) / 100).toFixed(2)));
     } else if (c > 0) {
       setRiskPercent(Number(((riskAmount / c) * 100).toFixed(2)));
+    }
+  };
+
+  const handleSlPriceChange = (val) => {
+    setStopLossPrice(val);
+    const p = Number(val);
+    if (!isNaN(p) && entryPrice && pipSize) {
+      const distance = Math.abs(entryPrice - p);
+      setSlPips(Number((distance / (pipSize || 0.0001)).toFixed(1)));
+    }
+  };
+
+  const handleSlPipsChange = (pips) => {
+    const numPips = Math.max(0.1, Number(pips) || 0);
+    setSlPips(numPips);
+    if (entryPrice && pipSize) {
+      const delta = numPips * (pipSize || 0.0001);
+      const newSl = direction === 'BUY' ? entryPrice - delta : entryPrice + delta;
+      setStopLossPrice(Number(newSl.toFixed(5)));
+    }
+  };
+
+  const handleTpPriceChange = (val) => {
+    setTakeProfitPrice(val);
+    const p = Number(val);
+    if (!isNaN(p) && entryPrice && pipSize) {
+      const distance = Math.abs(p - entryPrice);
+      setTpPips(Number((distance / (pipSize || 0.0001)).toFixed(1)));
+    }
+  };
+
+  const handleTpPipsChange = (pips) => {
+    const numPips = Math.max(0.1, Number(pips) || 0);
+    setTpPips(numPips);
+    if (entryPrice && pipSize) {
+      const delta = numPips * (pipSize || 0.0001);
+      const newTp = direction === 'BUY' ? entryPrice + delta : entryPrice - delta;
+      setTakeProfitPrice(Number(newTp.toFixed(5)));
     }
   };
 
@@ -455,6 +497,7 @@ export default function PositionCalculator() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Entry Price */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                   {isEn ? 'Entry Price' : "Prix d'Entrée"}
@@ -463,38 +506,140 @@ export default function PositionCalculator() {
                   type="number"
                   step="any"
                   value={entryPrice}
-                  onChange={(e) => setEntryPrice(e.target.value)}
+                  onChange={(e) => setEntryPrice(Number(e.target.value))}
                   className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
 
+              {/* Stop Loss (with Price vs Pips vs $ Mode) */}
               <div>
-                <label className="block text-xs font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1">
-                  <span>{isEn ? 'Stop Loss' : 'Stop Loss'}</span>
-                  <span className="text-[10px] font-normal text-gray-400">
-                    ({direction === 'BUY' ? '< Entrée' : '> Entrée'})
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={stopLossPrice}
-                  onChange={(e) => setStopLossPrice(e.target.value)}
-                  className="w-full rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20 px-3 py-2 text-sm font-mono font-bold text-rose-700 dark:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                    Stop Loss ({slInputMode === 'pips' ? 'Pips' : slInputMode === 'amount' ? '$' : 'Prix'})
+                  </label>
+                  <div className="flex gap-1 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setSlInputMode('price')}
+                      className={`px-1.5 py-0.5 rounded font-bold transition ${
+                        slInputMode === 'price' ? 'bg-rose-500 text-white' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      Prix
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSlInputMode('pips')}
+                      className={`px-1.5 py-0.5 rounded font-bold transition ${
+                        slInputMode === 'pips' ? 'bg-rose-500 text-white' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      Pips
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSlInputMode('amount')}
+                      className={`px-1.5 py-0.5 rounded font-bold transition ${
+                        slInputMode === 'amount' ? 'bg-rose-500 text-white' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      $
+                    </button>
+                  </div>
+                </div>
+
+                {slInputMode === 'price' && (
+                  <input
+                    type="number"
+                    step="any"
+                    value={stopLossPrice}
+                    onChange={(e) => handleSlPriceChange(e.target.value)}
+                    placeholder="Prix SL"
+                    className="w-full rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20 px-3 py-2 text-sm font-mono font-bold text-rose-700 dark:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                )}
+                {slInputMode === 'pips' && (
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.1"
+                      value={slPips}
+                      onChange={(e) => handleSlPipsChange(e.target.value)}
+                      placeholder="Pips de distance"
+                      className="w-full rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20 px-3 py-2 text-sm font-mono font-bold text-rose-700 dark:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-400">Pips</span>
+                  </div>
+                )}
+                {slInputMode === 'amount' && (
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      min="1"
+                      value={riskAmount}
+                      onChange={(e) => handleRiskAmountChange(e.target.value)}
+                      placeholder="Perte max en $"
+                      className="w-full rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20 px-3 py-2 text-sm font-mono font-bold text-rose-700 dark:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-400">$</span>
+                  </div>
+                )}
               </div>
 
+              {/* Take Profit (with Price vs Pips Mode) */}
               <div>
-                <label className="block text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-1 flex items-center gap-1">
-                  <span>{isEn ? 'Take Profit (Optional)' : 'Take Profit (Optionnel)'}</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={takeProfitPrice}
-                  onChange={(e) => setTakeProfitPrice(e.target.value)}
-                  className="w-full rounded-xl border border-emerald-300 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 px-3 py-2 text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    Take Profit ({tpInputMode === 'pips' ? 'Pips' : 'Prix'})
+                  </label>
+                  <div className="flex gap-1 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setTpInputMode('price')}
+                      className={`px-1.5 py-0.5 rounded font-bold transition ${
+                        tpInputMode === 'price' ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      Prix
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTpInputMode('pips')}
+                      className={`px-1.5 py-0.5 rounded font-bold transition ${
+                        tpInputMode === 'pips' ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      Pips
+                    </button>
+                  </div>
+                </div>
+
+                {tpInputMode === 'price' && (
+                  <input
+                    type="number"
+                    step="any"
+                    value={takeProfitPrice}
+                    onChange={(e) => handleTpPriceChange(e.target.value)}
+                    placeholder="Prix TP"
+                    className="w-full rounded-xl border border-emerald-300 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 px-3 py-2 text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                )}
+                {tpInputMode === 'pips' && (
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.1"
+                      value={tpPips}
+                      onChange={(e) => handleTpPipsChange(e.target.value)}
+                      placeholder="Pips d'objectif"
+                      className="w-full rounded-xl border border-emerald-300 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 px-3 py-2 text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-400">Pips</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -690,6 +835,23 @@ export default function PositionCalculator() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Main Action Calculate Button */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={calculate}
+              disabled={calculating}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-brand-600 hover:from-emerald-700 hover:to-brand-700 text-white font-black text-sm shadow-lg shadow-emerald-600/20 transition transform active:scale-98"
+            >
+              <Calculator className={`h-5 w-5 ${calculating ? 'animate-spin' : ''}`} />
+              <span>
+                {calculating
+                  ? isEn ? 'Calculating Lot Size...' : 'Calcul du Volume en cours...'
+                  : isEn ? 'CALCULER LA TAILLE DE POSITION (LOT)' : 'CALCULER LA TAILLE DE POSITION (LOT)'}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -924,8 +1086,17 @@ export default function PositionCalculator() {
                 </div>
               )}
 
-              {/* Quick Link to Trading Journal */}
-              <div className="pt-2">
+              {/* Quick Link to Managed Trading & Trading Journal */}
+              <div className="pt-2 space-y-2">
+                <Link
+                  to={`/dashboard/managed-trading`}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold transition shadow-md"
+                >
+                  <Cpu className="h-4 w-4" />
+                  {isEn ? 'Execute via AI Managed Trading' : 'Exécuter via AI Managed Trading'}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+
                 <Link
                   to={`/dashboard/journal?symbol=${encodeURIComponent(result.symbol)}&direction=${result.direction}&entryPrice=${result.entryPrice}&stopLoss=${result.stopLossPrice}&takeProfit=${result.takeProfitPrice || ''}&lotSize=${result.executableVolume}`}
                   className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:hover:bg-brand-950/70 dark:text-brand-300 text-xs font-bold transition"
