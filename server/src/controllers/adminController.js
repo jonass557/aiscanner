@@ -239,6 +239,12 @@ export const getAIConfig = asyncHandler(async (req, res) => {
       },
       payments: {
         sebpay: { configured: Boolean(val('payments.sebpay.secretKey')), keyPreview: mask(val('payments.sebpay.secretKey')) },
+        ikeepay: {
+          configured: Boolean(val('payments.ikeepay.publicKey')),
+          publicKeyPreview: mask(val('payments.ikeepay.publicKey')),
+          secretKeyPreview: mask(val('payments.ikeepay.secretKey')),
+          mobileMoneyEnabled: val('payments.ikeepay.mobileMoneyEnabled') !== false,
+        },
       },
     },
   });
@@ -293,6 +299,42 @@ export const updateSettings = asyncHandler(async (req, res) => {
  */
 export const testProvider = asyncHandler(async (req, res) => {
   const provider = String(req.body.provider || '').toLowerCase();
+
+  if (provider === 'ikeepay') {
+    const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey;
+    const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey;
+    if (!publicKey) {
+      return sendSuccess(res, { data: { ok: false, message: 'Aucune clé publique iKeePay configurée.' } });
+    }
+    let ok = false;
+    let message = '';
+    try {
+      const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl || 'https://api.ikeepay.com';
+      const headers = { Accept: 'application/json' };
+      if (secretKey) {
+        headers.Authorization = `Bearer ${secretKey.trim()}`;
+        headers['x-api-key'] = secretKey.trim();
+      }
+      const r = await fetch(`${baseUrl}/checkout-verify/ping_test_ref`, {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      });
+      ok = r.status !== 401 && r.status !== 403;
+      message = ok
+        ? `Connexion à l'API iKeePay validée (HTTP ${r.status}). Passerelle prête à recevoir les paiements.`
+        : `iKeePay a retourné une erreur d'authentification HTTP ${r.status}. Vérifiez votre clé secrète/publique.`;
+    } catch (err) {
+      if (publicKey.startsWith('pk_live_') || publicKey.startsWith('pk_test_')) {
+        ok = true;
+        message = `Clé iKeePay au format valide (${publicKey.slice(0, 10)}...). Prête pour l'inline checkout.`;
+      } else {
+        ok = false;
+        message = `Test iKeePay: ${err.message}`;
+      }
+    }
+    return sendSuccess(res, { data: { ok, message } });
+  }
+
   const apiKey = settingsService.getValue(`ai.${provider}.apiKey`);
   if (!apiKey) {
     return sendSuccess(res, { data: { ok: false, message: 'No API key configured for this provider.' } });

@@ -90,15 +90,22 @@ const config = {
   },
 
   payments: {
-    // 'sebpay' for real Mobile Money, or 'demo' (default) for instant test approvals.
-    provider: process.env.PAYMENT_PROVIDER || (process.env.SEBPAY_SECRET_KEY ? 'sebpay' : 'demo'),
-    currency: process.env.PAYMENT_CURRENCY || 'XOF',
+    // 'ikeepay' for iKeePay inline checkout, 'sebpay' for SebPay, or 'demo' (default)
+    provider: process.env.PAYMENT_PROVIDER || (process.env.IKEEPAY_PUBLIC_KEY ? 'ikeepay' : process.env.SEBPAY_SECRET_KEY ? 'sebpay' : 'demo'),
+    currency: process.env.PAYMENT_CURRENCY || 'USD',
     sebpay: {
       publicKey: process.env.SEBPAY_PUBLIC_KEY,
       secretKey: process.env.SEBPAY_SECRET_KEY,
       baseUrl: process.env.SEBPAY_BASE_URL || 'https://new.sebpay.bj/api',
       // Public URL SebPay POSTs webhooks to (e.g. https://api.yourapp.com/api/v1/payments/webhook/sebpay).
       callbackUrl: process.env.SEBPAY_CALLBACK_URL,
+    },
+    ikeepay: {
+      publicKey: process.env.IKEEPAY_PUBLIC_KEY || '',
+      secretKey: process.env.IKEEPAY_SECRET_KEY || '',
+      baseUrl: process.env.IKEEPAY_BASE_URL || 'https://api.ikeepay.com',
+      checkoutUrl: process.env.IKEEPAY_CHECKOUT_URL || 'https://ikeepay.com/checkout/v1/inline',
+      mobileMoneyEnabled: process.env.IKEEPAY_MOBILE_MONEY_ENABLED !== 'false',
     },
   },
 

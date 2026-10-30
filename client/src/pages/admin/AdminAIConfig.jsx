@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Cpu, CheckCircle2, XCircle, Info, Save, PlugZap, Eye, Sparkles, Key, Zap } from 'lucide-react';
+import {
+  Cpu, CheckCircle2, XCircle, Info, Save, PlugZap, Eye, Sparkles,
+  CreditCard, Smartphone, Copy, Check, Zap, Layers,
+} from 'lucide-react';
 import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -7,9 +10,11 @@ import Input from '../../components/ui/Input.jsx';
 import { adminApi } from '../../services/endpoints.js';
 
 /**
- * Configuration IA avancée et gestion dynamique des modèles Gemini & Providers.
- * Permet à l'administrateur de modifier la clé Gemini et de basculer
- * instantanément entre les derniers modèles (gemini-3.8-flash, gemini-3.5-flash, etc.).
+ * Configuration IA avancée, Passerelles de Paiement iKeePay & Modèles Gemini.
+ * Permet à l'administrateur de gérer en direct :
+ * - Les clés API Google Gemini et modèles de vision
+ * - La passerelle de paiement iKeePay (clés publiques/secrètes, mobile money, webhooks)
+ * - Les paramètres globaux sans interruption de service
  */
 
 const GEMINI_MODELS = [
@@ -33,7 +38,16 @@ const FIELD_META = {
   'ai.nvidia.model': { label: 'Modèle NVIDIA', hint: 'meta/llama-3.2-90b-vision-instruct' },
   'ai.nvidia.baseUrl': { label: 'URL de base NVIDIA', hint: 'https://integrate.api.nvidia.com/v1' },
   'marketData.twelveData.apiKey': { label: 'Clé API TwelveData (Flux Forex / Or / Indices temps réel)', secret: true },
-  'payments.provider': { label: 'Fournisseur de paiement actif', hint: 'sebpay | demo' },
+  'payments.provider': { label: 'Passerelle de paiement active', hint: 'ikeepay | sebpay | demo' },
+  'payments.ikeepay.publicKey': { label: 'Clé Publique iKeePay (pk_live_... ou pk_test_...)', secret: false, hint: 'pk_live_...' },
+  'payments.ikeepay.secretKey': { label: 'Clé Secrète iKeePay (sk_live_... ou sk_test_...)', secret: true },
+  'payments.ikeepay.baseUrl': { label: 'URL API iKeePay', hint: 'https://api.ikeepay.com' },
+  'payments.ikeepay.checkoutUrl': { label: 'URL Inline Checkout iKeePay', hint: 'https://ikeepay.com/checkout/v1/inline' },
+  'payments.ikeepay.mobileMoneyEnabled': {
+    label: 'Activer Mobile Money iKeePay (Orange, MTN, Moov, Wave, etc.)',
+    hint: 'Permet aux utilisateurs de souscrire par portefeuille mobile ou carte bancaire.',
+    toggle: true,
+  },
   'payments.sebpay.publicKey': { label: 'Clé publique SebPay', secret: true },
   'payments.sebpay.secretKey': { label: 'Clé secrète SebPay', secret: true },
   'payments.sebpay.baseUrl': { label: 'URL de base SebPay', hint: 'https://new.sebpay.bj/api' },
@@ -48,11 +62,11 @@ const FIELD_META = {
 const CATEGORY_TITLES = {
   ai: 'Fournisseurs IA (Gemini · OpenAI · Claude · NVIDIA)',
   vision: 'Moteur de Vision par Ordinateur (Graphiques)',
-  payments: 'Paiements & Abonnements (SebPay)',
+  payments: 'Passerelles de Paiements & Abonnements (iKeePay & Mobile Money)',
   features: 'Fonctionnalités & Sécurité',
 };
 
-const TESTABLE = ['gemini', 'openai', 'claude', 'nvidia'];
+const TESTABLE = ['gemini', 'openai', 'claude', 'nvidia', 'ikeepay'];
 
 export default function AdminAIConfig() {
   const [aiConfig, setAiConfig] = useState(null);
@@ -63,6 +77,8 @@ export default function AdminAIConfig() {
   const [flash, setFlash] = useState(null);
   const [tests, setTests] = useState({});
   const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [showIkeepaySecret, setShowIkeepaySecret] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   const load = async () => {
     const [{ data: cfg }, { data: st }] = await Promise.all([adminApi.aiConfig(), adminApi.settings()]);
@@ -100,7 +116,7 @@ export default function AdminAIConfig() {
 
     try {
       await adminApi.updateSettings(payload);
-      setFlash({ tone: 'green', text: 'Paramètres enregistrés avec succès ! Modèles et clés mis à jour.' });
+      setFlash({ tone: 'green', text: 'Paramètres enregistrés avec succès ! Clés et configurations mises à jour.' });
       await load();
     } catch (err) {
       setFlash({ tone: 'red', text: err.response?.data?.message || "Échec de l'enregistrement des paramètres." });
@@ -123,6 +139,22 @@ export default function AdminAIConfig() {
     await save(payload);
   };
 
+  const activateIkeepayGlobally = async () => {
+    const payload = [
+      { key: 'payments.provider', value: 'ikeepay' },
+    ];
+    if (values['payments.ikeepay.publicKey']) {
+      payload.push({ key: 'payments.ikeepay.publicKey', value: values['payments.ikeepay.publicKey'].trim() });
+    }
+    if (values['payments.ikeepay.secretKey'] && values['payments.ikeepay.secretKey'].trim()) {
+      payload.push({ key: 'payments.ikeepay.secretKey', value: values['payments.ikeepay.secretKey'].trim() });
+    }
+    if (values['payments.ikeepay.mobileMoneyEnabled'] !== undefined) {
+      payload.push({ key: 'payments.ikeepay.mobileMoneyEnabled', value: values['payments.ikeepay.mobileMoneyEnabled'] });
+    }
+    await save(payload);
+  };
+
   const runTest = async (provider) => {
     setTests((t) => ({ ...t, [provider]: { loading: true } }));
     try {
@@ -136,20 +168,36 @@ export default function AdminAIConfig() {
     }
   };
 
-  if (loading) return <Spinner label="Chargement de la configuration IA…" />;
+  const webhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/v1/payments/webhook/ikeepay`
+    : '/api/v1/payments/webhook/ikeepay';
+
+  const copyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
+  };
+
+  if (loading) return <Spinner label="Chargement de la configuration…" />;
 
   const geminiConfigured = aiConfig?.providers?.gemini?.configured;
   const isGeminiActive = aiConfig?.activeProvider === 'gemini';
+
+  const ikeepayConfigured = Boolean(
+    values['payments.ikeepay.publicKey'] ||
+    aiConfig?.payments?.ikeepay?.configured
+  );
+  const isIkeepayActive = (values['payments.provider'] || aiConfig?.activePaymentProvider) === 'ikeepay';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <Sparkles className="h-6 w-6 text-cyan-400" /> Centre de Contrôle IA &amp; Modèles Gemini
+            <Sparkles className="h-6 w-6 text-cyan-400" /> Centre de Contrôle IA &amp; Passerelles
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Gérez vos clés API et sélectionnez les modèles Gemini les plus performants en temps réel sans redémarrage.
+            Gérez vos clés API Gemini, configurez les paiements iKeePay / Mobile Money et appliquez les réglages en temps réel.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -172,7 +220,135 @@ export default function AdminAIConfig() {
         </div>
       )}
 
-      {/* Carte spéciale : Configuration Google Gemini Ultra-Performant */}
+      {/* Carte spéciale 1 : Passerelle de Paiement iKeePay & Mobile Money */}
+      <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950/30 p-6 shadow-xl">
+        <div className="absolute right-0 top-0 -mr-16 -mt-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="relative z-10 space-y-5">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/40">
+                <CreditCard className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-white">iKeePay &amp; Mobile Money (Passerelle de Paiement)</h2>
+                  {ikeepayConfigured ? (
+                    <Badge tone="green"><CheckCircle2 className="h-3.5 w-3.5" /> Configuré</Badge>
+                  ) : (
+                    <Badge tone="yellow"><XCircle className="h-3.5 w-3.5" /> Clé manquante</Badge>
+                  )}
+                  {isIkeepayActive && (
+                    <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-300 ring-1 ring-amber-500/40">
+                      ★ Passerelle Active
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400">
+                  Tunnel de paiement Inline Checkout sans redirection externe. Supporte Cartes Bancaires (Visa/Mastercard) et Mobile Money (Orange, MTN, Moov, Wave...).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={tests['ikeepay']?.loading}
+                onClick={() => runTest('ikeepay')}
+                className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+              >
+                <PlugZap className="h-4 w-4" /> Tester iKeePay
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={saving}
+                onClick={activateIkeepayGlobally}
+                className="bg-amber-500 text-slate-950 hover:bg-amber-400 font-semibold shadow-lg shadow-amber-500/20"
+              >
+                Activer iKeePay pour le Site
+              </Button>
+            </div>
+          </div>
+
+          {tests['ikeepay'] && !tests['ikeepay'].loading && (
+            <div
+              className={`rounded-xl p-3 text-xs ${
+                tests['ikeepay'].ok
+                  ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                  : 'border border-red-500/30 bg-red-500/10 text-red-300'
+              }`}
+            >
+              {tests['ikeepay'].message}
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-300">
+                Clé Publique iKeePay (pk_live_... ou pk_test_...)
+              </label>
+              <input
+                type="text"
+                value={values['payments.ikeepay.publicKey'] ?? ''}
+                onChange={(e) => onChange('payments.ikeepay.publicKey', e.target.value)}
+                placeholder="Ex : pk_live_cc90c4cc40f2437a80b0b88dd3b8bd3b"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900/90 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Visible dans votre espace marchand sur <a href="https://ikeepay.com" target="_blank" rel="noreferrer" className="text-amber-400 underline">ikeepay.com</a>.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-300">
+                Clé Secrète iKeePay (sk_live_... ou sk_test_...)
+              </label>
+              <div className="relative">
+                <input
+                  type={showIkeepaySecret ? 'text' : 'password'}
+                  value={values['payments.ikeepay.secretKey'] ?? ''}
+                  onChange={(e) => onChange('payments.ikeepay.secretKey', e.target.value)}
+                  placeholder={
+                    aiConfig?.payments?.ikeepay?.secretKeyPreview
+                      ? `${aiConfig.payments.ikeepay.secretKeyPreview} (Laissez vide pour conserver)`
+                      : 'Ex : sk_live_...'
+                  }
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900/90 px-3 py-2.5 pr-10 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowIkeepaySecret(!showIkeepaySecret)}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                Chiffrée en AES-256 pour vérifier les paiements et sécuriser les webhooks.
+              </p>
+            </div>
+          </div>
+
+          {/* Webhook URL information box */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/80 p-3.5">
+            <div>
+              <span className="text-xs font-semibold text-amber-300">URL de Webhook iKeePay (Notifications Instantanées) :</span>
+              <p className="font-mono text-xs text-slate-300 select-all break-all">{webhookUrl}</p>
+            </div>
+            <button
+              type="button"
+              onClick={copyWebhook}
+              className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition shrink-0"
+            >
+              {copiedWebhook ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiedWebhook ? 'Copié !' : 'Copier l\'URL'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Carte spéciale 2 : Configuration Google Gemini Ultra-Performant */}
       <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-950/40 p-6 shadow-xl">
         <div className="absolute right-0 top-0 -mr-16 -mt-16 h-48 w-48 rounded-full bg-cyan-500/10 blur-3xl" />
         <div className="relative z-10 space-y-5">
@@ -292,10 +468,10 @@ export default function AdminAIConfig() {
       <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard icon={Cpu} label="Fournisseur Raisonnement Actif" value={aiConfig.activeProvider} />
         <SummaryCard icon={Eye} label="Fournisseur Vision Actif" value={aiConfig.activeVisionProvider} />
-        <SummaryCard icon={PlugZap} label="Passerelle Paiements" value={aiConfig.activePaymentProvider} />
+        <SummaryCard icon={CreditCard} label="Passerelle Paiements" value={aiConfig.activePaymentProvider} />
       </div>
 
-      {/* Statut de tous les fournisseurs */}
+      {/* Statut de tous les fournisseurs IA */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Object.entries(aiConfig.providers).map(([name, p]) => {
           const test = tests[name];
@@ -357,7 +533,7 @@ export default function AdminAIConfig() {
                       role="switch"
                       aria-checked={on}
                       onClick={() => onChange(f.key, !on)}
-                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${on ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${on ? 'bg-amber-500' : 'bg-slate-700'}`}
                     >
                       <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${on ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>

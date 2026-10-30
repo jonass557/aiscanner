@@ -47,8 +47,13 @@ export const SETTING_DEFS = [
   // --- Market Data (TwelveData pour Forex/Matières premières temps réel) ---
   { key: 'marketData.twelveData.apiKey', path: 'marketData.twelveData.apiKey', category: 'ai', secret: true },
 
-  // --- Payments: SebPay -----------------------------------------------------
+  // --- Payments: iKeePay & SebPay -------------------------------------------
   { key: 'payments.provider', path: 'payments.provider', category: 'payments', secret: false },
+  { key: 'payments.ikeepay.publicKey', path: 'payments.ikeepay.publicKey', category: 'payments', secret: false },
+  { key: 'payments.ikeepay.secretKey', path: 'payments.ikeepay.secretKey', category: 'payments', secret: true },
+  { key: 'payments.ikeepay.baseUrl', path: 'payments.ikeepay.baseUrl', category: 'payments', secret: false },
+  { key: 'payments.ikeepay.checkoutUrl', path: 'payments.ikeepay.checkoutUrl', category: 'payments', secret: false },
+  { key: 'payments.ikeepay.mobileMoneyEnabled', path: 'payments.ikeepay.mobileMoneyEnabled', category: 'payments', secret: false, type: 'boolean' },
   { key: 'payments.sebpay.publicKey', path: 'payments.sebpay.publicKey', category: 'payments', secret: true },
   { key: 'payments.sebpay.secretKey', path: 'payments.sebpay.secretKey', category: 'payments', secret: true },
   { key: 'payments.sebpay.baseUrl', path: 'payments.sebpay.baseUrl', category: 'payments', secret: false },

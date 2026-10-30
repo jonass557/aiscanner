@@ -99,6 +99,9 @@ export const assistantApi = {
 
 export const paymentApi = {
   checkout: (payload) => api.post('/payments/checkout', payload),
+  initiateIkeepay: (payload) => api.post('/payments/ikeepay/initiate', payload),
+  verifyIkeepay: (payload) => api.post('/payments/ikeepay/verify', payload),
+  getConfig: () => api.get('/payments/config'),
   list: (params) => api.get('/payments', { params }),
   get: (id) => api.get(`/payments/${id}`),
 };
