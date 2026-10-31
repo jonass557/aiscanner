@@ -185,20 +185,13 @@ export const updateStrategy = asyncHandler(async (req, res) => {
 
 /**
  * DELETE /strategies/:id (Admin only)
- * Deletes or deactivates a strategy.
+ * Deletes a strategy from the database.
  */
 export const deleteStrategy = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const strategy = await Strategy.findById(id);
   if (!strategy) throw ApiError.notFound('Stratégie introuvable.');
 
-  if (strategy.isSystem) {
-    // For system strategies, deactivate rather than hard-delete
-    strategy.isActive = false;
-    await strategy.save();
-    return sendSuccess(res, { message: 'Stratégie système désactivée.' });
-  }
-
   await Strategy.findByIdAndDelete(id);
-  return sendSuccess(res, { message: 'Stratégie supprimée avec succès.' });
+  return sendSuccess(res, { message: `Stratégie "${strategy.name}" supprimée avec succès.` });
 });

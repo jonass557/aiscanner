@@ -15,6 +15,23 @@ export const getDecimals = (price) => {
   return 2;
 };
 
+/** Normalize any timeframe identifier into standard uppercase key (e.g. 'd1' -> 'D1', '1h' -> 'H1') */
+export const normalizeTf = (tf) => {
+  if (!tf) return 'H1';
+  const clean = String(tf).trim().toUpperCase();
+  if (clean === '1M' || clean === 'M1') return 'M1';
+  if (clean === '5M' || clean === 'M5') return 'M5';
+  if (clean === '15M' || clean === 'M15') return 'M15';
+  if (clean === '30M' || clean === 'M30') return 'M30';
+  if (clean === '1H' || clean === 'H1') return 'H1';
+  if (clean === '2H' || clean === 'H2') return 'H2';
+  if (clean === '4H' || clean === 'H4') return 'H4';
+  if (clean === '1D' || clean === 'D1' || clean === 'DAILY') return 'D1';
+  if (clean === '1W' || clean === 'W1' || clean === 'WEEKLY') return 'W1';
+  if (clean === '1MO' || clean === 'MN' || clean === 'MONTHLY') return 'MN';
+  return clean;
+};
+
 /**
  * Clean, deduplicate, and validate institutional OHLC candles.
  * Strictly preserves real authentic broker/market prices.
@@ -95,28 +112,44 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
       }
     }
 
-    // Eliminate flat barcode / zero-body tick candles
+    // Eliminate flat barcode / zero-body tick candles:
+    // Guarantee genuine Japanese candlestick bodies (65-85% of total bar range)
     const candleRange = high - low;
     const bodySize = Math.abs(close - open);
-    const minSpread = Math.max(Math.pow(10, -dp) * 2, open * 0.00035);
+    const minSpread = Math.max(Math.pow(10, -dp) * 4, open * 0.0006);
 
     if (candleRange < minSpread) {
-      const halfSpread = minSpread * 0.5;
-      high = Number((open + halfSpread * 1.3).toFixed(dp));
-      low = Number((Math.max(0.00001, open - halfSpread * 1.3)).toFixed(dp));
-      close = Number((open >= close ? open - halfSpread : open + halfSpread).toFixed(dp));
-    } else if (bodySize < candleRange * 0.40) {
+      // Natural organic wave movement so adjacent bars never align flat like a barcode
+      const phase = Math.sin((b.time || idx) * 0.05 + idx * 0.3) * 0.5 + 0.5;
+      const waveSpread = minSpread * (0.85 + phase * 0.45);
+      const isBull = phase > 0.48;
+      const bodyRatio = 0.72; // Bold, healthy rectangular body
+      const halfBody = (waveSpread * bodyRatio) / 2;
+
+      const mid = open;
+      if (isBull) {
+        open = Number((mid - halfBody).toFixed(dp));
+        close = Number((mid + halfBody).toFixed(dp));
+      } else {
+        open = Number((mid + halfBody).toFixed(dp));
+        close = Number((mid - halfBody).toFixed(dp));
+      }
+      // Modest wicks that highlight, rather than bury, the candle body
+      const wickExtra = (waveSpread * (1 - bodyRatio)) / 2;
+      high = Number((Math.max(open, close) + wickExtra * 0.9).toFixed(dp));
+      low = Number((Math.max(0.00001, Math.min(open, close) - wickExtra * 0.9)).toFixed(dp));
+    } else if (bodySize < candleRange * 0.60) {
       // Rebalance body so it renders as a clean, healthy institutional rectangular candle
-      const targetBody = Math.max(minSpread * 0.8, candleRange * 0.55);
+      const targetBody = Math.max(minSpread * 0.9, candleRange * 0.70);
       const isBull = close >= open || (idx > 0 && close >= unique[idx - 1].close);
       const mid = (high + low) / 2;
 
       if (isBull) {
-        open = Number((mid - targetBody * 0.45).toFixed(dp));
-        close = Number((mid + targetBody * 0.55).toFixed(dp));
+        open = Number((mid - targetBody * 0.48).toFixed(dp));
+        close = Number((mid + targetBody * 0.52).toFixed(dp));
       } else {
-        open = Number((mid + targetBody * 0.45).toFixed(dp));
-        close = Number((mid - targetBody * 0.55).toFixed(dp));
+        open = Number((mid + targetBody * 0.48).toFixed(dp));
+        close = Number((mid - targetBody * 0.52).toFixed(dp));
       }
 
       high = Number(Math.max(high, open, close).toFixed(dp));
@@ -148,63 +181,49 @@ export const generateRealisticCandles = (
   customStartSec = null,
   customEndSec = null
 ) => {
+  const normTf = normalizeTf(timeframe);
   const dp = getDecimals(basePrice);
   const nowSec = Math.floor(Date.now() / 1000);
   const tfSec = {
     M1: 60,
-    '1m': 60,
     M2: 120,
-    '2m': 120,
     M3: 180,
-    '3m': 180,
     M5: 300,
-    '5m': 300,
     M15: 900,
-    '15m': 900,
     M30: 1800,
-    '30m': 1800,
     M45: 2700,
-    '45m': 2700,
     H1: 3600,
-    '1h': 3600,
     H2: 7200,
-    '2h': 7200,
     H3: 10800,
-    '3h': 10800,
     H4: 14400,
-    '4h': 14400,
     D1: 86400,
-    '1d': 86400,
     W1: 604800,
-    '1w': 604800,
     MN: 2592000,
-    '1M': 2592000,
-    '1mo': 2592000,
     '3M': 7776000,
     '6M': 15552000,
     '12M': 31104000,
-  }[timeframe] || 3600;
+  }[normTf] || 3600;
 
   // Realistic institutional volatility per timeframe
   const tfVolMultiplier = {
-    M1: 0.22,
-    M2: 0.30,
-    M3: 0.38,
-    M5: 0.48,
-    M15: 0.70,
-    M30: 0.85,
-    M45: 0.95,
-    H1: 1.00,
-    H2: 1.35,
-    H3: 1.60,
-    H4: 1.90,
-    D1: 3.40,
-    W1: 6.80,
-    MN: 12.00,
-    '3M': 18.00,
-    '6M': 24.00,
-    '12M': 32.00,
-  }[timeframe] || 1.0;
+    M1: 0.25,
+    M2: 0.32,
+    M3: 0.40,
+    M5: 0.50,
+    M15: 0.72,
+    M30: 0.88,
+    M45: 0.96,
+    H1: 1.05,
+    H2: 1.40,
+    H3: 1.65,
+    H4: 2.00,
+    D1: 3.50,
+    W1: 7.00,
+    MN: 12.50,
+    '3M': 18.50,
+    '6M': 24.50,
+    '12M': 33.00,
+  }[normTf] || 1.05;
 
   // Base volatility calibrated by asset price scale
   const rawBaseVol =
@@ -264,37 +283,37 @@ export const generateRealisticCandles = (
     const candleVol =
       volType > 0.94 ? baseVol * 2.2 : volType > 0.75 ? baseVol * 1.4 : baseVol * (0.7 + rand() * 0.6);
 
-    // Ensure healthy candle body (no flat 1-pixel barcode ticks)
-    // Minimum body size = at least 45% of standard candle volatility
+    // Ensure healthy, bold Japanese candlestick body (never flat 1-pixel barcode ticks)
+    // Minimum body size = at least 70% of standard candle volatility
     const rawMove = drift + normalNoise * candleVol;
     const dir = rawMove >= 0 ? 1 : -1;
-    const minBodyPct = candleVol * (0.40 + rand() * 0.35);
+    const minBodyPct = candleVol * (0.65 + rand() * 0.45);
     const returnPct = dir * Math.max(minBodyPct, Math.abs(rawMove));
 
     const open = prevClose;
     const close = Math.max(basePrice * 0.15, open * (1 + returnPct));
     const body = Math.abs(close - open);
 
-    // Realistic institutional candlestick shapes
+    // Realistic institutional candlestick shapes where the rectangular body clearly dominates
     const shapeRand = rand();
     let upperWick, lowerWick;
 
-    if (shapeRand < 0.06) {
-      // Institutional Pinbar / rejection high
-      upperWick = body * (1.4 + rand() * 1.6);
-      lowerWick = body * (0.1 + rand() * 0.25);
-    } else if (shapeRand < 0.12) {
-      // Institutional Hammer / rejection low
-      lowerWick = body * (1.4 + rand() * 1.6);
-      upperWick = body * (0.1 + rand() * 0.25);
-    } else if (shapeRand < 0.22) {
-      // Spinning top / balanced candle (healthy body, modest wicks)
-      upperWick = body * (0.45 + rand() * 0.55);
-      lowerWick = body * (0.45 + rand() * 0.55);
+    if (shapeRand < 0.08) {
+      // Pinbar / rejection high (wick is controlled, never obscuring body)
+      upperWick = body * (0.40 + rand() * 0.35);
+      lowerWick = body * (0.05 + rand() * 0.12);
+    } else if (shapeRand < 0.16) {
+      // Hammer / rejection low
+      lowerWick = body * (0.40 + rand() * 0.35);
+      upperWick = body * (0.05 + rand() * 0.12);
+    } else if (shapeRand < 0.30) {
+      // Spinning top / balanced candle (solid body, modest wicks)
+      upperWick = body * (0.18 + rand() * 0.20);
+      lowerWick = body * (0.18 + rand() * 0.20);
     } else {
-      // Standard institutional directional bar (clean body dominates wicks)
-      upperWick = body * (0.15 + rand() * 0.30);
-      lowerWick = body * (0.15 + rand() * 0.30);
+      // Standard institutional directional bar (clean solid body dominates)
+      upperWick = body * (0.08 + rand() * 0.15);
+      lowerWick = body * (0.08 + rand() * 0.15);
     }
 
     const high = Math.max(open, close) + upperWick;
@@ -310,7 +329,7 @@ export const generateRealisticCandles = (
     });
     prevClose = close;
   }
-  return raw;
+  return sanitizeCandles(raw, basePrice);
 };
 
 /**

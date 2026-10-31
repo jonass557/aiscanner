@@ -150,10 +150,33 @@ export default function AnnotatedChart({ imageUrl, annotations = [], symbol = 'c
   );
 }
 
-/** Render a single annotation as SVG in pixel space. */
+/** Render a single annotation as SVG in pixel space with clear, non-cluttering compact badge pills. */
 function Annotation({ a, w, h }) {
   const color = a.color || '#888888';
-  const label = a.confidence != null ? `${a.label} · ${a.confidence}%` : a.label;
+
+  // Compact label mapping so text never overwhelms or obstructs order zones
+  const compactText = (raw) => {
+    if (!raw) return '';
+    return raw
+      .replace(/Bullish Order Block \(OB\)/gi, 'OB Bull')
+      .replace(/Bearish Order Block \(OB\)/gi, 'OB Bear')
+      .replace(/Order Block/gi, 'OB')
+      .replace(/Fair Value Gap \(FVG\)/gi, 'FVG')
+      .replace(/Fair Value Gap/gi, 'FVG')
+      .replace(/Buy-Side Liquidity Swept \(BSL\)/gi, 'BSL')
+      .replace(/Sell-Side Liquidity Swept \(SSL\)/gi, 'SSL')
+      .replace(/Liquidity/gi, 'LIQ')
+      .replace(/Support/gi, 'SUP')
+      .replace(/Resistance/gi, 'RES')
+      .replace(/Stop Loss/gi, 'SL')
+      .replace(/Take Profit/gi, 'TP')
+      .replace(/Entry/gi, 'ENTRY');
+  };
+
+  const shortLabel = compactText(a.label);
+  const label = a.confidence != null ? `${shortLabel} ${a.confidence}%` : shortLabel;
+  const badgeWidth = Math.max(24, label.length * 6.5 + 10);
+  const badgeHeight = 15;
 
   if (a.shape === 'line' && a.coords?.points?.length >= 2) {
     const [p1, p2] = a.coords.points;
@@ -161,13 +184,29 @@ function Annotation({ a, w, h }) {
     const y1 = p1.y * h;
     const x2 = p2.x * w;
     const y2 = p2.y * h;
+    const badgeX = Math.min(x1, x2) + 4;
+    const badgeY = y1 - 15;
+
     return (
       <g>
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={2} strokeDasharray="6 4" />
-        {a.label && (
-          <text x={Math.min(x1, x2) + 4} y={y1 - 4} fill={color} fontSize={11} fontWeight="600">
-            {label}
-          </text>
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1.5} strokeDasharray="5 3" />
+        {label && (
+          <g>
+            <rect
+              x={badgeX}
+              y={badgeY}
+              width={badgeWidth}
+              height={badgeHeight}
+              rx={3}
+              fill="#090d16"
+              fillOpacity={0.82}
+              stroke={color}
+              strokeWidth={0.8}
+            />
+            <text x={badgeX + 5} y={badgeY + 11} fill={color} fontSize={9.5} fontWeight="700" letterSpacing="0.3px">
+              {label}
+            </text>
+          </g>
         )}
       </g>
     );
@@ -180,6 +219,9 @@ function Annotation({ a, w, h }) {
     const pw = Math.max(2, bw * w);
     const ph = Math.max(2, bh * h);
     const isZone = a.shape === 'zone';
+    const badgeX = px + 4;
+    const badgeY = py + 3;
+
     return (
       <g>
         <rect
@@ -188,15 +230,28 @@ function Annotation({ a, w, h }) {
           width={pw}
           height={ph}
           fill={isZone ? color : 'none'}
-          fillOpacity={isZone ? 0.18 : 0}
+          fillOpacity={isZone ? 0.14 : 0}
           stroke={color}
-          strokeWidth={2}
+          strokeWidth={1.5}
           rx={3}
         />
-        {a.label && (
-          <text x={px + 4} y={py + 13} fill={color} fontSize={11} fontWeight="600">
-            {label}
-          </text>
+        {label && (
+          <g>
+            <rect
+              x={badgeX}
+              y={badgeY}
+              width={badgeWidth}
+              height={badgeHeight}
+              rx={3}
+              fill="#090d16"
+              fillOpacity={0.82}
+              stroke={color}
+              strokeWidth={0.8}
+            />
+            <text x={badgeX + 5} y={badgeY + 11} fill={color} fontSize={9.5} fontWeight="700" letterSpacing="0.3px">
+              {label}
+            </text>
+          </g>
         )}
       </g>
     );

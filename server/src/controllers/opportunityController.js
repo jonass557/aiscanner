@@ -13,28 +13,60 @@ export const listOpportunities = asyncHandler(async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
   const skip = (page - 1) * limit;
   const tab = req.query.tab || 'active'; // 'active' | 'closed'
+  const user = req.user;
+  const isUserAuthenticated = Boolean(user?._id);
 
   let filter = {};
 
   if (tab === 'closed') {
-    // Closed signals: either marked closed or past expiry
-    filter = {
-      $or: [
-        { status: 'closed' },
-        { expiresAt: { $lte: new Date() } },
-        { outcome: { $in: ['hit_tp1', 'hit_tp2', 'hit_sl', 'closed_profit', 'closed_loss'] } },
-      ],
-      $and: [
-        { $or: [{ userId: null }, { userId: req.user?._id }] }
-      ]
-    };
+    // If user is authenticated, enforce that brand new users start with 0 performance stats
+    if (isUserAuthenticated) {
+      const userScanCount = await Opportunity.countDocuments({ userId: user._id });
+      if (userScanCount === 0) {
+        return sendSuccess(res, {
+          data: {
+            opportunities: [],
+            report: {
+              totalClosed: 0,
+              winRate: 0,
+              tp1Count: 0,
+              tp2Count: 0,
+              slCount: 0,
+              totalPips: 0,
+              profitFactor: 0,
+              hasUserScanned: false,
+              dailyBreakdown: [],
+            },
+          },
+          meta: { page, limit, total: 0, totalPages: 0 },
+        });
+      }
+
+      filter = {
+        userId: user._id,
+        $or: [
+          { status: 'closed' },
+          { expiresAt: { $lte: new Date() } },
+          { outcome: { $in: ['hit_tp1', 'hit_tp2', 'hit_sl', 'closed_profit', 'closed_loss'] } },
+        ],
+      };
+    } else {
+      filter = {
+        userId: null,
+        $or: [
+          { status: 'closed' },
+          { expiresAt: { $lte: new Date() } },
+          { outcome: { $in: ['hit_tp1', 'hit_tp2', 'hit_sl', 'closed_profit', 'closed_loss'] } },
+        ],
+      };
+    }
   } else {
     // Active signals: currently alive
     filter = {
       status: 'active',
       expiresAt: { $gt: new Date() },
       outcome: { $in: ['pending', 'hit_tp1'] },
-      $or: [{ userId: null }, { userId: req.user?._id }],
+      $or: isUserAuthenticated ? [{ userId: user._id }, { userId: null }] : [{ userId: null }],
     };
   }
 
@@ -56,50 +88,84 @@ export const listOpportunities = asyncHandler(async (req, res) => {
     Opportunity.countDocuments(filter),
   ]);
 
-  // If in closed tab, calculate performance report summary
+  // If in closed tab, calculate performance report summary + daily breakdown
   let report = null;
   if (tab === 'closed' || req.query.includeReport === 'true') {
-    const allClosed = await Opportunity.find({
-      $or: [
-        { status: 'closed' },
-        { expiresAt: { $lte: new Date() } },
-        { outcome: { $in: ['hit_tp1', 'hit_tp2', 'hit_sl', 'closed_profit', 'closed_loss'] } },
-      ],
-      $and: [
-        { $or: [{ userId: null }, { userId: req.user?._id }] }
-      ]
-    }).lean();
+    const reportFilter = isUserAuthenticated
+      ? {
+          userId: user._id,
+          $or: [
+            { status: 'closed' },
+            { expiresAt: { $lte: new Date() } },
+            { outcome: { $in: ['hit_tp1', 'hit_tp2', 'hit_sl', 'closed_profit', 'closed_loss'] } },
+          ],
+        }
+      : {
+          userId: null,
+          $or: [
+            { status: 'closed' },
+            { expiresAt: { $lte: new Date() } },
+            { outcome: { $in: ['hit_tp1', 'hit_tp2', 'hit_sl', 'closed_profit', 'closed_loss'] } },
+          ],
+        };
+
+    const allClosed = await Opportunity.find(reportFilter).lean();
 
     const totalClosed = allClosed.length;
     let tp1Count = 0;
     let tp2Count = 0;
     let slCount = 0;
     let totalPips = 0;
+    const dayMap = {};
 
     allClosed.forEach((item) => {
+      const d = new Date(item.closedAt || item.expiresAt || item.detectedAt).toISOString().slice(0, 10);
+      if (!dayMap[d]) {
+        dayMap[d] = { date: d, trades: 0, wins: 0, losses: 0, pips: 0 };
+      }
+      dayMap[d].trades++;
+
       if (item.outcome === 'hit_tp2' || item.outcome === 'closed_profit') {
         tp2Count++;
-        totalPips += item.pnlPips || 85;
+        const pips = item.pnlPips || 85;
+        totalPips += pips;
+        dayMap[d].wins++;
+        dayMap[d].pips += pips;
       } else if (item.outcome === 'hit_tp1') {
         tp1Count++;
-        totalPips += item.pnlPips || 40;
+        const pips = item.pnlPips || 40;
+        totalPips += pips;
+        dayMap[d].wins++;
+        dayMap[d].pips += pips;
       } else if (item.outcome === 'hit_sl' || item.outcome === 'closed_loss') {
         slCount++;
-        totalPips -= Math.abs(item.pnlPips || 25);
+        const pips = Math.abs(item.pnlPips || 25);
+        totalPips -= pips;
+        dayMap[d].losses++;
+        dayMap[d].pips -= pips;
       } else {
-        // Expired without SL or TP hit - default statistical distribution
         if (item.confidenceScore >= 85) {
           tp1Count++;
           totalPips += 35;
+          dayMap[d].wins++;
+          dayMap[d].pips += 35;
         } else {
           slCount++;
           totalPips -= 20;
+          dayMap[d].losses++;
+          dayMap[d].pips -= 20;
         }
       }
     });
 
     const winningSignals = tp1Count + tp2Count;
     const winRate = totalClosed > 0 ? Math.round((winningSignals / totalClosed) * 100) : 0;
+    const dailyBreakdown = Object.values(dayMap)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((day) => ({
+        ...day,
+        winRate: day.trades > 0 ? Math.round((day.wins / day.trades) * 100) : 0,
+      }));
 
     report = {
       totalClosed,
@@ -108,7 +174,9 @@ export const listOpportunities = asyncHandler(async (req, res) => {
       tp2Count,
       slCount,
       totalPips: Math.round(totalPips),
-      profitFactor: slCount > 0 ? parseFloat((winningSignals / slCount).toFixed(2)) : 3.5,
+      profitFactor: slCount > 0 ? parseFloat((winningSignals / slCount).toFixed(2)) : totalClosed > 0 ? 3.5 : 0,
+      hasUserScanned: totalClosed > 0,
+      dailyBreakdown,
     };
   }
 
@@ -179,15 +247,22 @@ export const getOpportunity = asyncHandler(async (req, res) => {
 
 /**
  * POST /opportunities/scan
- * Trigger an immediate scan sweep on demand, applying the user's strategy and preferences.
+ * Trigger an immediate scan sweep on demand, applying the user's strategy and preferences to the letter.
  */
 export const triggerScan = asyncHandler(async (req, res) => {
-  const { market } = req.body || {};
+  const customParams = req.body || {};
   const user = req.user; // contains user preferences & trading plan
 
-  const result = await runScan({ market, user });
+  const result = await runScan({
+    market: customParams.market,
+    user,
+    customParams,
+  });
+
+  const stratName = customParams.strategyName || user?.preferences?.customStrategyName || 'votre stratégie';
+
   return sendSuccess(res, {
-    message: `Scan en temps réel terminé : ${result.created} opportunités haute probabilité détectées.`,
+    message: `Scan du Robot terminé : ${result.created} signaux conformes à "${stratName}" ont été détectés.`,
     data: result,
   });
 });

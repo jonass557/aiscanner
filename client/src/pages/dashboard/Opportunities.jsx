@@ -9,6 +9,7 @@ import {
   BookMarked,
   Mail,
   CheckCircle,
+  CheckCircle2,
   FileText,
   Sliders,
   Bell,
@@ -19,6 +20,10 @@ import {
   Layers,
   Crosshair,
   Calculator,
+  Calendar,
+  Bot,
+  Target,
+  Edit3,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -26,7 +31,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import OpportunityCard from '../../components/analysis/OpportunityCard.jsx';
 import LiveChart from '../../components/analysis/LiveChart.jsx';
-import { opportunityApi, userApi } from '../../services/endpoints.js';
+import { opportunityApi, userApi, strategyApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatPrice, marketLabel } from '../../utils/format.js';
@@ -69,7 +74,13 @@ export default function Opportunities() {
 
   // Strategy & Trading Plan modal / state
   const [strategyModalOpen, setStrategyModalOpen] = useState(false);
+  const [adminStrategies, setAdminStrategies] = useState([]);
   const [strategyType, setStrategyType] = useState('smc');
+  const [customStrategyName, setCustomStrategyName] = useState('');
+  const [strategyMarket, setStrategyMarket] = useState('');
+  const [strategyTimeframe, setStrategyTimeframe] = useState('H1');
+  const [strategySession, setStrategySession] = useState('Toutes');
+  const [minRiskReward, setMinRiskReward] = useState('1:2.5');
   const [customStrategyText, setCustomStrategyText] = useState('');
   const [customTradingPlanText, setCustomTradingPlanText] = useState('');
   const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(true);
@@ -99,11 +110,16 @@ export default function Opportunities() {
     [filters, activeTab]
   );
 
-  // Load preferences & meta
+  // Load preferences, meta, & admin strategies
   useEffect(() => {
     opportunityApi
       .meta()
       .then(({ data }) => setMeta(data.data))
+      .catch(() => {});
+
+    strategyApi
+      .list()
+      .then(({ data }) => setAdminStrategies(data.data.strategies || []))
       .catch(() => {});
 
     userApi
@@ -111,8 +127,13 @@ export default function Opportunities() {
       .then(({ data }) => {
         const p = data.data.preferences || {};
         setStrategyType(p.favoriteStrategy || 'smc');
+        setCustomStrategyName(p.customStrategyName || '');
         setCustomStrategyText(p.customStrategy || '');
         setCustomTradingPlanText(p.customTradingPlan || '');
+        setStrategyMarket(p.favoriteMarkets?.[0] || '');
+        setStrategyTimeframe(p.favoriteTimeframes?.[0] || 'H1');
+        setStrategySession(p.favoriteSession || 'Toutes');
+        setMinRiskReward(p.minRiskReward || '1:2.5');
         setEmailAlertsEnabled(p.opportunityEmailAlerts !== false);
         setMinEmailConfidence(p.minOpportunityConfidence || 80);
       })
@@ -126,10 +147,22 @@ export default function Opportunities() {
     return () => clearInterval(id);
   }, [load]);
 
-  const runScan = async () => {
+  const runScan = async (overrideParams = null) => {
     setScanning(true);
     try {
-      const { data } = await opportunityApi.scan({ market: filters.market || undefined });
+      const scanPayload = {
+        market: overrideParams?.market || strategyMarket || filters.market || undefined,
+        customParams: {
+          strategyName: overrideParams?.strategyName || customStrategyName || strategyType,
+          strategyRules: overrideParams?.strategyRules !== undefined ? overrideParams.strategyRules : customStrategyText,
+          customTradingPlan: overrideParams?.customTradingPlan !== undefined ? overrideParams.customTradingPlan : customTradingPlanText,
+          market: overrideParams?.market || strategyMarket || filters.market || undefined,
+          timeframe: overrideParams?.timeframe || strategyTimeframe || filters.timeframe || undefined,
+          session: overrideParams?.session || strategySession || undefined,
+          minRiskReward: overrideParams?.minRiskReward || minRiskReward || undefined,
+        },
+      };
+      const { data } = await opportunityApi.scan(scanPayload);
       toast.success(
         data.message || (isEn ? 'Real-time scan completed!' : 'Scan en temps réel terminé !')
       );
@@ -141,13 +174,41 @@ export default function Opportunities() {
     }
   };
 
+  const handleSelectStrategyOption = (val) => {
+    setStrategyType(val);
+    const foundAdmin = adminStrategies.find((s) => s._id === val || s.key === val);
+    if (foundAdmin) {
+      setCustomStrategyName(foundAdmin.name);
+      setCustomStrategyText((foundAdmin.rules || []).join('\n'));
+      if (foundAdmin.targetRiskReward) {
+        setMinRiskReward(`1:${foundAdmin.targetRiskReward}`);
+      }
+    } else if (val === 'smc') {
+      setCustomStrategyName('Smart Money Concepts (SMC)');
+      setCustomStrategyText('Validation de la tendance institutionnelle\nZone Order Block / FVG non mitigée\nBalayage de liquidité (Sweep) confirmé\nConfirmation bougie de rejet en session clé');
+    } else if (val === 'ict') {
+      setCustomStrategyName('Inner Circle Trader (ICT)');
+      setCustomStrategyText('Prise de liquidité BSL/SSL en Killzone\nChangement de structure de marché (MSS/CHoCH)\nCréation d\'un Fair Value Gap (FVG) évident\nEntrée OTE (Optimal Trade Entry 62%-79%)');
+    } else if (val === 'price-action') {
+      setCustomStrategyName('Price Action Institutionnel');
+      setCustomStrategyText('Rejet net sur niveau Support/Résistance majeur\nBougie de signal (Pinbar ou Engulfing)\nRatio Risque/Rendement minimum 1:2.5');
+    } else if (val === 'custom') {
+      if (!customStrategyName) setCustomStrategyName('Ma Stratégie Personnalisée');
+    }
+  };
+
   const handleSaveStrategyPlan = async () => {
     setSavingPlan(true);
     try {
       await userApi.updatePreferences({
         favoriteStrategy: strategyType,
+        customStrategyName,
         customStrategy: customStrategyText,
         customTradingPlan: customTradingPlanText,
+        favoriteMarkets: strategyMarket ? [strategyMarket] : undefined,
+        favoriteTimeframes: strategyTimeframe ? [strategyTimeframe] : undefined,
+        favoriteSession: strategySession,
+        minRiskReward,
         opportunityEmailAlerts: emailAlertsEnabled,
         minOpportunityConfidence: Number(minEmailConfidence),
       });
@@ -157,7 +218,15 @@ export default function Opportunities() {
           : 'Stratégie et Plan de Trading enregistrés avec succès !'
       );
       setStrategyModalOpen(false);
-      runScan();
+      await runScan({
+        strategyName: customStrategyName || strategyType,
+        strategyRules: customStrategyText,
+        customTradingPlan: customTradingPlanText,
+        market: strategyMarket,
+        timeframe: strategyTimeframe,
+        session: strategySession,
+        minRiskReward,
+      });
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -229,13 +298,77 @@ export default function Opportunities() {
           {/* Scan Now */}
           <Button
             variant="primary"
-            onClick={runScan}
+            onClick={() => runScan()}
             loading={scanning}
             className="flex items-center gap-1.5 text-xs"
           >
             <Sparkles className="h-4 w-4" />
             {t('scanNow')}
           </Button>
+        </div>
+      </div>
+
+      {/* Active Robot Strategy Banner */}
+      <div className="rounded-2xl border border-brand-500/30 bg-gradient-to-r from-brand-950/40 via-gray-900 to-accent-950/30 p-4 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-600 text-white shadow-md">
+              <Bot className="h-5 w-5" />
+            </span>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-brand-400">
+                  {isEn ? 'Robot Active Strategy' : 'Stratégie Active du Robot'} :
+                </span>
+                <span className="rounded-md bg-brand-500/20 px-2 py-0.5 text-xs font-bold text-brand-300 border border-brand-500/30">
+                  {customStrategyName ||
+                    adminStrategies.find((s) => s._id === strategyType || s.key === strategyType)?.name ||
+                    strategyType.toUpperCase()}
+                </span>
+                {strategyMarket && (
+                  <span className="rounded-md bg-purple-500/20 px-2 py-0.5 text-[11px] font-bold text-purple-300 border border-purple-500/30">
+                    {marketLabel(strategyMarket)}
+                  </span>
+                )}
+                <span className="rounded-md bg-gray-800 px-2 py-0.5 text-[11px] font-bold text-gray-300 border border-gray-700">
+                  TF: {strategyTimeframe}
+                </span>
+                <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-bold text-amber-300 border border-amber-500/30">
+                  Session: {strategySession}
+                </span>
+                <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300 border border-emerald-500/30">
+                  R:R ≥ {minRiskReward}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-gray-300 line-clamp-1 max-w-3xl">
+                {customStrategyText ||
+                  customTradingPlanText ||
+                  (isEn
+                    ? 'Institutional Smart Money setups strictly applied to the letter according to your rules.'
+                    : 'Setups institutionnels appliqués à la lettre selon vos règles et confluences.')}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="secondary"
+              onClick={() => setStrategyModalOpen(true)}
+              className="text-xs border-brand-500/40 text-brand-400 hover:bg-brand-500/10"
+            >
+              <Sliders className="h-3.5 w-3.5 mr-1" />
+              {isEn ? 'Configure Strategy' : 'Modifier ma Stratégie'}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => runScan()}
+              loading={scanning}
+              className="text-xs"
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-1" />
+              {isEn ? 'Run Robot Scan' : 'Lancer le Robot'}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -268,82 +401,150 @@ export default function Opportunities() {
 
       {/* Closed Tab: Performance KPI Report */}
       {activeTab === 'closed' && report && (
-        <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-6 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:to-gray-950">
-          <div className="flex items-center justify-between border-b border-gray-200 pb-4 dark:border-gray-800">
-            <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <Award className="h-5 w-5 text-amber-500" />
-                {t('reportTitle')}
-              </h3>
-              <p className="mt-0.5 text-xs text-gray-500">
-                {isEn
-                  ? 'Verifiable statistical tracking of past signals, Stop Losses and Take Profits hit.'
-                  : 'Suivi statistique vérifiable des signaux passés, des Stop Loss et des Take Profits atteints.'}
-              </p>
-            </div>
-            <span className="rounded-xl bg-brand-500/10 px-3 py-1 font-mono text-xs font-bold text-brand-600 dark:text-brand-300">
-              {report.totalClosed} {isEn ? 'Signals Evaluated' : 'Signaux Évalués'}
-            </span>
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            {/* Winrate */}
-            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
-              <span className="text-[10px] font-bold uppercase text-gray-400">{t('winrate')}</span>
-              <p className="mt-1 font-mono text-2xl font-black text-brand-600 dark:text-brand-400">
-                {report.winRate}%
-              </p>
-            </div>
-
-            {/* Total Pips */}
-            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
-              <span className="text-[10px] font-bold uppercase text-gray-400">{t('pipsWon')}</span>
-              <p
-                className={`mt-1 font-mono text-2xl font-black ${
-                  report.totalPips >= 0 ? 'text-emerald-500' : 'text-rose-500'
-                }`}
-              >
-                {report.totalPips >= 0 ? `+${report.totalPips}` : report.totalPips} pips
-              </p>
-            </div>
-
-            {/* TP1 Count */}
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-center">
-              <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">
-                {t('tp1Hit')}
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-6 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:to-gray-950">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-4 dark:border-gray-800">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Award className="h-5 w-5 text-amber-500" />
+                  {t('reportTitle')}
+                </h3>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {isEn
+                    ? 'Verifiable statistical tracking of past signals, Stop Losses and Take Profits hit.'
+                    : 'Suivi statistique vérifiable des signaux passés, des Stop Loss et des Take Profits atteints.'}
+                </p>
+              </div>
+              <span className="rounded-xl bg-brand-500/10 px-3 py-1 font-mono text-xs font-bold text-brand-600 dark:text-brand-300">
+                {report.totalClosed} {isEn ? 'Signals Evaluated' : 'Signaux Évalués'}
               </span>
-              <p className="mt-1 font-mono text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                {report.tp1Count}
-              </p>
             </div>
 
-            {/* TP2 Count */}
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-center">
-              <span className="text-[10px] font-bold uppercase text-emerald-500">
-                {t('tp2Hit')}
-              </span>
-              <p className="mt-1 font-mono text-2xl font-black text-emerald-500">
-                {report.tp2Count}
-              </p>
+            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              {/* Winrate */}
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
+                <span className="text-[10px] font-bold uppercase text-gray-400">{t('winrate')}</span>
+                <p className="mt-1 font-mono text-2xl font-black text-brand-600 dark:text-brand-400">
+                  {report.winRate}%
+                </p>
+              </div>
+
+              {/* Total Pips */}
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
+                <span className="text-[10px] font-bold uppercase text-gray-400">{t('pipsWon')}</span>
+                <p
+                  className={`mt-1 font-mono text-2xl font-black ${
+                    report.totalPips >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                  }`}
+                >
+                  {report.totalPips >= 0 ? `+${report.totalPips}` : report.totalPips} pips
+                </p>
+              </div>
+
+              {/* TP1 Count */}
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-center">
+                <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">
+                  {t('tp1Hit')}
+                </span>
+                <p className="mt-1 font-mono text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  {report.tp1Count}
+                </p>
+              </div>
+
+              {/* TP2 Count */}
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-center">
+                <span className="text-[10px] font-bold uppercase text-emerald-500">
+                  {t('tp2Hit')}
+                </span>
+                <p className="mt-1 font-mono text-2xl font-black text-emerald-500">
+                  {report.tp2Count}
+                </p>
+              </div>
+
+              {/* SL Count */}
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 text-center">
+                <span className="text-[10px] font-bold uppercase text-rose-500">
+                  {t('slHit')}
+                </span>
+                <p className="mt-1 font-mono text-2xl font-black text-rose-500">
+                  {report.slCount}
+                </p>
+              </div>
+
+              {/* Profit Factor */}
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
+                <span className="text-[10px] font-bold uppercase text-gray-400">Profit Factor</span>
+                <p className="mt-1 font-mono text-2xl font-black text-cyan-500">
+                  {report.profitFactor}
+                </p>
+              </div>
             </div>
 
-            {/* SL Count */}
-            <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 text-center">
-              <span className="text-[10px] font-bold uppercase text-rose-500">
-                {t('slHit')}
-              </span>
-              <p className="mt-1 font-mono text-2xl font-black text-rose-500">
-                {report.slCount}
-              </p>
-            </div>
+            {/* Zero State Onboarding Notice for New Users */}
+            {report.totalClosed === 0 && (
+              <div className="mt-5 rounded-xl border border-dashed border-gray-300 dark:border-gray-800 p-6 text-center bg-gray-50/50 dark:bg-gray-900/40">
+                <Sparkles className="mx-auto h-8 w-8 text-brand-500 mb-2" />
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                  {isEn ? 'Your Performance Results Start at 0' : 'Vos Résultats & Rapports Débutent à 0'}
+                </h4>
+                <p className="mx-auto mt-1 max-w-lg text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  {isEn
+                    ? 'Configure your strategy preferences or enter your exact rules above, then run the Robot scan. Your personal stats and daily performance tracking will begin counting as trades execute.'
+                    : 'Configurez vos préférences ou saisissez vos règles ci-dessus, puis lancez le Robot de Trading. Vos statistiques personnelles et vos rapports de performance quotidiens commenceront à se comptabiliser chaque jour.'}
+                </p>
+                <Button
+                  variant="primary"
+                  onClick={() => setStrategyModalOpen(true)}
+                  className="mt-3 text-xs"
+                >
+                  <BookMarked className="h-3.5 w-3.5 mr-1.5" />
+                  {isEn ? 'Set My Strategy & Run Scan' : 'Configurer ma Stratégie & Lancer le Robot'}
+                </Button>
+              </div>
+            )}
 
-            {/* Profit Factor */}
-            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-gray-900">
-              <span className="text-[10px] font-bold uppercase text-gray-400">Profit Factor</span>
-              <p className="mt-1 font-mono text-2xl font-black text-cyan-500">
-                {report.profitFactor}
-              </p>
-            </div>
+            {/* Daily Performance Breakdown Table */}
+            {report.totalClosed > 0 && report.dailyBreakdown?.length > 0 && (
+              <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                <div className="border-b border-gray-200 dark:border-gray-800 px-4 py-3 bg-gray-50/80 dark:bg-gray-800/50 flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-brand-500" />
+                    {isEn ? 'Daily Performance Breakdown' : 'Rapport Quotidien des Performances (Jour par Jour)'}
+                  </h4>
+                  <span className="text-[11px] text-gray-500">
+                    {report.dailyBreakdown.length} {isEn ? 'Days Tracked' : 'Jours Enregistrés'}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-gray-100/70 dark:bg-gray-800/40 text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
+                      <tr>
+                        <th className="px-4 py-2.5">Date</th>
+                        <th className="px-4 py-2.5 text-center">{isEn ? 'Closed Trades' : 'Trades Clôturés'}</th>
+                        <th className="px-4 py-2.5 text-center">Winrate</th>
+                        <th className="px-4 py-2.5 text-center">Pips</th>
+                        <th className="px-4 py-2.5 text-center">TP1 / TP2</th>
+                        <th className="px-4 py-2.5 text-center">Stop Loss</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                      {report.dailyBreakdown.map((row) => (
+                        <tr key={row.date} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
+                          <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{row.date}</td>
+                          <td className="px-4 py-3 text-center">{row.closed}</td>
+                          <td className="px-4 py-3 text-center font-bold text-brand-600 dark:text-brand-400">{row.winRate}%</td>
+                          <td className={`px-4 py-3 text-center font-bold ${row.pips >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {row.pips >= 0 ? `+${row.pips}` : row.pips}
+                          </td>
+                          <td className="px-4 py-3 text-center text-emerald-500">{row.tp1} / {row.tp2}</td>
+                          <td className="px-4 py-3 text-center text-rose-500">{row.sl}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -440,62 +641,170 @@ export default function Opportunities() {
         <Modal
           open={strategyModalOpen}
           onClose={() => setStrategyModalOpen(false)}
-          title={isEn ? 'My Trading Strategy & Plan' : 'Ma Stratégie & Mon Plan de Trading'}
+          size="lg"
+          title={isEn ? 'Configure Robot Strategy & Trading Plan' : 'Configurer la Stratégie & le Plan de Trading du Robot'}
         >
           <div className="space-y-4">
             <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
               {isEn
-                ? 'Configure your personal strategy. The Opportunity Scanner will scan live markets according to your exact rules.'
-                : 'Configurez votre stratégie personnelle. L\'Opportunity Scanner analysera les marchés selon vos règles exactes.'}
+                ? 'Input all details of your strategy. The high-probability trading robot will apply your rules strictly to the letter to generate compliant market setups.'
+                : 'Saisissez tous les détails de votre stratégie. Le robot de trading haute probabilité appliquera vos règles à la lettre pour ne détecter que les signaux strictement conformes.'}
             </p>
 
+            {/* Strategy Model / Paradigm Selector */}
             <div>
-              <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                {t('strategy')}
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                <span>{isEn ? 'Strategy Model / Paradigm' : 'Modèle ou Paradigme de Stratégie'}</span>
+                <span className="text-[11px] font-normal text-brand-600 dark:text-brand-400">
+                  {adminStrategies.length} {isEn ? 'admin strategies available' : 'stratégies administrées disponibles'}
+                </span>
               </label>
               <select
                 value={strategyType}
-                onChange={(e) => setStrategyType(e.target.value)}
+                onChange={(e) => handleSelectStrategyOption(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-800"
               >
-                <option value="smc">Smart Money Concepts (SMC - Par Défaut)</option>
-                <option value="ict">Inner Circle Trader (ICT)</option>
-                <option value="price-action">Price Action Institutionnel</option>
-                <option value="custom">Ma Stratégie Personnalisée</option>
+                <optgroup label={isEn ? 'Standard Paradigms' : 'Paradigmes Standards'}>
+                  <option value="smc">Smart Money Concepts (SMC - Par Défaut)</option>
+                  <option value="ict">Inner Circle Trader (ICT Precision)</option>
+                  <option value="price-action">Price Action Institutionnel & S/R</option>
+                </optgroup>
+
+                {adminStrategies.length > 0 && (
+                  <optgroup label={isEn ? 'Admin & Platform Strategies' : 'Stratégies Enregistrées Plateforme & Admin'}>
+                    {adminStrategies.map((strat) => (
+                      <option key={strat._id || strat.key} value={strat._id || strat.key}>
+                        {strat.name} ({strat.category?.toUpperCase() || 'SMC'} · Winrate ~{strat.winRateEstimate || 85}%)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                <optgroup label={isEn ? 'Custom' : 'Sur Mesure'}>
+                  <option value="custom">✍️ {isEn ? 'My Custom Strategy' : 'Ma Stratégie 100% Personnalisée'}</option>
+                </optgroup>
               </select>
             </div>
 
-            {strategyType === 'custom' && (
+            {/* Strategy Name & Category Grid */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                  {isEn ? 'Custom Strategy Description' : 'Description de votre Stratégie'}
+                  {isEn ? 'Strategy Name' : 'Nom de votre Stratégie'}
                 </label>
-                <textarea
-                  rows={4}
-                  value={customStrategyText}
-                  onChange={(e) => setCustomStrategyText(e.target.value)}
-                  placeholder={
-                    isEn
-                      ? 'e.g., Scan for M15 rejections on 1H Order Blocks after Asian session liquidity sweep...'
-                      : 'ex: Chercher un rejet M15 sur Order Block 1H après balayage de la liquidité asiatique...'
-                  }
-                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white p-3 text-xs dark:border-gray-700 dark:bg-gray-800"
+                <input
+                  type="text"
+                  value={customStrategyName}
+                  onChange={(e) => setCustomStrategyName(e.target.value)}
+                  placeholder="ex: Scalping London Killzone SMC"
+                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-800"
                 />
               </div>
-            )}
 
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  {isEn ? 'Target Asset Class' : 'Catégorie de Marché Ciblée'}
+                </label>
+                <select
+                  value={strategyMarket}
+                  onChange={(e) => setStrategyMarket(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <option value="">{isEn ? 'All Markets (Multi-Asset)' : 'Tous les Marchés (Multi-Actifs)'}</option>
+                  <option value="forex">Forex (Majeures & Mineures)</option>
+                  <option value="crypto">Cryptomonnaies (BTC, ETH, Altcoins)</option>
+                  <option value="indices">Indices Boursiers (NAS100, US30, GER40)</option>
+                  <option value="commodities">Métaux & Matières Premières (XAU, XAG, USOIL)</option>
+                  <option value="synthetic">Indices Synthétiques (Volatility, Boom, Crash)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Timeframe, Session, & Min R:R Grid */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  Timeframe
+                </label>
+                <select
+                  value={strategyTimeframe}
+                  onChange={(e) => setStrategyTimeframe(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <option value="M5">M5 (Scalping Rapide)</option>
+                  <option value="M15">M15 (Day Trading Court Terme)</option>
+                  <option value="H1">H1 (Day Trading / Swing Standard)</option>
+                  <option value="H4">H4 (Swing Institutionnel)</option>
+                  <option value="D1">D1 (Position / Moyen Terme)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  {isEn ? 'Trading Session' : 'Session de Trading'}
+                </label>
+                <select
+                  value={strategySession}
+                  onChange={(e) => setStrategySession(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <option value="Toutes">{isEn ? 'All Sessions (24h/24)' : 'Toutes les Sessions'}</option>
+                  <option value="Londres">Session Londres (08h00 - 16h00 UTC)</option>
+                  <option value="New York">Session New York (13h00 - 21h00 UTC)</option>
+                  <option value="Asie">Session Asiatique (00h00 - 08h00 UTC)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  {isEn ? 'Min. Risk/Reward (R:R)' : 'R:R Minimum'}
+                </label>
+                <select
+                  value={minRiskReward}
+                  onChange={(e) => setMinRiskReward(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <option value="1:2.0">1:2.0 (Standard)</option>
+                  <option value="1:2.5">1:2.5 (Recommandé)</option>
+                  <option value="1:3.0">1:3.0 (Haute Rentabilité)</option>
+                  <option value="1:4.0">1:4.0 (Sniper Institutionnel)</option>
+                  <option value="1:5.0">1:5.0 (Ultra High R:R)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Detailed Strategy Rules */}
             <div>
-              <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                {isEn ? 'Personal Trading Plan (Rules & Constraints)' : 'Plan de Trading Personnel (Règles & Contraintes)'}
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                <span>{isEn ? 'Detailed Strategy Rules & Confluences (Applied strictly by Robot)' : 'Règles Détaillées & Confluences de la Stratégie (Appliquées à la lettre)'}</span>
+                <span className="text-[10px] text-gray-400">1 règle par ligne</span>
               </label>
               <textarea
-                rows={3}
+                rows={4}
+                value={customStrategyText}
+                onChange={(e) => setCustomStrategyText(e.target.value)}
+                placeholder={
+                  isEn
+                    ? 'Validation of higher-timeframe trend\nUnmitigated Order Block / FVG\nLiquidity sweep (BSL/SSL)\nCandlestick rejection confirmation\nEntry during active killzone'
+                    : 'Validation de la tendance sur timeframe supérieur\nZone Order Block / Fair Value Gap non mitigée\nPrise de liquidité (Sweep) préalable\nBougie de confirmation de rejet\nExécution pendant la session active'
+                }
+                className="mt-1 w-full rounded-xl border border-gray-300 bg-white p-3 text-xs leading-relaxed dark:border-gray-700 dark:bg-gray-800 font-mono"
+              />
+            </div>
+
+            {/* Personal Trading Plan */}
+            <div>
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                {isEn ? 'Personal Trading Plan (Money Management & Discipline)' : 'Plan de Trading Personnel (Gestion du Risque & Discipline)'}
+              </label>
+              <textarea
+                rows={2}
                 value={customTradingPlanText}
                 onChange={(e) => setCustomTradingPlanText(e.target.value)}
                 placeholder={
                   isEn
-                    ? 'e.g., Maximum 1% risk per trade, Minimum 1:2.5 R:R, Only trade during London and NY sessions...'
-                    : 'ex: Risque max 1% par trade, Ratio R:R minimum 1:2.5, Ne trader que pendant les sessions Londres et New York...'
+                    ? 'Maximum 1% risk per trade, Maximum 2 trades per day, Move stop loss to breakeven at TP1...'
+                    : 'Risque max 1% par trade, Maximum 2 trades par jour, Déplacement du SL à Breakeven après atteinte de TP1...'
                 }
                 className="mt-1 w-full rounded-xl border border-gray-300 bg-white p-3 text-xs dark:border-gray-700 dark:bg-gray-800"
               />
@@ -520,16 +829,11 @@ export default function Opportunities() {
               <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                 {isEn
                   ? 'Receive detected opportunities straight into your inbox in real time.'
-                  : 'Recevez directement les opportunités détectées dans votre boîte mail dès leur apparition en temps réel.'}
-                <span className="block mt-0.5 text-amber-600 dark:text-amber-400">
-                  {isEn
-                    ? '⚠️ Alerts automatically stop when your subscription expires.'
-                    : '⚠️ Les alertes s\'arrêtent automatiquement dès que votre abonnement arrive à expiration.'}
-                </span>
+                  : 'Recevez directement les opportunités conformes à votre stratégie dans votre boîte mail.'}
               </p>
 
               {emailAlertsEnabled && (
-                <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
                   <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">
                     {isEn ? 'Minimum Confidence Threshold:' : 'Seuil de Probabilité pour Email :'}
                   </span>
@@ -555,7 +859,8 @@ export default function Opportunities() {
                 loading={savingPlan}
                 className="bg-brand-600 hover:bg-brand-500 text-white"
               >
-                {t('save')} &amp; {t('scanNow')}
+                <Sparkles className="h-4 w-4 mr-1.5" />
+                {isEn ? 'Save Strategy & Scan Robot' : 'Enregistrer ma Stratégie & Lancer le Robot'}
               </Button>
             </div>
           </div>

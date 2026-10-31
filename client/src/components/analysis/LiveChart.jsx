@@ -95,12 +95,23 @@ export default function LiveChart({
   const [isRealFeed, setIsRealFeed] = useState(false);
   const [feedSource, setFeedSource] = useState('live');
   const [autoTrace, setAutoTrace] = useState(true);
+  const [labelMode, setLabelMode] = useState('clean'); // 'clean' | 'minimal' | 'full'
   const [zoneBoxes, setZoneBoxes] = useState({ supply: null, demand: null });
 
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const linesRef = useRef([]);
+
+  // Helper for de-cluttering chart labels without removing them
+  const getLineTitle = useCallback(
+    (compactTitle, fullTitle) => {
+      if (labelMode === 'minimal') return '';
+      if (labelMode === 'clean') return compactTitle;
+      return fullTitle;
+    },
+    [labelMode]
+  );
 
   // Fetch or update candles
   const fetchMarketCandles = useCallback(async () => {
@@ -270,65 +281,65 @@ export default function LiveChart({
     clearChartLines();
 
     if (autoTrace && strategicOverlay) {
-      // 1. Supply Zone
+      // 1. Supply Zone (clean top tag, leave inner zone clear)
       if (strategicOverlay.supplyZone) {
         const top = seriesRef.current.createPriceLine({
           price: strategicOverlay.supplyZone.top,
           color: '#ef4444',
-          lineWidth: 2,
+          lineWidth: 1.5,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: `SUPPLY OB (${strategicOverlay.supplyZone.top})`,
+          title: getLineTitle('SUPPLY OB', `SUPPLY OB (${strategicOverlay.supplyZone.top})`),
         });
         const btm = seriesRef.current.createPriceLine({
           price: strategicOverlay.supplyZone.bottom,
-          color: 'rgba(239, 68, 68, 0.7)',
-          lineWidth: 1.5,
+          color: 'rgba(239, 68, 68, 0.6)',
+          lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: `SUPPLY OB BOTTOM`,
+          title: getLineTitle('', 'SUPPLY OB BOTTOM'),
         });
         linesRef.current.push(top, btm);
       }
 
-      // 2. Demand Zone
+      // 2. Demand Zone (leave inner zone clear, clean bottom tag)
       if (strategicOverlay.demandZone) {
         const top = seriesRef.current.createPriceLine({
           price: strategicOverlay.demandZone.top,
-          color: 'rgba(16, 185, 129, 0.7)',
-          lineWidth: 1.5,
+          color: 'rgba(16, 185, 129, 0.6)',
+          lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: `DEMAND OB TOP`,
+          title: getLineTitle('', 'DEMAND OB TOP'),
         });
         const btm = seriesRef.current.createPriceLine({
           price: strategicOverlay.demandZone.bottom,
           color: '#10b981',
-          lineWidth: 2,
+          lineWidth: 1.5,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: `DEMAND OB (${strategicOverlay.demandZone.bottom})`,
+          title: getLineTitle('DEMAND OB', `DEMAND OB (${strategicOverlay.demandZone.bottom})`),
         });
         linesRef.current.push(top, btm);
       }
 
-      // 3. Liquidity Pools
+      // 3. Liquidity Pools (compact BSL / SSL markers)
       if (Array.isArray(strategicOverlay.liquidityPools)) {
         strategicOverlay.liquidityPools.forEach((liq) => {
           const isBsl = liq.type.includes('BSL') || liq.type.includes('EQH') || liq.type.includes('HIGH');
           const line = seriesRef.current.createPriceLine({
             price: liq.price,
             color: isBsl ? '#38bdf8' : '#f59e0b',
-            lineWidth: 2,
+            lineWidth: 1.5,
             lineStyle: LineStyle.Dotted,
             axisLabelVisible: true,
-            title: `LIQUIDITÉ ${liq.type} (${liq.price})`,
+            title: getLineTitle(isBsl ? 'BSL' : 'SSL', `LIQUIDITÉ ${liq.type}`),
           });
           linesRef.current.push(line);
         });
       }
 
-      // 4. Trade Plan Lines (Entry, SL, TP1, TP2)
+      // 4. Trade Plan Lines (Clean badges: ▲ ENTRY / ▼ ENTRY, SL, TP1, TP2)
       if (strategicOverlay.entry) {
         const lineEntry = seriesRef.current.createPriceLine({
           price: strategicOverlay.entry,
@@ -336,7 +347,10 @@ export default function LiveChart({
           lineWidth: 2,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: `ENTRÉE ${strategicOverlay.direction} (${strategicOverlay.entry})`,
+          title: getLineTitle(
+            strategicOverlay.direction === 'BUY' ? '▲ ENTRY' : '▼ ENTRY',
+            `ENTRÉE ${strategicOverlay.direction} (${strategicOverlay.entry})`
+          ),
         });
         linesRef.current.push(lineEntry);
       }
@@ -345,10 +359,10 @@ export default function LiveChart({
         const lineSl = seriesRef.current.createPriceLine({
           price: strategicOverlay.sl,
           color: '#dc2626',
-          lineWidth: 2,
+          lineWidth: 1.5,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: `SL (${strategicOverlay.sl})`,
+          title: getLineTitle('SL', `SL (${strategicOverlay.sl})`),
         });
         linesRef.current.push(lineSl);
       }
@@ -357,10 +371,10 @@ export default function LiveChart({
         const lineTp1 = seriesRef.current.createPriceLine({
           price: strategicOverlay.tp1,
           color: '#16a34a',
-          lineWidth: 2,
+          lineWidth: 1.5,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: `TP1 (${strategicOverlay.tp1})`,
+          title: getLineTitle('TP1', `TP1 (${strategicOverlay.tp1})`),
         });
         linesRef.current.push(lineTp1);
       }
@@ -369,10 +383,10 @@ export default function LiveChart({
         const lineTp2 = seriesRef.current.createPriceLine({
           price: strategicOverlay.tp2,
           color: '#059669',
-          lineWidth: 2,
+          lineWidth: 1.5,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: `TP2 (${strategicOverlay.tp2})`,
+          title: getLineTitle('TP2', `TP2 (${strategicOverlay.tp2})`),
         });
         linesRef.current.push(lineTp2);
       }
@@ -398,7 +412,7 @@ export default function LiveChart({
         // ignore
       }
     }
-  }, [candles, strategicOverlay, autoTrace]);
+  }, [candles, strategicOverlay, autoTrace, labelMode, getLineTitle]);
 
   const lastBar = candles[candles.length - 1];
 
@@ -464,6 +478,23 @@ export default function LiveChart({
           ) : (
             <Badge tone="yellow">Flux Continu</Badge>
           )}
+
+          {/* Label Density Control: Clean / Minimalist / Full */}
+          <button
+            type="button"
+            onClick={() => setLabelMode((m) => (m === 'clean' ? 'minimal' : m === 'minimal' ? 'full' : 'clean'))}
+            title="Ajuster l'affichage des écrits sur le graphique pour une clarté optimale"
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+          >
+            <Layers className="h-3.5 w-3.5 text-brand-500" />
+            <span>
+              {labelMode === 'clean'
+                ? 'Écrits Épurés (Clarté)'
+                : labelMode === 'minimal'
+                ? 'Sans Texte (Axe seul)'
+                : 'Texte Complet'}
+            </span>
+          </button>
 
           <button
             onClick={() => setAutoTrace(!autoTrace)}
@@ -553,6 +584,37 @@ export default function LiveChart({
             <span className="absolute left-3 top-1 text-[9px] font-bold uppercase tracking-wider text-emerald-400">
               {strategicOverlay?.demandZone?.shortLabel || 'DEMAND ZONE OB'}
             </span>
+          </div>
+        )}
+
+        {/* Minimalist Floating HUD: shows order zones and targets without obstructing candlesticks */}
+        {autoTrace && strategicOverlay && (
+          <div className="absolute top-2.5 right-16 z-10 pointer-events-none flex flex-wrap gap-1 max-w-[85%] justify-end">
+            {strategicOverlay.entry && (
+              <span className="px-2 py-0.5 rounded-md bg-blue-950/80 backdrop-blur-md border border-blue-500/40 text-[9.5px] font-mono font-bold text-blue-300 shadow">
+                {strategicOverlay.direction === 'BUY' ? '▲ ACHAT' : '▼ VENTE'} {strategicOverlay.entry}
+              </span>
+            )}
+            {strategicOverlay.sl && (
+              <span className="px-2 py-0.5 rounded-md bg-rose-950/80 backdrop-blur-md border border-rose-500/40 text-[9.5px] font-mono font-bold text-rose-300 shadow">
+                SL {strategicOverlay.sl}
+              </span>
+            )}
+            {strategicOverlay.tp1 && (
+              <span className="px-2 py-0.5 rounded-md bg-emerald-950/80 backdrop-blur-md border border-emerald-500/40 text-[9.5px] font-mono font-bold text-emerald-300 shadow">
+                TP1 {strategicOverlay.tp1}
+              </span>
+            )}
+            {strategicOverlay.supplyZone && (
+              <span className="px-2 py-0.5 rounded-md bg-red-950/70 backdrop-blur-md border border-red-500/30 text-[9px] font-mono font-semibold text-red-300 shadow">
+                OB SUPPLY
+              </span>
+            )}
+            {strategicOverlay.demandZone && (
+              <span className="px-2 py-0.5 rounded-md bg-emerald-950/70 backdrop-blur-md border border-emerald-500/30 text-[9px] font-mono font-semibold text-emerald-300 shadow">
+                OB DEMAND
+              </span>
+            )}
           </div>
         )}
 

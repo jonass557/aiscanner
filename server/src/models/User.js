@@ -84,14 +84,15 @@ const userSchema = new mongoose.Schema(
         enum: ['beginner', 'intermediate', 'expert'],
         default: 'intermediate',
       },
-      // Favorite methodology; 'custom' uses the free-text customStrategy.
+      // Favorite methodology (can be any system, admin, or custom strategy key).
       favoriteStrategy: {
         type: String,
-        enum: ['smc', 'ict', 'price-action', 'custom'],
         default: 'smc',
       },
-      customStrategy: { type: String, default: '' }, // injected into the AI prompt when favoriteStrategy === 'custom'
+      customStrategyName: { type: String, default: '' },
+      customStrategy: { type: String, default: '' }, // injected into the AI prompt and robot scanner
       customTradingPlan: { type: String, default: '' }, // detailed personal trading plan & execution guidelines
+      favoriteSession: { type: String, default: 'London' }, // target trading session
       opportunityEmailAlerts: { type: Boolean, default: true }, // receive high-probability setups by email when active
       minOpportunityConfidence: { type: Number, min: 70, max: 100, default: 80 }, // filter for email dispatch
       riskPercent: { type: Number, min: 0.1, max: 100, default: 1 },
