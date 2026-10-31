@@ -76,6 +76,19 @@ export default function LiveChart({
 
   const [activeSymbol, setActiveSymbol] = useState(normalizedInitialSymbol);
   const [activeTf, setActiveTf] = useState(initialTf && initialTf !== 'Unknown' ? initialTf.toLowerCase() : '1h');
+
+  // Synchronize when parent passes new symbol or timeframe
+  useEffect(() => {
+    if (normalizedInitialSymbol) {
+      setActiveSymbol(normalizedInitialSymbol);
+    }
+  }, [normalizedInitialSymbol]);
+
+  useEffect(() => {
+    if (initialTf && initialTf !== 'Unknown') {
+      setActiveTf(initialTf.toLowerCase());
+    }
+  }, [initialTf]);
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);

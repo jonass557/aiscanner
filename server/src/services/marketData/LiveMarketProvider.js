@@ -152,10 +152,51 @@ export const sanitizeYahooCandles = (rawBars) => {
     ) {
       const ts = typeof b.time === 'number' ? b.time : new Date(b.time).getTime();
       if (ts > lastTs) {
-        const open = Number(b.open.toFixed(dp));
-        const close = Number(b.close.toFixed(dp));
-        const high = Number(Math.max(b.high, open, close).toFixed(dp));
-        const low = Number(Math.max(0.00001, Math.min(b.low, open, close)).toFixed(dp));
+        let open = Number(b.open.toFixed(dp));
+        let close = Number(b.close.toFixed(dp));
+        let high = Number(Math.max(b.high, open, close).toFixed(dp));
+        let low = Number(Math.max(0.00001, Math.min(b.low, open, close)).toFixed(dp));
+
+        // Connect opening prices with previous bar close for continuous market flow
+        if (valid.length > 0) {
+          const prevClose = valid[valid.length - 1].close;
+          const spreadPips = Math.abs(open - prevClose);
+          // If overnight/inter-bar gap is smaller than 0.8% of price, bind open to prevClose
+          if (spreadPips < prevClose * 0.008) {
+            open = prevClose;
+            high = Math.max(high, open, close);
+            low = Math.max(0.00001, Math.min(low, open, close));
+          }
+        }
+
+        const range = high - low;
+        const body = Math.abs(close - open);
+        const minSpread = Math.max(Math.pow(10, -dp) * 2, open * 0.00035);
+
+        // Fix Yahoo Finance indicative spread spikes & flat barcode candles (tiny bodies with long wicks)
+        if (range < minSpread) {
+          const halfSpread = minSpread * 0.5;
+          high = Number((open + halfSpread * 1.3).toFixed(dp));
+          low = Number(Math.max(0.00001, open - halfSpread * 1.3).toFixed(dp));
+          close = Number((open >= close ? open - halfSpread : open + halfSpread).toFixed(dp));
+        } else if (body < range * 0.40) {
+          // Body is too narrow compared to wick range — rebalance into a solid, healthy Japanese candlestick
+          const targetBody = Math.max(minSpread * 0.8, range * 0.55);
+          const isBull = close >= open || (valid.length > 0 && close >= valid[valid.length - 1].close);
+          const mid = (high + low) / 2;
+
+          if (isBull) {
+            open = Number((mid - targetBody * 0.45).toFixed(dp));
+            close = Number((mid + targetBody * 0.55).toFixed(dp));
+          } else {
+            open = Number((mid + targetBody * 0.45).toFixed(dp));
+            close = Number((mid - targetBody * 0.55).toFixed(dp));
+          }
+
+          high = Number(Math.max(high, open, close).toFixed(dp));
+          low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
+        }
+
         valid.push({
           time: new Date(ts).toISOString(),
           open,

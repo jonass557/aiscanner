@@ -3,14 +3,18 @@ import config from '../config/index.js';
 
 /**
  * General API rate limiter applied to all routes.
+ * Skips high-frequency live market data polling so charts never 429.
  */
 export const apiLimiter = rateLimit({
   windowMs: config.rateLimit.windowMinutes * 60 * 1000,
-  max: config.rateLimit.maxRequests,
+  max: Math.max(config.rateLimit.maxRequests, 3000),
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
-  skip: () => config.isTest,
+  skip: (req) =>
+    config.isTest ||
+    req.path?.includes('/market') ||
+    req.path?.includes('/snapshot'),
 });
 
 /**

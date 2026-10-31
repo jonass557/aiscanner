@@ -6,12 +6,138 @@ import {
   Trash2, X, ExternalLink, Activity, ArrowUpRight, ArrowDownRight,
   Clock, Lock, Check, Info, FileText, ChevronRight, Zap,
   TrendingUp, TrendingDown, Target, Sparkles, BookOpen,
+  Calculator, Layers, Search, Filter
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { managedTradingApi, opportunityApi, marketApi } from '../../services/endpoints.js';
 import LiveChart from '../../components/analysis/LiveChart.jsx';
 import toast from 'react-hot-toast';
+
+export const MANAGED_ASSET_CATEGORIES = [
+  { id: 'forex', labelFr: 'Forex (Devises)', labelEn: 'Forex (Currencies)', icon: '💱' },
+  { id: 'metals', labelFr: 'Métaux & Matières Premières', labelEn: 'Metals & Commodities', icon: '🪙' },
+  { id: 'crypto', labelFr: 'Cryptomonnaies', labelEn: 'Cryptocurrencies', icon: '₿' },
+  { id: 'synthetics', labelFr: 'Indices Synthétiques (Deriv)', labelEn: 'Synthetic Indices (Deriv)', icon: '⚡' },
+  { id: 'indices', labelFr: 'Indices Mondiaux', labelEn: 'World Indices', icon: '📈' },
+];
+
+export const MANAGED_ALL_PAIRS = [
+  // 1. FOREX - MAJEURES
+  { symbol: 'EUR/USD', category: 'forex', subgroup: 'Majeures', label: 'EUR/USD · Euro / Dollar US', base: 1.0865 },
+  { symbol: 'GBP/USD', category: 'forex', subgroup: 'Majeures', label: 'GBP/USD · Livre / Dollar US', base: 1.2710 },
+  { symbol: 'USD/JPY', category: 'forex', subgroup: 'Majeures', label: 'USD/JPY · Dollar US / Yen', base: 156.20 },
+  { symbol: 'USD/CHF', category: 'forex', subgroup: 'Majeures', label: 'USD/CHF · Dollar US / Franc Suisse', base: 0.9040 },
+  { symbol: 'AUD/USD', category: 'forex', subgroup: 'Majeures', label: 'AUD/USD · Dollar Australien / Dollar US', base: 0.6640 },
+  { symbol: 'USD/CAD', category: 'forex', subgroup: 'Majeures', label: 'USD/CAD · Dollar US / Dollar Canadien', base: 1.3680 },
+  { symbol: 'NZD/USD', category: 'forex', subgroup: 'Majeures', label: 'NZD/USD · Dollar Néo-Zélandais / Dollar US', base: 0.6100 },
+
+  // 1. FOREX - MINEURES (CROSSES)
+  { symbol: 'EUR/GBP', category: 'forex', subgroup: 'Mineures', label: 'EUR/GBP · Euro / Livre', base: 0.8550 },
+  { symbol: 'EUR/JPY', category: 'forex', subgroup: 'Mineures', label: 'EUR/JPY · Euro / Yen', base: 169.70 },
+  { symbol: 'GBPJPY', category: 'forex', subgroup: 'Mineures', label: 'GBP/JPY · Livre / Yen', base: 198.40 },
+  { symbol: 'EUR/AUD', category: 'forex', subgroup: 'Mineures', label: 'EUR/AUD · Euro / Aussie', base: 1.6360 },
+  { symbol: 'EUR/CAD', category: 'forex', subgroup: 'Mineures', label: 'EUR/CAD · Euro / Dollar Canadien', base: 1.4860 },
+  { symbol: 'EUR/CHF', category: 'forex', subgroup: 'Mineures', label: 'EUR/CHF · Euro / Franc Suisse', base: 0.9820 },
+  { symbol: 'EUR/NZD', category: 'forex', subgroup: 'Mineures', label: 'EUR/NZD · Euro / Dollar NZ', base: 1.7780 },
+  { symbol: 'GBP/AUD', category: 'forex', subgroup: 'Mineures', label: 'GBP/AUD · Livre / Aussie', base: 1.9130 },
+  { symbol: 'GBP/CAD', category: 'forex', subgroup: 'Mineures', label: 'GBP/CAD · Livre / Dollar Canadien', base: 1.7380 },
+  { symbol: 'GBP/CHF', category: 'forex', subgroup: 'Mineures', label: 'GBP/CHF · Livre / Franc Suisse', base: 1.1480 },
+  { symbol: 'GBP/NZD', category: 'forex', subgroup: 'Mineures', label: 'GBP/NZD · Livre / Dollar NZ', base: 2.0820 },
+  { symbol: 'AUD/CAD', category: 'forex', subgroup: 'Mineures', label: 'AUD/CAD · Aussie / Dollar Canadien', base: 0.9080 },
+  { symbol: 'AUD/CHF', category: 'forex', subgroup: 'Mineures', label: 'AUD/CHF · Aussie / Franc Suisse', base: 0.6010 },
+  { symbol: 'AUD/JPY', category: 'forex', subgroup: 'Mineures', label: 'AUD/JPY · Aussie / Yen', base: 103.70 },
+  { symbol: 'AUD/NZD', category: 'forex', subgroup: 'Mineures', label: 'AUD/NZD · Aussie / Kiwi', base: 1.0880 },
+  { symbol: 'CAD/CHF', category: 'forex', subgroup: 'Mineures', label: 'CAD/CHF · Dollar Canadien / Franc Suisse', base: 0.6610 },
+  { symbol: 'CAD/JPY', category: 'forex', subgroup: 'Mineures', label: 'CAD/JPY · Dollar Canadien / Yen', base: 114.20 },
+  { symbol: 'CHF/JPY', category: 'forex', subgroup: 'Mineures', label: 'CHF/JPY · Franc Suisse / Yen', base: 172.80 },
+  { symbol: 'NZD/CAD', category: 'forex', subgroup: 'Mineures', label: 'NZD/CAD · Kiwi / Dollar Canadien', base: 0.8350 },
+  { symbol: 'NZD/CHF', category: 'forex', subgroup: 'Mineures', label: 'NZD/CHF · Kiwi / Franc Suisse', base: 0.5520 },
+  { symbol: 'NZD/JPY', category: 'forex', subgroup: 'Mineures', label: 'NZD/JPY · Kiwi / Yen', base: 95.30 },
+
+  // 1. FOREX - EXOTIQUES
+  { symbol: 'USD/ZAR', category: 'forex', subgroup: 'Exotiques', label: 'USD/ZAR · Dollar / Rand Sud-Africain', base: 18.25 },
+  { symbol: 'USD/MXN', category: 'forex', subgroup: 'Exotiques', label: 'USD/MXN · Dollar / Peso Mexicain', base: 19.85 },
+  { symbol: 'USD/TRY', category: 'forex', subgroup: 'Exotiques', label: 'USD/TRY · Dollar / Livre Turque', base: 34.25 },
+  { symbol: 'USD/BRL', category: 'forex', subgroup: 'Exotiques', label: 'USD/BRL · Dollar / Real Brésilien', base: 5.65 },
+  { symbol: 'USD/SEK', category: 'forex', subgroup: 'Exotiques', label: 'USD/SEK · Dollar / Couronne Suédoise', base: 10.42 },
+  { symbol: 'USD/NOK', category: 'forex', subgroup: 'Exotiques', label: 'USD/NOK · Dollar / Couronne Norvégienne', base: 10.88 },
+  { symbol: 'USD/PLN', category: 'forex', subgroup: 'Exotiques', label: 'USD/PLN · Dollar / Zloty Polonais', base: 3.96 },
+  { symbol: 'USD/SGD', category: 'forex', subgroup: 'Exotiques', label: 'USD/SGD · Dollar / Dollar Singapour', base: 1.312 },
+  { symbol: 'USD/HKD', category: 'forex', subgroup: 'Exotiques', label: 'USD/HKD · Dollar / Dollar Hong Kong', base: 7.77 },
+  { symbol: 'USD/CNH', category: 'forex', subgroup: 'Exotiques', label: 'USD/CNH · Dollar / Yuan Offshore', base: 7.12 },
+  { symbol: 'EUR/TRY', category: 'forex', subgroup: 'Exotiques', label: 'EUR/TRY · Euro / Livre Turque', base: 37.20 },
+  { symbol: 'EUR/ZAR', category: 'forex', subgroup: 'Exotiques', label: 'EUR/ZAR · Euro / Rand Sud-Africain', base: 19.82 },
+  { symbol: 'GBP/ZAR', category: 'forex', subgroup: 'Exotiques', label: 'GBP/ZAR · Livre / Rand Sud-Africain', base: 23.20 },
+
+  // 2. MÉTAUX & MATIÈRES PREMIÈRES
+  { symbol: 'XAU/USD', category: 'metals', label: 'Or (Gold / XAUUSD)', base: 2685.0 },
+  { symbol: 'XAG/USD', category: 'metals', label: 'Argent (Silver / XAGUSD)', base: 31.80 },
+  { symbol: 'XPT/USD', category: 'metals', label: 'Platine (Platinum / XPTUSD)', base: 980.0 },
+  { symbol: 'XPD/USD', category: 'metals', label: 'Palladium (XPDUSD)', base: 1060.0 },
+  { symbol: 'COPPER', category: 'metals', label: 'Cuivre (Copper)', base: 4.35 },
+  { symbol: 'USOIL', category: 'metals', label: 'Pétrole Brut WTI (Crude Oil)', base: 74.50 },
+  { symbol: 'UKOIL', category: 'metals', label: 'Pétrole Brent (UK Oil)', base: 78.20 },
+
+  // 3. CRYPTOMONNAIES
+  { symbol: 'BTC/USD', category: 'crypto', label: 'Bitcoin (BTC/USD)', base: 68400 },
+  { symbol: 'ETH/USD', category: 'crypto', label: 'Ethereum (ETH/USD)', base: 2640 },
+  { symbol: 'SOL/USD', category: 'crypto', label: 'Solana (SOL/USD)', base: 158.0 },
+  { symbol: 'BNB/USD', category: 'crypto', label: 'Binance Coin (BNB/USD)', base: 595.0 },
+  { symbol: 'XRP/USD', category: 'crypto', label: 'Ripple (XRP/USD)', base: 0.548 },
+  { symbol: 'ADA/USD', category: 'crypto', label: 'Cardano (ADA/USD)', base: 0.355 },
+  { symbol: 'DOGE/USD', category: 'crypto', label: 'Dogecoin (DOGE/USD)', base: 0.142 },
+  { symbol: 'AVAX/USD', category: 'crypto', label: 'Avalanche (AVAX/USD)', base: 26.5 },
+  { symbol: 'LINK/USD', category: 'crypto', label: 'Chainlink (LINK/USD)', base: 11.8 },
+  { symbol: 'DOT/USD', category: 'crypto', label: 'Polkadot (DOT/USD)', base: 4.25 },
+  { symbol: 'NEAR/USD', category: 'crypto', label: 'NEAR Protocol (NEAR/USD)', base: 4.85 },
+  { symbol: 'SUI/USD', category: 'crypto', label: 'Sui Network (SUI/USD)', base: 2.15 },
+  { symbol: 'MATIC/USD', category: 'crypto', label: 'Polygon (POL / MATIC)', base: 0.38 },
+  { symbol: 'LTC/USD', category: 'crypto', label: 'Litecoin (LTC/USD)', base: 71.5 },
+  { symbol: 'SHIB/USD', category: 'crypto', label: 'Shiba Inu (SHIB/USD)', base: 0.0000185 },
+
+  // 4. INDICES SYNTHÉTIQUES (DERIV)
+  { symbol: 'Volatility 75 Index', category: 'synthetics', label: 'Volatility 75 Index (V75)', base: 325400 },
+  { symbol: 'Volatility 100 Index', category: 'synthetics', label: 'Volatility 100 Index (V100)', base: 1840 },
+  { symbol: 'Volatility 50 Index', category: 'synthetics', label: 'Volatility 50 Index (V50)', base: 412.5 },
+  { symbol: 'Volatility 25 Index', category: 'synthetics', label: 'Volatility 25 Index (V25)', base: 2450 },
+  { symbol: 'Volatility 10 Index', category: 'synthetics', label: 'Volatility 10 Index (V10)', base: 1250 },
+  { symbol: 'Volatility 75 (1s) Index', category: 'synthetics', label: 'Volatility 75 (1s) Index', base: 425000 },
+  { symbol: 'Volatility 100 (1s) Index', category: 'synthetics', label: 'Volatility 100 (1s) Index', base: 1250 },
+  { symbol: 'Volatility 50 (1s) Index', category: 'synthetics', label: 'Volatility 50 (1s) Index', base: 530 },
+  { symbol: 'Volatility 25 (1s) Index', category: 'synthetics', label: 'Volatility 25 (1s) Index', base: 3200 },
+  { symbol: 'Volatility 10 (1s) Index', category: 'synthetics', label: 'Volatility 10 (1s) Index', base: 980 },
+  { symbol: 'Volatility 150 (1s) Index', category: 'synthetics', label: 'Volatility 150 (1s) Index', base: 760 },
+  { symbol: 'Volatility 250 (1s) Index', category: 'synthetics', label: 'Volatility 250 (1s) Index', base: 1450 },
+  { symbol: 'Boom 1000 Index', category: 'synthetics', label: 'Boom 1000 Index', base: 12500 },
+  { symbol: 'Boom 500 Index', category: 'synthetics', label: 'Boom 500 Index', base: 4820 },
+  { symbol: 'Boom 300 Index', category: 'synthetics', label: 'Boom 300 Index', base: 3200 },
+  { symbol: 'Crash 1000 Index', category: 'synthetics', label: 'Crash 1000 Index', base: 6400 },
+  { symbol: 'Crash 500 Index', category: 'synthetics', label: 'Crash 500 Index', base: 3910 },
+  { symbol: 'Crash 300 Index', category: 'synthetics', label: 'Crash 300 Index', base: 2800 },
+  { symbol: 'Step Index', category: 'synthetics', label: 'Step Index', base: 8420 },
+  { symbol: 'Step 200 Index', category: 'synthetics', label: 'Step 200 Index', base: 4200 },
+  { symbol: 'Step 500 Index', category: 'synthetics', label: 'Step 500 Index', base: 2150 },
+  { symbol: 'Range Break 100 Index', category: 'synthetics', label: 'Range Break 100 Index', base: 5120 },
+  { symbol: 'Range Break 200 Index', category: 'synthetics', label: 'Range Break 200 Index', base: 7850 },
+  { symbol: 'Jump 10 Index', category: 'synthetics', label: 'Jump 10 Index', base: 1100 },
+  { symbol: 'Jump 25 Index', category: 'synthetics', label: 'Jump 25 Index', base: 2350 },
+  { symbol: 'Jump 50 Index', category: 'synthetics', label: 'Jump 50 Index', base: 4650 },
+  { symbol: 'Jump 75 Index', category: 'synthetics', label: 'Jump 75 Index', base: 6950 },
+  { symbol: 'Jump 100 Index', category: 'synthetics', label: 'Jump 100 Index', base: 9200 },
+
+  // 5. INDICES MONDIAUX
+  { symbol: 'US100', category: 'indices', label: 'Nasdaq 100 (US100 / NAS100)', base: 20450 },
+  { symbol: 'US30', category: 'indices', label: 'Dow Jones 30 (US30 / DJ30)', base: 43250 },
+  { symbol: 'SPX500', category: 'indices', label: 'S&P 500 (SPX500 / US500)', base: 5860 },
+  { symbol: 'GER40', category: 'indices', label: 'DAX 40 Allemagne (GER40)', base: 19550 },
+  { symbol: 'UK100', category: 'indices', label: 'FTSE 100 Royaume-Uni (UK100)', base: 8250 },
+  { symbol: 'FRA40', category: 'indices', label: 'CAC 40 France (FRA40)', base: 7520 },
+  { symbol: 'JPN225', category: 'indices', label: 'Nikkei 225 Japon (JPN225)', base: 38950 },
+  { symbol: 'EUSTX50', category: 'indices', label: 'Euro Stoxx 50 (EUSTX50)', base: 4920 },
+  { symbol: 'AUS200', category: 'indices', label: 'ASX 200 Australie (AUS200)', base: 8150 },
+  { symbol: 'HK50', category: 'indices', label: 'Hang Seng 50 Hong Kong (HK50)', base: 20500 },
+];
 
 export default function ManagedTrading() {
   const { isEn } = useLanguage();
@@ -52,10 +178,14 @@ export default function ManagedTrading() {
   const [maxSlippage, setMaxSlippage] = useState(0.20);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Strategy Configuration & Immediate AI Detection State (persisted across sessions)
+  // Categorized Asset Selection & Strategy State
+  const [stratCategory, setStratCategory] = useState(() => {
+    return localStorage.getItem('managed_strat_category') || 'forex';
+  });
   const [stratSymbol, setStratSymbol] = useState(() => {
     return localStorage.getItem('managed_strat_symbol') || 'EUR/USD';
   });
+  const [pairSearchQuery, setPairSearchQuery] = useState('');
   const [stratTimeframe, setStratTimeframe] = useState(() => {
     return localStorage.getItem('managed_strat_tf') || '1h';
   });
@@ -82,6 +212,9 @@ export default function ManagedTrading() {
 
   // Sync strategy preferences to localStorage
   useEffect(() => {
+    localStorage.setItem('managed_strat_category', stratCategory);
+  }, [stratCategory]);
+  useEffect(() => {
     localStorage.setItem('managed_strat_symbol', stratSymbol);
   }, [stratSymbol]);
   useEffect(() => {
@@ -97,20 +230,37 @@ export default function ManagedTrading() {
     localStorage.setItem('managed_strat_criteria', stratCriteria);
   }, [stratCriteria]);
 
-  // Load configuration, accounts, positions, and history
+  // Filter available pairs by current category and search query
+  const filteredPairs = useMemo(() => {
+    let list = MANAGED_ALL_PAIRS;
+    if (pairSearchQuery.trim()) {
+      const q = pairSearchQuery.toLowerCase().trim();
+      return list.filter(
+        (p) =>
+          p.symbol.toLowerCase().includes(q) ||
+          p.label.toLowerCase().includes(q) ||
+          (p.subgroup && p.subgroup.toLowerCase().includes(q))
+      );
+    }
+    return list.filter((p) => p.category === stratCategory);
+  }, [stratCategory, pairSearchQuery]);
+
+  // Load configuration, accounts, positions, and history with resilient Promise.allSettled
   const loadData = useCallback(async (isBg = false) => {
     if (!isBg) setRefreshing(true);
     try {
-      const [cfgRes, accRes, posRes, ordRes, oppRes] = await Promise.all([
+      const results = await Promise.allSettled([
         managedTradingApi.getConfig(),
         managedTradingApi.getBrokerAccounts(),
         managedTradingApi.getPositions(),
         managedTradingApi.getOrders({ limit: 40 }),
-        opportunityApi.list({ tab: 'active' }).catch(() => ({ data: { data: { opportunities: [] } } })),
+        opportunityApi.list({ tab: 'active' }),
       ]);
 
-      if (cfgRes?.data?.data?.config) {
-        const c = cfgRes.data.data.config;
+      const [cfgRes, accRes, posRes, ordRes, oppRes] = results;
+
+      if (cfgRes.status === 'fulfilled' && cfgRes.value?.data?.data?.config) {
+        const c = cfgRes.value.data.data.config;
         setConfig(c);
         setMaxRiskPercent(c.maxRiskPerTradePercent || 1.0);
         setMaxRiskAmount(c.maxRiskPerTradeAmount || 100);
@@ -119,12 +269,20 @@ export default function ManagedTrading() {
         setMaxOrdersDay(c.maxOrdersPerDay || 5);
         setMaxSlippage(c.maxAllowedSlippagePercent || 0.20);
       }
-      if (accRes?.data?.data?.accounts) setBrokerAccounts(accRes.data.data.accounts);
-      if (posRes?.data?.data?.positions) setOpenPositions(posRes.data.data.positions);
-      if (ordRes?.data?.data?.orders) setOrdersHistory(ordRes.data.data.orders);
-      if (oppRes?.data?.data?.opportunities) setPendingOpportunities(oppRes.data.data.opportunities);
-    } catch (err) {
-      if (!isBg) toast.error(err?.response?.data?.message || 'Erreur de chargement');
+      if (accRes.status === 'fulfilled' && accRes.value?.data?.data?.accounts) {
+        setBrokerAccounts(accRes.value.data.data.accounts);
+      }
+      if (posRes.status === 'fulfilled' && posRes.value?.data?.data?.positions) {
+        setOpenPositions(posRes.value.data.data.positions);
+      }
+      if (ordRes.status === 'fulfilled' && ordRes.value?.data?.data?.orders) {
+        setOrdersHistory(ordRes.value.data.data.orders);
+      }
+      if (oppRes.status === 'fulfilled' && oppRes.value?.data?.data?.opportunities) {
+        setPendingOpportunities(oppRes.value.data.data.opportunities);
+      }
+    } catch {
+      // Gracefully silent on background network glitches
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -133,8 +291,11 @@ export default function ManagedTrading() {
 
   useEffect(() => {
     loadData();
-    // Poll every 10 seconds for real-time monitoring
-    const interval = setInterval(() => loadData(true), 10000);
+    // Poll every 25 seconds for real-time monitoring, paused when tab is inactive to avoid 429
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadData(true);
+    }, 25000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -363,15 +524,8 @@ export default function ManagedTrading() {
         }
       } catch (err) {
         console.warn('Live snapshot request failed, using dynamic price engine:', err);
-        // Fallback realistic prices per market asset
-        if (stratSymbol.includes('XAU')) currentPrice = 2685.5;
-        else if (stratSymbol.includes('BTC')) currentPrice = 68500;
-        else if (stratSymbol.includes('US30')) currentPrice = 43250;
-        else if (stratSymbol.includes('JPY')) currentPrice = 153.25;
-        else if (stratSymbol.includes('VOL75')) currentPrice = 325400;
-        else if (stratSymbol.includes('BOOM')) currentPrice = 12500;
-        else if (stratSymbol.includes('CRASH')) currentPrice = 8500;
-        else currentPrice = 1.0865;
+        const matchPair = MANAGED_ALL_PAIRS.find((p) => p.symbol === stratSymbol);
+        currentPrice = matchPair?.base || 1.0865;
       }
 
       if (isNaN(currentPrice) || currentPrice <= 0) {
@@ -598,32 +752,111 @@ export default function ManagedTrading() {
 
         {showStratSection && (
           <form onSubmit={handleDetectOpportunity} className="mt-4 space-y-4">
-            {/* Top row: Symbol, Timeframe, Session */}
+            {/* 1. Asset Categories Tabs */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                  {isEn ? '1. Select Asset Category' : '1. Sélectionnez la Catégorie d\'Actifs'}
+                </label>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+                  {MANAGED_ALL_PAIRS.length} {isEn ? 'total assets supported' : 'actifs au total'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1 bg-gray-100 dark:bg-gray-800/80 rounded-xl">
+                {MANAGED_ASSET_CATEGORIES.map((cat) => {
+                  const count = MANAGED_ALL_PAIRS.filter((p) => p.category === cat.id).length;
+                  const isActive = stratCategory === cat.id && !pairSearchQuery.trim();
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setStratCategory(cat.id);
+                        setPairSearchQuery('');
+                        const firstInCat = MANAGED_ALL_PAIRS.find((p) => p.category === cat.id);
+                        if (firstInCat) setStratSymbol(firstInCat.symbol);
+                      }}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition ${
+                        isActive
+                          ? 'bg-white dark:bg-gray-900 text-brand-600 dark:text-brand-400 shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <span>{cat.icon}</span>
+                      <span className="truncate">{isEn ? cat.labelEn : cat.labelFr.split(' ')[0]}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-gray-200 dark:bg-gray-700/60 font-mono">
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Top row: Symbol, Timeframe, Session */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  {isEn ? 'Instrument / Pair' : 'Paire ou Actif'}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                    {isEn ? '2. Instrument / Pair' : '2. Paire ou Actif'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={pairSearchQuery}
+                      onChange={(e) => setPairSearchQuery(e.target.value)}
+                      placeholder={isEn ? 'Filter pair...' : 'Filtrer actif...'}
+                      className="w-28 sm:w-36 text-[10px] px-2 py-0.5 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+
                 <select
                   value={stratSymbol}
                   onChange={(e) => setStratSymbol(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-bold text-gray-900 dark:text-white"
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500"
                 >
-                  <option value="EUR/USD">EUR/USD (Forex Majeur)</option>
-                  <option value="GBP/USD">GBP/USD (Forex Majeur)</option>
-                  <option value="USD/JPY">USD/JPY (Forex)</option>
-                  <option value="XAU/USD">XAU/USD (Or / Gold)</option>
-                  <option value="US30">US30 / Dow Jones</option>
-                  <option value="BTC/USD">BTC/USD (Bitcoin)</option>
-                  <option value="VOL75">Volatility 75 Index (Deriv)</option>
-                  <option value="BOOM1000">Boom 1000 Index (Deriv)</option>
-                  <option value="CRASH1000">Crash 1000 Index (Deriv)</option>
+                  {pairSearchQuery.trim() ? (
+                    filteredPairs.length > 0 ? (
+                      filteredPairs.map((p) => (
+                        <option key={p.symbol} value={p.symbol}>
+                          {p.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled>{isEn ? 'No asset found' : 'Aucun actif trouvé'}</option>
+                    )
+                  ) : stratCategory === 'forex' ? (
+                    <>
+                      <optgroup label="Forex — Paires Majeures">
+                        {MANAGED_ALL_PAIRS.filter((p) => p.category === 'forex' && p.subgroup === 'Majeures').map((p) => (
+                          <option key={p.symbol} value={p.symbol}>{p.label}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Forex — Paires Mineures (Crosses)">
+                        {MANAGED_ALL_PAIRS.filter((p) => p.category === 'forex' && p.subgroup === 'Mineures').map((p) => (
+                          <option key={p.symbol} value={p.symbol}>{p.label}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Forex — Paires Exotiques">
+                        {MANAGED_ALL_PAIRS.filter((p) => p.category === 'forex' && p.subgroup === 'Exotiques').map((p) => (
+                          <option key={p.symbol} value={p.symbol}>{p.label}</option>
+                        ))}
+                      </optgroup>
+                    </>
+                  ) : (
+                    filteredPairs.map((p) => (
+                      <option key={p.symbol} value={p.symbol}>
+                        {p.label}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  {isEn ? 'Timeframe' : 'Unité de Temps'}
+                  {isEn ? '3. Timeframe' : '3. Unité de Temps'}
                 </label>
                 <select
                   value={stratTimeframe}
@@ -640,7 +873,7 @@ export default function ManagedTrading() {
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  {isEn ? 'Trading Session' : 'Session de Trading'}
+                  {isEn ? '4. Trading Session' : '4. Session de Trading'}
                 </label>
                 <select
                   value={stratSession}
@@ -650,7 +883,7 @@ export default function ManagedTrading() {
                   <option value="London">Session de Londres (07:00 - 16:00 UTC)</option>
                   <option value="New-York">Session de New York (13:00 - 22:00 UTC)</option>
                   <option value="Asian">Session Asiatique (00:00 - 09:00 UTC)</option>
-                  <option value="Any">Toutes les Sessions</option>
+                  <option value="Any">Toutes les Sessions (24/7)</option>
                 </select>
               </div>
             </div>
@@ -778,7 +1011,7 @@ export default function ManagedTrading() {
               </div>
               <div className="w-full">
                 <LiveChart
-                  market="forex"
+                  market={MANAGED_ALL_PAIRS.find(p => p.symbol === detectedOpportunity.symbol)?.category || 'forex'}
                   symbol={detectedOpportunity.symbol}
                   timeframe={detectedOpportunity.timeframe}
                   tradePlan={{

@@ -78,26 +78,49 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   }
 
   const dp = getDecimals(unique[unique.length - 1]?.close || fallbackBase);
-  return unique.map((b) => {
+  return unique.map((b, idx) => {
     let open = Number(b.open.toFixed(dp));
     let close = Number(b.close.toFixed(dp));
     let high = Number(b.high.toFixed(dp));
     let low = Number(b.low.toFixed(dp));
 
-    // Ensure no candle renders as a flat 1-pixel barcode without a visible body
-    const minSpread = Math.max(Math.pow(10, -dp), open * 0.0003);
-    if (high - low < minSpread) {
-      high = Number((open + minSpread).toFixed(dp));
-      low = Number((Math.max(0.00001, open - minSpread)).toFixed(dp));
-      close = Number((open >= close ? open + minSpread * 0.5 : open - minSpread * 0.5).toFixed(dp));
-    } else if (Math.abs(close - open) < minSpread * 0.25) {
-      // Give flat doji lines a healthy visible micro-body so they render as clean institutional bars
-      const bump = minSpread * 0.35;
-      if (close >= open) {
-        close = Number((open + bump).toFixed(dp));
-      } else {
-        close = Number((open - bump).toFixed(dp));
+    // Connect opening prices with previous bar close for continuous market flow
+    if (idx > 0) {
+      const prevClose = Number(unique[idx - 1].close.toFixed(dp));
+      const spreadPips = Math.abs(open - prevClose);
+      if (spreadPips < prevClose * 0.008) {
+        open = prevClose;
+        high = Math.max(high, open, close);
+        low = Math.max(0.00001, Math.min(low, open, close));
       }
+    }
+
+    // Eliminate flat barcode / zero-body tick candles
+    const candleRange = high - low;
+    const bodySize = Math.abs(close - open);
+    const minSpread = Math.max(Math.pow(10, -dp) * 2, open * 0.00035);
+
+    if (candleRange < minSpread) {
+      const halfSpread = minSpread * 0.5;
+      high = Number((open + halfSpread * 1.3).toFixed(dp));
+      low = Number((Math.max(0.00001, open - halfSpread * 1.3)).toFixed(dp));
+      close = Number((open >= close ? open - halfSpread : open + halfSpread).toFixed(dp));
+    } else if (bodySize < candleRange * 0.40) {
+      // Rebalance body so it renders as a clean, healthy institutional rectangular candle
+      const targetBody = Math.max(minSpread * 0.8, candleRange * 0.55);
+      const isBull = close >= open || (idx > 0 && close >= unique[idx - 1].close);
+      const mid = (high + low) / 2;
+
+      if (isBull) {
+        open = Number((mid - targetBody * 0.45).toFixed(dp));
+        close = Number((mid + targetBody * 0.55).toFixed(dp));
+      } else {
+        open = Number((mid + targetBody * 0.45).toFixed(dp));
+        close = Number((mid - targetBody * 0.55).toFixed(dp));
+      }
+
+      high = Number(Math.max(high, open, close).toFixed(dp));
+      low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
     }
 
     return {

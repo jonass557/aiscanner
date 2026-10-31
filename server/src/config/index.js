@@ -130,7 +130,7 @@ const config = {
 
   rateLimit: {
     windowMinutes: parseInt(process.env.RATE_LIMIT_WINDOW, 10) || 15,
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 3000,
   },
 
   admin: {
