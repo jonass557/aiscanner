@@ -17,8 +17,9 @@ const run = async () => {
   if (existing) {
     existing.role = 'admin';
     existing.isVerified = true;
+    existing.password = config.admin.password;
     await existing.save();
-    logger.info(`Existing user ${config.admin.email} promoted to admin.`);
+    logger.info(`Existing user ${config.admin.email} promoted to admin and password updated.`);
   } else {
     const premium = getPlan('premium');
     await User.create({
