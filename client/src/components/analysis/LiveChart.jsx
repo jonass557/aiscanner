@@ -357,20 +357,20 @@ export default function LiveChart({
         linesRef.current.push(lineTp2);
       }
 
-      // Update box overlay coordinates
+      // Update box overlay coordinates safely
       try {
-        const sTop = seriesRef.current.priceToCoordinate(strategicOverlay.supplyZone.top);
-        const sBtm = seriesRef.current.priceToCoordinate(strategicOverlay.supplyZone.bottom);
-        const dTop = seriesRef.current.priceToCoordinate(strategicOverlay.demandZone.top);
-        const dBtm = seriesRef.current.priceToCoordinate(strategicOverlay.demandZone.bottom);
+        const sTop = strategicOverlay.supplyZone ? seriesRef.current.priceToCoordinate(strategicOverlay.supplyZone.top) : null;
+        const sBtm = strategicOverlay.supplyZone ? seriesRef.current.priceToCoordinate(strategicOverlay.supplyZone.bottom) : null;
+        const dTop = strategicOverlay.demandZone ? seriesRef.current.priceToCoordinate(strategicOverlay.demandZone.top) : null;
+        const dBtm = strategicOverlay.demandZone ? seriesRef.current.priceToCoordinate(strategicOverlay.demandZone.bottom) : null;
 
         setZoneBoxes({
           supply:
-            sTop !== null && sBtm !== null
+            sTop != null && sBtm != null
               ? { top: Math.min(sTop, sBtm), height: Math.max(8, Math.abs(sBtm - sTop)) }
               : null,
           demand:
-            dTop !== null && dBtm !== null
+            dTop != null && dBtm != null
               ? { top: Math.min(dTop, dBtm), height: Math.max(8, Math.abs(dBtm - dTop)) }
               : null,
         });

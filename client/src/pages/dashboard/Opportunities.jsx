@@ -566,6 +566,7 @@ export default function Opportunities() {
       <Modal
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
+        size="xl"
         title={selected ? `${selected.symbol} · ${selected.direction}` : ''}
       >
         {selected && (
