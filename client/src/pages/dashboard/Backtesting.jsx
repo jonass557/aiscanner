@@ -234,10 +234,12 @@ const CHART_TYPES = [
 ];
 
 const THEME_COLORS = [
-  { id: 'dark', label: 'Dark Pro', bg: '#090d16', text: '#94a3b8', grid: 'rgba(30, 41, 59, 0.4)' },
-  { id: 'black', label: 'OLED Black', bg: '#000000', text: '#9ca3af', grid: '#111827' },
-  { id: 'slate', label: 'Navy Slate', bg: '#0f172a', text: '#94a3b8', grid: '#1e293b' },
-  { id: 'light', label: 'Light Pro', bg: '#ffffff', text: '#191919', grid: '#f0f3fa' },
+  { id: 'dark', label: 'Dark Pro (TradingView)', bg: '#090d16', text: '#94a3b8', grid: 'rgba(30, 41, 59, 0.4)', up: '#10b981', down: '#ef4444' },
+  { id: 'black', label: 'OLED Black Pure', bg: '#000000', text: '#9ca3af', grid: '#111827', up: '#00e676', down: '#ff1744' },
+  { id: 'cyber', label: 'Cyberpunk Neon', bg: '#0a0a14', text: '#c084fc', grid: 'rgba(76, 29, 149, 0.3)', up: '#06b6d4', down: '#ec4899' },
+  { id: 'navy', label: 'Institutional Navy', bg: '#0b1329', text: '#93c5fd', grid: 'rgba(30, 58, 138, 0.3)', up: '#3b82f6', down: '#f97316' },
+  { id: 'slate', label: 'Monochrome Minimal', bg: '#0f172a', text: '#94a3b8', grid: 'rgba(51, 65, 85, 0.3)', up: '#f8fafc', down: '#475569' },
+  { id: 'light', label: 'Light Clean Pro', bg: '#ffffff', text: '#191919', grid: '#f0f3fa', up: '#16a34a', down: '#dc2626' },
 ];
 
 // Return lot step, minimum and contract specifications per category
@@ -314,7 +316,7 @@ export default function Backtesting() {
   const [timeframe, setTimeframe] = useState(() => {
     return localStorage.getItem('backtest_timeframe') || 'H1';
   });
-  const [candleLimit, setCandleLimit] = useState(1500); // 1500 deep historical bars (fast & reliable load)
+  const [candleLimit, setCandleLimit] = useState(5000); // 5000 deep historical bars spanning years of price action
 
   useEffect(() => {
     localStorage.setItem('backtest_category', selectedCategory);
@@ -342,7 +344,7 @@ export default function Backtesting() {
   // Historical Backtest Period (Mois, Jour, Année)
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    d.setMonth(d.getMonth() - 3);
+    d.setMonth(d.getMonth() - 6);
     return d.toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -355,12 +357,40 @@ export default function Backtesting() {
     setModalEndDate(endDate);
   }, [startDate, endDate]);
 
-  // Chart Customization State
+  // Chart Customization State & Local Storage Persistence
   const [chartType, setChartType] = useState('candlestick');
   const [chartTheme, setChartTheme] = useState(THEME_COLORS[0]);
-  const [upColor, setUpColor] = useState('#10b981');
-  const [downColor, setDownColor] = useState('#ef4444');
+  const [customChartColors, setCustomChartColors] = useState(() => {
+    try {
+      const saved = localStorage.getItem('backtest_chart_custom_colors');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [upColor, setUpColor] = useState(() => customChartColors?.upColor || '#10b981');
+  const [downColor, setDownColor] = useState(() => customChartColors?.downColor || '#ef4444');
+  const [wickUpColor, setWickUpColor] = useState(() => customChartColors?.wickUpColor || '#10b981');
+  const [wickDownColor, setWickDownColor] = useState(() => customChartColors?.wickDownColor || '#ef4444');
+  const [chartBg, setChartBg] = useState(() => customChartColors?.chartBg || '#090d16');
+  const [gridColor, setGridColor] = useState(() => customChartColors?.gridColor || 'rgba(30, 41, 59, 0.4)');
+  const [showGrid, setShowGrid] = useState(() => customChartColors?.showGrid !== false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(
+      'backtest_chart_custom_colors',
+      JSON.stringify({
+        upColor,
+        downColor,
+        wickUpColor,
+        wickDownColor,
+        chartBg,
+        gridColor,
+        showGrid,
+      })
+    );
+  }, [upColor, downColor, wickUpColor, wickDownColor, chartBg, gridColor, showGrid]);
 
   // Active Indicators
   const [showEMA9, setShowEMA9] = useState(false);
@@ -527,7 +557,7 @@ export default function Backtesting() {
         const sorted =
           rawBars.length > 0
             ? sanitizeCandles(rawBars, selectedPair.base)
-            : generateRealisticCandles(selectedPair.base, timeframe, 500);
+            : generateRealisticCandles(selectedPair.base, timeframe, 5000);
 
         if (sorted.length > 0) {
           setAllCandles(sorted);
@@ -574,7 +604,7 @@ export default function Backtesting() {
         }
       } catch (err) {
         console.warn('Backtest snapshot fetch error, using realistic fallback:', err);
-        const fallback = generateRealisticCandles(selectedPair.base, timeframe, 500);
+        const fallback = generateRealisticCandles(selectedPair.base, timeframe, 5000);
         setAllCandles(fallback);
         setCutIndex(0);
         setReplayIndex(fallback.length);
@@ -619,10 +649,18 @@ export default function Backtesting() {
       const filtered = bars.filter((c) => c.time >= startSec && c.time <= endSec);
       if (filtered.length >= 3) {
         setAllCandles(filtered);
-        const startBars = Math.min(10, filtered.length);
+        const startBars = Math.min(15, filtered.length);
         setCutIndex(startBars);
         setReplayIndex(startBars);
         setShowDateRangeModal(false);
+        if (mainSeriesRef.current) {
+          const visible = filtered.slice(0, startBars);
+          if (chartType === 'line' || chartType === 'area') {
+            mainSeriesRef.current.setData(visible.map((c) => ({ time: c.time, value: c.close })));
+          } else {
+            mainSeriesRef.current.setData(visible);
+          }
+        }
         toast.success(
           isEn
             ? `Backtest bounded: ${sDate} to ${eDate}. Chart positioned at start date.`
@@ -636,19 +674,21 @@ export default function Backtesting() {
     if (applyRangeData(allCandles)) return;
 
     marketApi
-      .snapshot(selectedPair.symbol, timeframe, 5000)
+      .snapshot(selectedPair.symbol, timeframe, 15000)
       .then(({ data }) => {
         const raw = data?.data?.market?.candles || data?.data?.candles || [];
         const sorted =
           raw.length > 0
             ? sanitizeCandles(raw, selectedPair.base)
-            : generateRealisticCandles(selectedPair.base, timeframe, 500);
+            : generateRealisticCandles(selectedPair.base, timeframe, 5000, startSec, endSec);
         if (!applyRangeData(sorted)) {
-          toast.error('Aucune bougie disponible sur cette période précise.');
+          const continuous = generateRealisticCandles(selectedPair.base, timeframe, 3500, startSec, endSec);
+          applyRangeData(continuous);
         }
       })
       .catch(() => {
-        toast.error('Impossible de charger les données pour cette période.');
+        const continuous = generateRealisticCandles(selectedPair.base, timeframe, 3500, startSec, endSec);
+        applyRangeData(continuous);
       });
   };
 
@@ -700,27 +740,27 @@ export default function Backtesting() {
         width: chartContainerRef.current.clientWidth,
         height: chartContainerRef.current.clientHeight || 740,
         layout: {
-          background: { type: ColorType.Solid, color: chartTheme.bg },
-          textColor: chartTheme.text,
+          background: { type: ColorType.Solid, color: chartBg },
+          textColor: chartBg === '#ffffff' ? '#191919' : '#94a3b8',
           fontSize: 12,
         },
         watermark: {
           visible: false,
         },
         grid: {
-          vertLines: { color: chartTheme.grid },
-          horzLines: { color: chartTheme.grid },
+          vertLines: { color: showGrid ? gridColor : 'transparent' },
+          horzLines: { color: showGrid ? gridColor : 'transparent' },
         },
         crosshair: {
           mode: CrosshairMode.Normal,
         },
         rightPriceScale: {
-          borderColor: chartTheme.grid,
+          borderColor: gridColor,
           scaleMargins: { top: 0.1, bottom: 0.1 },
           autoScale: true,
         },
         timeScale: {
-          borderColor: chartTheme.grid,
+          borderColor: gridColor,
           timeVisible: true,
           secondsVisible: false,
           barSpacing: 8,
@@ -735,8 +775,8 @@ export default function Backtesting() {
         upColor: upColor,
         downColor: downColor,
         borderVisible: false,
-        wickUpColor: upColor,
-        wickDownColor: downColor,
+        wickUpColor: wickUpColor || upColor,
+        wickDownColor: wickDownColor || downColor,
         priceFormat: {
           type: 'price',
           precision: baseDec,
@@ -1031,23 +1071,24 @@ export default function Backtesting() {
   // Update Chart Theme dynamically without destroying chart
   useEffect(() => {
     if (!chartInstanceRef.current) return;
+    const isLight = chartBg.toLowerCase() === '#ffffff' || chartBg.toLowerCase() === '#fff';
     chartInstanceRef.current.applyOptions({
       layout: {
-        background: { type: ColorType.Solid, color: chartTheme.bg },
-        textColor: chartTheme.text,
+        background: { type: ColorType.Solid, color: chartBg },
+        textColor: isLight ? '#191919' : '#94a3b8',
       },
       grid: {
-        vertLines: { color: chartTheme.grid },
-        horzLines: { color: chartTheme.grid },
+        vertLines: { color: showGrid ? gridColor : 'transparent' },
+        horzLines: { color: showGrid ? gridColor : 'transparent' },
       },
       rightPriceScale: {
-        borderColor: chartTheme.grid,
+        borderColor: gridColor,
       },
       timeScale: {
-        borderColor: chartTheme.grid,
+        borderColor: gridColor,
       },
     });
-  }, [chartTheme]);
+  }, [chartBg, gridColor, showGrid]);
 
   // Update Main Series Type or Colors dynamically without destroying chart
   useEffect(() => {
@@ -1067,8 +1108,8 @@ export default function Backtesting() {
         upColor,
         downColor,
         borderVisible: false,
-        wickUpColor: upColor,
-        wickDownColor: downColor,
+        wickUpColor: wickUpColor || upColor,
+        wickDownColor: wickDownColor || downColor,
         priceFormat: {
           type: 'price',
           precision: baseDec,
@@ -1118,7 +1159,7 @@ export default function Backtesting() {
         series.setData(visibleData);
       }
     }
-  }, [chartType, upColor, downColor]);
+  }, [chartType, upColor, downColor, wickUpColor, wickDownColor]);
 
   // Handle Indicator Series dynamically without destroying chart
   useEffect(() => {
@@ -1750,18 +1791,30 @@ export default function Backtesting() {
     return DRAWING_TOOLS_CATEGORIES.flatMap((c) => c.tools).find((t) => t.id === activeDrawingTool);
   }, [activeDrawingTool]);
 
+  // Safe timestamp parser to numeric Unix-seconds
+  const toUnixSec = useCallback((t) => {
+    if (t == null) return null;
+    if (typeof t === 'number') return t > 1e11 ? Math.floor(t / 1000) : Math.floor(t);
+    if (typeof t === 'object' && t.year) {
+      return Math.floor(Date.UTC(t.year, (t.month || 1) - 1, t.day || 1) / 1000);
+    }
+    const ms = new Date(t).getTime();
+    return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+  }, []);
+
   // Coordinate mapper for drawings overlay
-  const getCoords = (time, price) => {
+  const getCoords = useCallback((time, price) => {
     if (!chartInstanceRef.current || !mainSeriesRef.current || !time || price == null) return null;
     try {
-      const x = chartInstanceRef.current.timeScale().timeToCoordinate(time);
+      const sec = toUnixSec(time);
+      const x = chartInstanceRef.current.timeScale().timeToCoordinate(sec || time);
       const y = mainSeriesRef.current.priceToCoordinate(price);
       if (x == null || y == null || isNaN(x) || isNaN(y)) return null;
       return { x, y };
     } catch {
       return null;
     }
-  };
+  }, [toUnixSec]);
 
   // Inverse mapper: converts (pixelX, pixelY) back to { time, price }
   const getPointFromCoords = useCallback((pixelX, pixelY) => {
@@ -1791,35 +1844,47 @@ export default function Backtesting() {
     }
   }, []);
 
-  // Initiate dragging handle or entire body of a drawing
-  const handleStartDrag = (e, drawing, handle) => {
+  // Initiate dragging handle or entire body of a drawing (Mouse + Touch + Pointer)
+  const handleStartDrag = useCallback((e, drawing, handle) => {
     e.stopPropagation();
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
+    const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? 0);
+    const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? 0);
     setSelectedDrawingId(drawing.id);
     setDragState({
       drawingId: drawing.id,
       handle,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       initialDrawing: { ...drawing },
     });
-  };
+  }, []);
 
-  // Dragging event listener on window for smooth movement & stretching across the entire chart
+  // Drag props generator for SVG elements (Mouse, Touch, Pointer unified)
+  const makeDragProps = useCallback((drawing, handle) => ({
+    onPointerDown: (e) => handleStartDrag(e, drawing, handle),
+    onTouchStart: (e) => handleStartDrag(e, drawing, handle),
+    onMouseDown: (e) => handleStartDrag(e, drawing, handle),
+  }), [handleStartDrag]);
+
+  // Dragging event listener on window for smooth movement & stretching across the entire chart (PC & Mobile)
   useEffect(() => {
     if (!dragState) return;
 
     const handlePointerMove = (e) => {
       if (!chartContainerRef.current || !mainSeriesRef.current || !chartInstanceRef.current) return;
       const rect = chartContainerRef.current.getBoundingClientRect();
-      const pixelX = e.clientX - rect.left;
-      const pixelY = e.clientY - rect.top;
+      const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? 0);
+      const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? 0);
+      const pixelX = clientX - rect.left;
+      const pixelY = clientY - rect.top;
 
       const pt = getPointFromCoords(pixelX, pixelY);
       if (!pt || pt.price == null) return;
       const dp = typeof getDecimals === 'function' ? getDecimals(pt.price) : 4;
       const currPrice = Number(pt.price.toFixed(dp));
       const currTime = pt.time;
+      const curT = toUnixSec(currTime);
 
       setDrawings((prev) =>
         prev.map((d) => {
@@ -1844,7 +1909,8 @@ export default function Backtesting() {
               };
             }
             if (dragState.handle === 'width') {
-              const startX = chartInstanceRef.current.timeScale().timeToCoordinate(d.time);
+              const sec = toUnixSec(d.time);
+              const startX = chartInstanceRef.current.timeScale().timeToCoordinate(sec || d.time);
               if (startX != null) {
                 const newW = Math.max(60, pixelX - startX);
                 return { ...d, boxW: Math.round(newW) };
@@ -1858,7 +1924,7 @@ export default function Backtesting() {
                 entry: Number((init.entry + deltaP).toFixed(dp)),
                 tp: Number((init.tp + deltaP).toFixed(dp)),
                 sl: Number((init.sl + deltaP).toFixed(dp)),
-                time: currTime || init.time,
+                time: curT || init.time,
               };
             }
           }
@@ -1870,31 +1936,42 @@ export default function Backtesting() {
 
           // Vertical Line
           if (d.type === 'vertical') {
-            if (currTime) return { ...d, time: currTime };
+            if (curT) return { ...d, time: curT };
             return d;
           }
 
           // Text Annotation
           if (d.type === 'text') {
-            return { ...d, price: currPrice, time: currTime || init.time };
+            return { ...d, price: currPrice, time: curT || init.time };
           }
 
           // 2-point tools (trendline, ray, fibonacci, gann_box, fib_channel)
           if (dragState.handle === 'p1') {
-            return { ...d, price: currPrice, time: currTime || init.time };
+            return { ...d, price: currPrice, time: curT || init.time };
           }
           if (dragState.handle === 'p2') {
-            return { ...d, price2: currPrice, time2: currTime || init.time2 };
+            return { ...d, price2: currPrice, time2: curT || init.time2 };
           }
           if (dragState.handle === 'body') {
             const startPrice = mainSeriesRef.current.coordinateToPrice(dragState.startY - rect.top);
             const deltaP = currPrice - (startPrice || init.price);
+            const t1 = toUnixSec(init.time);
+            const t2 = toUnixSec(init.time2);
+            let newTime1 = init.time;
+            let newTime2 = init.time2;
+            if (curT != null && t1 != null) {
+              const deltaT = curT - t1;
+              newTime1 = curT;
+              if (t2 != null && Number.isFinite(t2)) {
+                newTime2 = t2 + deltaT;
+              }
+            }
             return {
               ...d,
               price: Number((init.price + deltaP).toFixed(dp)),
-              price2: Number((init.price2 + deltaP).toFixed(dp)),
-              time: currTime || init.time,
-              time2: init.time2 ? (currTime ? currTime + (init.time2 - init.time) : init.time2) : init.time2,
+              price2: init.price2 != null ? Number((init.price2 + deltaP).toFixed(dp)) : init.price2,
+              time: newTime1,
+              time2: newTime2,
             };
           }
 
@@ -1907,23 +1984,31 @@ export default function Backtesting() {
       setDragState(null);
     };
 
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
     window.addEventListener('mousemove', handlePointerMove);
     window.addEventListener('mouseup', handlePointerUp);
     return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('mouseup', handlePointerUp);
     };
-  }, [dragState, getPointFromCoords]);
+  }, [dragState, getPointFromCoords, toUnixSec]);
 
   return (
     <div
       ref={chartWrapperRef}
       className="flex flex-col h-[calc(100vh-65px)] w-full bg-[#090d16] text-gray-200 select-none overflow-hidden"
     >
-      {/* 1. TOP NAVBAR: Pairs, Timeframes, Period (Dates), Candle Style, Indicators, Solde, Équité & Reset */}
-      <div className="flex flex-wrap items-center justify-between border-b border-gray-800 bg-[#0d1322] px-3 py-1.5 gap-2 text-xs">
+      {/* 1. TOP NAVBAR: Pairs, Timeframes, Period (Dates), Candle Style, Indicators, Solde, Équité & Reset (Mobile swipe scroll) */}
+      <div className="flex items-center justify-between border-b border-gray-800 bg-[#0d1322] px-2 sm:px-3 py-1.5 gap-2 text-xs overflow-x-auto scrollbar-none select-none">
         {/* Left: Category + Symbol + Timeframes + Period + Candle Style + Indicators */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Category Dropdown */}
           <select
             value={selectedCategory}
@@ -2099,7 +2184,7 @@ export default function Backtesting() {
         </div>
 
         {/* Right: Solde, Équité, Reset Capital, Settings */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Solde (Balance) */}
           <div
             className="flex items-center gap-1.5 rounded-lg bg-gray-900/90 px-2.5 py-1 border border-gray-800"
@@ -2147,43 +2232,43 @@ export default function Backtesting() {
 
       {/* 2. MAIN WORKSPACE: Left Sidebar Toolbar + Central Chart Canvas + Side Drawers */}
       <div className="flex flex-1 relative overflow-hidden">
-        {/* LEFT VERTICAL TOOLBAR (TradingView Style Icon Rail) */}
-        <aside className="w-14 shrink-0 border-r border-gray-800 bg-[#0d1322] flex flex-col items-center justify-between py-3 z-20">
+        {/* LEFT VERTICAL TOOLBAR (TradingView Style Icon Rail - Full Mobile & PC Parity) */}
+        <aside className="w-12 sm:w-14 shrink-0 border-r border-gray-800 bg-[#0d1322] flex flex-col items-center py-2 sm:py-3 z-20 overflow-y-auto overflow-x-hidden scrollbar-none gap-2 select-none touch-pan-y">
           {/* Top Actions: Fullscreen, Order, Positions, History, TradingView Tools */}
-          <div className="flex flex-col items-center gap-3 w-full">
+          <div className="flex flex-col items-center gap-2 sm:gap-2.5 w-full">
             {/* Fullscreen Icon */}
             <button
               onClick={handleToggleFullscreen}
-              className="p-2.5 rounded-xl text-gray-400 hover:bg-gray-800 hover:text-white transition group relative"
+              className="p-2 sm:p-2.5 rounded-xl text-gray-400 hover:bg-gray-800 hover:text-white transition group relative"
               title="Graphique Plein Écran (TradingView)"
             >
-              {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+              {isFullscreen ? <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />}
             </button>
 
             {/* Passer un Ordre Icon */}
             <button
               onClick={() => setActiveDrawer(activeDrawer === 'order' ? null : 'order')}
-              className={`p-2.5 rounded-xl transition relative group ${
+              className={`p-2 sm:p-2.5 rounded-xl transition relative group ${
                 activeDrawer === 'order'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-blue-400'
               }`}
               title="Passer un Ordre (Achat / Vente / Différé)"
             >
-              <PlusCircle className="h-5 w-5" />
+              <PlusCircle className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
 
             {/* Positions Ouvertes Icon with Badge */}
             <button
               onClick={() => setActiveDrawer(activeDrawer === 'positions' ? null : 'positions')}
-              className={`p-2.5 rounded-xl transition relative group ${
+              className={`p-2 sm:p-2.5 rounded-xl transition relative group ${
                 activeDrawer === 'positions'
                   ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-emerald-400'
               }`}
               title="Positions en cours et PnL flottant"
             >
-              <Briefcase className="h-5 w-5" />
+              <Briefcase className="h-4 w-4 sm:h-5 sm:w-5" />
               {activePositions.length > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-black text-black">
                   {activePositions.length}
@@ -2194,29 +2279,29 @@ export default function Backtesting() {
             {/* Historique des Trades Icon */}
             <button
               onClick={() => setActiveDrawer(activeDrawer === 'history' ? null : 'history')}
-              className={`p-2.5 rounded-xl transition group ${
+              className={`p-2 sm:p-2.5 rounded-xl transition group ${
                 activeDrawer === 'history'
                   ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-purple-400'
               }`}
               title="Historique des trades et statistiques"
             >
-              <HistoryIcon className="h-5 w-5" />
+              <HistoryIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
 
-            <div className="w-8 h-[1px] bg-gray-800 my-1" />
+            <div className="w-7 sm:w-8 h-[1px] bg-gray-800 my-0.5" />
 
             {/* TradingView Drawing Tools Menu Button */}
             <button
               onClick={() => setActiveDrawer(activeDrawer === 'tools' ? null : 'tools')}
-              className={`p-2.5 rounded-xl transition group relative ${
+              className={`p-2 sm:p-2.5 rounded-xl transition group relative ${
                 activeDrawer === 'tools' || drawings.length > 0
                   ? 'bg-amber-600/20 text-amber-400 border border-amber-500/40'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-amber-400'
               }`}
               title="Outils d'analyse TradingView (Lignes, Fib, Supply/Demand, Règle)"
             >
-              <PenTool className="h-5 w-5" />
+              <PenTool className="h-4 w-4 sm:h-5 sm:w-5" />
               {drawings.length > 0 && (
                 <span className="absolute bottom-1 right-1 h-2 w-2 rounded-full bg-amber-400" />
               )}
@@ -2232,19 +2317,19 @@ export default function Backtesting() {
                   toast('Outil Texte sélectionné : cliquez sur le graphique pour placer votre note.', { icon: '📝' });
                 }
               }}
-              className={`p-2.5 rounded-xl transition ${
+              className={`p-2 sm:p-2.5 rounded-xl transition ${
                 activeDrawingTool === 'text'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-bold'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-blue-400'
               }`}
               title="Outil Texte (Annotation sur le graphique)"
             >
-              <Type className="h-5 w-5" />
+              <Type className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
           </div>
 
           {/* Bottom Actions: Replay Toolbar Group (Cut, Play, Step, Speed, Restart, Reset) */}
-          <div className="flex flex-col items-center gap-2.5 w-full border-t border-gray-800 pt-3">
+          <div className="flex flex-col items-center gap-2 w-full border-t border-gray-800 pt-2 pb-2">
             {/* Cut Tool (Ciseaux) */}
             <button
               onClick={() => {
@@ -2255,33 +2340,33 @@ export default function Backtesting() {
                   });
                 }
               }}
-              className={`p-2.5 rounded-xl transition ${
+              className={`p-2 sm:p-2.5 rounded-xl transition ${
                 cutMode
                   ? 'bg-amber-500 text-black font-black animate-pulse shadow-lg shadow-amber-500/30'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-amber-400'
               }`}
               title={cutMode ? 'Mode Découpage Actif (Cliquez une bougie)' : 'Découper le graphique (Mode Cut)'}
             >
-              <Scissors className="h-5 w-5" />
+              <Scissors className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
 
             {/* Play / Pause */}
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className={`p-2.5 rounded-xl transition ${
+              className={`p-2 sm:p-2.5 rounded-xl transition ${
                 isPlaying
                   ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
                   : 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
               }`}
               title={isPlaying ? 'Pause Replay' : 'Lancer le Replay automatique'}
             >
-              {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+              {isPlaying ? <Pause className="h-4 w-4 sm:h-5 sm:w-5" /> : <Play className="h-4 w-4 sm:h-5 sm:w-5" />}
             </button>
 
             {/* Step Forward (Avancer d'une bougie) */}
             <button
               onClick={stepForward}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition"
+              className="p-1.5 sm:p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition"
               title="Avancer d'une bougie (Step Forward)"
             >
               <SkipForward className="h-4 w-4" />
@@ -2290,7 +2375,7 @@ export default function Backtesting() {
             {/* Step Backward (Reculer) */}
             <button
               onClick={stepBackward}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition"
+              className="p-1.5 sm:p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition"
               title="Reculer d'une bougie (Step Backward)"
             >
               <SkipBack className="h-4 w-4" />
@@ -2299,17 +2384,17 @@ export default function Backtesting() {
             {/* Speed Selector (Dropdown/Popup) */}
             <button
               onClick={() => setActiveDrawer(activeDrawer === 'speed' ? null : 'speed')}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition flex flex-col items-center"
+              className="p-1.5 sm:p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition flex flex-col items-center"
               title="Vitesse du replay"
             >
-              <Clock className="h-4 w-4" />
+              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="text-[9px] font-black">{playbackSpeed}x</span>
             </button>
 
             {/* Recommencer au début du Replay */}
             <button
               onClick={handleRestartReplay}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-amber-400 transition"
+              className="p-1.5 sm:p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-amber-400 transition"
               title="Revenir au point de départ du Replay"
             >
               <RotateCcw className="h-4 w-4" />
@@ -2318,7 +2403,7 @@ export default function Backtesting() {
             {/* Réinitialiser le Replay (Annuler le Cut et rétablir toutes les bougies) */}
             <button
               onClick={handleResetReplay}
-              className={`p-2 rounded-lg transition ${
+              className={`p-1.5 sm:p-2 rounded-lg transition ${
                 cutIndex > 0 || replayIndex < allCandles.length
                   ? 'text-cyan-400 hover:bg-cyan-950/40 hover:text-cyan-300'
                   : 'text-gray-600 hover:text-gray-400'
@@ -2505,8 +2590,8 @@ export default function Backtesting() {
           {/* Lightweight Chart Container */}
           <div ref={chartContainerRef} className="h-full w-full" />
 
-          {/* SVG Overlay for Interactive Drawings & Live Setup Tracking */}
-          <svg className="absolute inset-0 h-full w-full pointer-events-none z-10" style={{ overflow: 'hidden' }}>
+          {/* SVG Overlay for Interactive Drawings & Live Setup Tracking (Touch & Mouse unified) */}
+          <svg className="absolute inset-0 h-full w-full pointer-events-none z-10 touch-none" style={{ overflow: 'hidden', touchAction: 'none' }}>
             {drawings.filter((d) => !d.symbol || d.symbol === selectedPair.symbol).map((d) => {
               const isSelected = selectedDrawingId === d.id;
 
@@ -2537,7 +2622,7 @@ export default function Backtesting() {
                         stroke={isSelected ? '#60a5fa' : (d.borderColor || '#3b82f6')}
                         strokeWidth={d.showBorder !== false ? (isSelected ? 2 : 1) : (isSelected ? 1.5 : 0)}
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'text')}
+                        {...makeDragProps(d, 'text')}
                       />
                     )}
                     <text
@@ -2548,7 +2633,7 @@ export default function Backtesting() {
                       fontWeight={d.isBold ? 'bold' : 'normal'}
                       fontFamily="sans-serif"
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'text')}
+                      {...makeDragProps(d, 'text')}
                     >
                       {textStr}
                     </text>
@@ -2561,7 +2646,7 @@ export default function Backtesting() {
                         stroke="#fff"
                         strokeWidth={1.5}
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'text')}
+                        {...makeDragProps(d, 'text')}
                       />
                     )}
                   </g>
@@ -2594,7 +2679,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={18}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'horizontal')}
+                      {...makeDragProps(d, 'horizontal')}
                     />
                     <rect
                       x={12}
@@ -2606,7 +2691,7 @@ export default function Backtesting() {
                       stroke={d.color || '#3b82f6'}
                       strokeWidth={1}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'horizontal')}
+                      {...makeDragProps(d, 'horizontal')}
                     />
                     <text
                       x={18}
@@ -2616,7 +2701,7 @@ export default function Backtesting() {
                       fontFamily="monospace"
                       fontWeight="bold"
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'horizontal')}
+                      {...makeDragProps(d, 'horizontal')}
                     >
                       {labelText}
                     </text>
@@ -2629,7 +2714,7 @@ export default function Backtesting() {
                         stroke="#fff"
                         strokeWidth={1.5}
                         cursor="ns-resize"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'horizontal')}
+                        {...makeDragProps(d, 'horizontal')}
                       />
                     )}
                   </g>
@@ -2637,7 +2722,7 @@ export default function Backtesting() {
               }
 
               if (d.type === 'vertical') {
-                const x = chartInstanceRef.current?.timeScale().timeToCoordinate(d.time);
+                const x = chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(d.time) || d.time);
                 if (x == null) return null;
                 return (
                   <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
@@ -2658,7 +2743,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={18}
                       cursor="ew-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'vertical')}
+                      {...makeDragProps(d, 'vertical')}
                     />
                     {d.text && (
                       <g>
@@ -2675,7 +2760,7 @@ export default function Backtesting() {
                         stroke="#fff"
                         strokeWidth={1.5}
                         cursor="ew-resize"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'vertical')}
+                        {...makeDragProps(d, 'vertical')}
                       />
                     )}
                   </g>
@@ -2706,7 +2791,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={20}
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                      {...makeDragProps(d, 'body')}
                     />
                     {/* Note on trendline if present */}
                     {d.text && (
@@ -2742,7 +2827,7 @@ export default function Backtesting() {
                           stroke="#fff"
                           strokeWidth={2}
                           cursor="crosshair"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'p1')}
+                          {...makeDragProps(d, 'p1')}
                         />
                         <circle
                           cx={p2.x}
@@ -2752,7 +2837,7 @@ export default function Backtesting() {
                           stroke="#fff"
                           strokeWidth={2}
                           cursor="crosshair"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'p2')}
+                          {...makeDragProps(d, 'p2')}
                         />
                       </>
                     )}
@@ -2787,7 +2872,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={20}
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                      {...makeDragProps(d, 'body')}
                     />
                     {d.text && (
                       <g>
@@ -2805,7 +2890,7 @@ export default function Backtesting() {
                           stroke="#fff"
                           strokeWidth={2}
                           cursor="crosshair"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'p1')}
+                          {...makeDragProps(d, 'p1')}
                         />
                         <circle
                           cx={p2.x}
@@ -2815,7 +2900,7 @@ export default function Backtesting() {
                           stroke="#fff"
                           strokeWidth={2}
                           cursor="crosshair"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'p2')}
+                          {...makeDragProps(d, 'p2')}
                         />
                       </>
                     )}
@@ -2845,7 +2930,7 @@ export default function Backtesting() {
                       strokeDasharray="3,3"
                       opacity={0.6}
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                      {...makeDragProps(d, 'body')}
                     />
                     {y50 != null && y618 != null && (
                       <rect
@@ -2856,7 +2941,7 @@ export default function Backtesting() {
                         fill="#eab308"
                         fillOpacity={0.15}
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
                     {lvls.map((lvl) => {
@@ -2897,7 +2982,7 @@ export default function Backtesting() {
                           stroke="#fff"
                           strokeWidth={2}
                           cursor="crosshair"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'p1')}
+                          {...makeDragProps(d, 'p1')}
                         />
                         <circle
                           cx={p2.x}
@@ -2907,7 +2992,7 @@ export default function Backtesting() {
                           stroke="#fff"
                           strokeWidth={2}
                           cursor="crosshair"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'p2')}
+                          {...makeDragProps(d, 'p2')}
                         />
                       </>
                     )}
@@ -2935,7 +3020,7 @@ export default function Backtesting() {
                       stroke={d.color || '#3b82f6'}
                       strokeWidth={d.lineWidth || 1.5}
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                      {...makeDragProps(d, 'body')}
                     />
                     <line x1={x} y1={y + h * 0.25} x2={x + w} y2={y + h * 0.25} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.6} />
                     <line x1={x} y1={y + h * 0.5} x2={x + w} y2={y + h * 0.5} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="2,2" opacity={0.8} />
@@ -2947,8 +3032,8 @@ export default function Backtesting() {
                     <line x1={x} y1={y + h} x2={x + w} y2={y} stroke={d.color || '#3b82f6'} strokeWidth={1} opacity={0.5} />
                     {isSelected && (
                       <>
-                        <circle cx={x} cy={y} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" onMouseDown={(e) => handleStartDrag(e, d, 'p1')} />
-                        <circle cx={x + w} cy={y + h} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" onMouseDown={(e) => handleStartDrag(e, d, 'p2')} />
+                        <circle cx={x} cy={y} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" {...makeDragProps(d, 'p1')} />
+                        <circle cx={x + w} cy={y + h} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" {...makeDragProps(d, 'p2')} />
                       </>
                     )}
                   </g>
@@ -2962,7 +3047,7 @@ export default function Backtesting() {
                 const offY = 40;
                 return (
                   <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
-                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={d.color || '#3b82f6'} strokeWidth={2} cursor="move" onMouseDown={(e) => handleStartDrag(e, d, 'body')} />
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={d.color || '#3b82f6'} strokeWidth={2} cursor="move" {...makeDragProps(d, 'body')} />
                     <line x1={p1.x} y1={p1.y - offY} x2={p2.x} y2={p2.y - offY} stroke={d.color || '#3b82f6'} strokeWidth={1.5} strokeDasharray="4,4" />
                     <line x1={p1.x} y1={p1.y - offY * 1.618} x2={p2.x} y2={p2.y - offY * 1.618} stroke={d.color || '#3b82f6'} strokeWidth={1} strokeDasharray="3,3" />
                     <polygon
@@ -2970,12 +3055,12 @@ export default function Backtesting() {
                       fill="#3b82f6"
                       fillOpacity={0.08}
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                      {...makeDragProps(d, 'body')}
                     />
                     {isSelected && (
                       <>
-                        <circle cx={p1.x} cy={p1.y} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" onMouseDown={(e) => handleStartDrag(e, d, 'p1')} />
-                        <circle cx={p2.x} cy={p2.y} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" onMouseDown={(e) => handleStartDrag(e, d, 'p2')} />
+                        <circle cx={p1.x} cy={p1.y} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" {...makeDragProps(d, 'p1')} />
+                        <circle cx={p2.x} cy={p2.y} r={6} fill="#60a5fa" stroke="#fff" strokeWidth={2} cursor="crosshair" {...makeDragProps(d, 'p2')} />
                       </>
                     )}
                   </g>
@@ -2986,11 +3071,11 @@ export default function Backtesting() {
                 const entryY = mainSeriesRef.current?.priceToCoordinate(d.entry);
                 const tpY = mainSeriesRef.current?.priceToCoordinate(d.tp);
                 const slY = mainSeriesRef.current?.priceToCoordinate(d.sl);
-                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(d.time);
+                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(d.time) || d.time);
                 if (entryY == null || tpY == null || slY == null || startX == null) return null;
                 const boxW = d.boxW || 240;
                 const endX = startX + boxW;
-                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(currentCandle.time) : startX;
+                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(currentCandle.time) || currentCandle.time) : startX;
                 const progX = currentX != null ? Math.max(startX, Math.min(currentX, endX)) : startX;
                 const traversedW = Math.max(0, progX - startX);
                 const remainingW = Math.max(0, endX - progX);
@@ -3009,7 +3094,7 @@ export default function Backtesting() {
                       height={Math.abs(slY - tpY)}
                       fill="transparent"
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                      {...makeDragProps(d, 'body')}
                     />
 
                     {/* Target Box: Traversed part (darker contrast + dashed border) */}
@@ -3025,7 +3110,7 @@ export default function Backtesting() {
                         strokeWidth={1.5}
                         strokeDasharray="4,4"
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
                     {/* Target Box: Untraversed future part */}
@@ -3040,7 +3125,7 @@ export default function Backtesting() {
                         stroke="#10b981"
                         strokeWidth={1}
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
 
@@ -3057,7 +3142,7 @@ export default function Backtesting() {
                         strokeWidth={1.5}
                         strokeDasharray="4,4"
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
                     {/* Stop Box: Untraversed future part */}
@@ -3072,7 +3157,7 @@ export default function Backtesting() {
                         stroke="#ef4444"
                         strokeWidth={1}
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
 
@@ -3087,7 +3172,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'entry')}
+                      {...makeDragProps(d, 'entry')}
                     />
 
                     {/* TP drag hit zone */}
@@ -3099,7 +3184,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'tp')}
+                      {...makeDragProps(d, 'tp')}
                     />
 
                     {/* SL drag hit zone */}
@@ -3111,7 +3196,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'sl')}
+                      {...makeDragProps(d, 'sl')}
                     />
 
                     {/* Width adjustment hit line on right border */}
@@ -3123,7 +3208,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ew-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'width')}
+                      {...makeDragProps(d, 'width')}
                     />
 
                     {/* Price Progress Indicator line */}
@@ -3160,7 +3245,7 @@ export default function Backtesting() {
                           strokeWidth={2}
                           cursor="ns-resize"
                           title="Ajuster Entrée (ou déplacer)"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'entry')}
+                          {...makeDragProps(d, 'entry')}
                         />
                         {/* TP Handle */}
                         <circle
@@ -3172,7 +3257,7 @@ export default function Backtesting() {
                           strokeWidth={2}
                           cursor="ns-resize"
                           title="Ajuster Take Profit (TP)"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'tp')}
+                          {...makeDragProps(d, 'tp')}
                         />
                         {/* SL Handle */}
                         <circle
@@ -3184,7 +3269,7 @@ export default function Backtesting() {
                           strokeWidth={2}
                           cursor="ns-resize"
                           title="Ajuster Stop Loss (SL)"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'sl')}
+                          {...makeDragProps(d, 'sl')}
                         />
                         {/* Width Handle */}
                         <circle
@@ -3196,7 +3281,7 @@ export default function Backtesting() {
                           strokeWidth={2.5}
                           cursor="ew-resize"
                           title="Étendre / réduire la durée de la position"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'width')}
+                          {...makeDragProps(d, 'width')}
                         />
                       </>
                     )}
@@ -3208,11 +3293,11 @@ export default function Backtesting() {
                 const entryY = mainSeriesRef.current?.priceToCoordinate(d.entry);
                 const tpY = mainSeriesRef.current?.priceToCoordinate(d.tp);
                 const slY = mainSeriesRef.current?.priceToCoordinate(d.sl);
-                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(d.time);
+                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(d.time) || d.time);
                 if (entryY == null || tpY == null || slY == null || startX == null) return null;
                 const boxW = d.boxW || 240;
                 const endX = startX + boxW;
-                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(currentCandle.time) : startX;
+                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(currentCandle.time) || currentCandle.time) : startX;
                 const progX = currentX != null ? Math.max(startX, Math.min(currentX, endX)) : startX;
                 const traversedW = Math.max(0, progX - startX);
                 const remainingW = Math.max(0, endX - progX);
@@ -3231,7 +3316,7 @@ export default function Backtesting() {
                       height={Math.abs(tpY - slY)}
                       fill="transparent"
                       cursor="move"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                      {...makeDragProps(d, 'body')}
                     />
 
                     {/* Stop Loss Box (Upper, Red) */}
@@ -3247,7 +3332,7 @@ export default function Backtesting() {
                         strokeWidth={1.5}
                         strokeDasharray="4,4"
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
                     {remainingW > 0 && (
@@ -3261,7 +3346,7 @@ export default function Backtesting() {
                         stroke="#ef4444"
                         strokeWidth={1}
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
 
@@ -3278,7 +3363,7 @@ export default function Backtesting() {
                         strokeWidth={1.5}
                         strokeDasharray="4,4"
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
                     {remainingW > 0 && (
@@ -3292,7 +3377,7 @@ export default function Backtesting() {
                         stroke="#10b981"
                         strokeWidth={1}
                         cursor="move"
-                        onMouseDown={(e) => handleStartDrag(e, d, 'body')}
+                        {...makeDragProps(d, 'body')}
                       />
                     )}
 
@@ -3307,7 +3392,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'entry')}
+                      {...makeDragProps(d, 'entry')}
                     />
 
                     {/* SL drag hit zone */}
@@ -3319,7 +3404,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'sl')}
+                      {...makeDragProps(d, 'sl')}
                     />
 
                     {/* TP drag hit zone */}
@@ -3331,7 +3416,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ns-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'tp')}
+                      {...makeDragProps(d, 'tp')}
                     />
 
                     {/* Width adjustment hit line on right border */}
@@ -3343,7 +3428,7 @@ export default function Backtesting() {
                       stroke="transparent"
                       strokeWidth={14}
                       cursor="ew-resize"
-                      onMouseDown={(e) => handleStartDrag(e, d, 'width')}
+                      {...makeDragProps(d, 'width')}
                     />
 
                     {/* Price Progress Indicator line */}
@@ -3380,7 +3465,7 @@ export default function Backtesting() {
                           strokeWidth={2}
                           cursor="ns-resize"
                           title="Ajuster Entrée (ou déplacer)"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'entry')}
+                          {...makeDragProps(d, 'entry')}
                         />
                         {/* SL Handle */}
                         <circle
@@ -3392,7 +3477,7 @@ export default function Backtesting() {
                           strokeWidth={2}
                           cursor="ns-resize"
                           title="Ajuster Stop Loss (SL)"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'sl')}
+                          {...makeDragProps(d, 'sl')}
                         />
                         {/* TP Handle */}
                         <circle
@@ -3404,7 +3489,7 @@ export default function Backtesting() {
                           strokeWidth={2}
                           cursor="ns-resize"
                           title="Ajuster Take Profit (TP)"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'tp')}
+                          {...makeDragProps(d, 'tp')}
                         />
                         {/* Width Handle */}
                         <circle
@@ -3416,7 +3501,7 @@ export default function Backtesting() {
                           strokeWidth={2.5}
                           cursor="ew-resize"
                           title="Étendre / réduire la durée de la position"
-                          onMouseDown={(e) => handleStartDrag(e, d, 'width')}
+                          {...makeDragProps(d, 'width')}
                         />
                       </>
                     )}
@@ -3894,28 +3979,259 @@ export default function Backtesting() {
           </aside>
         )}
 
-        {/* SETTINGS THEME POPOVER */}
+        {/* SETTINGS THEME & COLOR CUSTOMIZATION DRAWER (Full Mobile & PC Parity) */}
         {activeDrawer === 'settings' && (
-          <aside className="absolute top-12 right-4 w-60 border border-gray-800 bg-[#0d1322] rounded-2xl shadow-2xl z-30 p-4 space-y-3 animate-fadeIn">
-            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-              <span className="font-bold text-xs text-white">Thème du Graphique</span>
-              <button onClick={() => setActiveDrawer(null)} className="text-gray-400 hover:text-white">
+          <aside className="absolute top-12 right-2 sm:right-4 w-[calc(100vw-1rem)] sm:w-96 border border-gray-800 bg-[#0d1322] rounded-2xl shadow-2xl z-30 p-4 space-y-4 animate-fadeIn max-h-[85vh] overflow-y-auto scrollbar-none">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Settings className="h-4 w-4 text-brand-400" />
+                <span className="font-bold text-xs text-white uppercase tracking-wider">Couleurs & Thème du Graphique</span>
+              </div>
+              <button onClick={() => setActiveDrawer(null)} className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="space-y-1">
-              {THEME_COLORS.map((thm) => (
-                <button
-                  key={thm.id}
-                  onClick={() => setChartTheme(thm)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    chartTheme.id === thm.id ? 'bg-brand-500 text-white' : 'text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  <span>{thm.label}</span>
-                  <span className="h-3 w-3 rounded-full border border-gray-600" style={{ backgroundColor: thm.bg }} />
-                </button>
-              ))}
+
+            {/* 1. Thèmes Prédéfinis Pro (1-Clic) */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
+                Thèmes Prédéfinis (1-Clic)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {THEME_COLORS.map((thm) => {
+                  const isActive = chartBg === thm.bg && upColor === thm.up && downColor === thm.down;
+                  return (
+                    <button
+                      key={thm.id}
+                      onClick={() => {
+                        setChartTheme(thm);
+                        setChartBg(thm.bg);
+                        setGridColor(thm.grid);
+                        if (thm.up) {
+                          setUpColor(thm.up);
+                          setWickUpColor(thm.up);
+                        }
+                        if (thm.down) {
+                          setDownColor(thm.down);
+                          setWickDownColor(thm.down);
+                        }
+                      }}
+                      className={`flex items-center justify-between p-2 rounded-xl border text-xs font-bold transition ${
+                        isActive
+                          ? 'border-brand-500 bg-brand-500/15 text-brand-300'
+                          : 'border-gray-800 bg-gray-900/80 text-gray-300 hover:border-gray-700 hover:bg-gray-800'
+                      }`}
+                    >
+                      <span className="truncate text-[11px]">{thm.label}</span>
+                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: thm.up || '#10b981' }} />
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: thm.down || '#ef4444' }} />
+                        <span className="h-2.5 w-2.5 rounded-full border border-gray-600" style={{ backgroundColor: thm.bg }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Couleurs des Bougies & Mèches */}
+            <div className="space-y-3 pt-2 border-t border-gray-800">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
+                Couleur des Bougies & Mèches
+              </label>
+
+              {/* Bougie Haussière (Bull) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: upColor }} />
+                    Bougie Haussière (Achat)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="color"
+                      value={upColor}
+                      onChange={(e) => {
+                        setUpColor(e.target.value);
+                        setWickUpColor(e.target.value);
+                      }}
+                      className="h-6 w-8 rounded cursor-pointer bg-transparent border-0"
+                    />
+                    <span className="font-mono text-[10px] text-gray-400">{upColor}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {['#10b981', '#00e676', '#06b6d4', '#3b82f6', '#ffffff', '#eab308'].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        setUpColor(c);
+                        setWickUpColor(c);
+                      }}
+                      className={`h-5 w-5 rounded-full border transition ${
+                        upColor === c ? 'scale-110 border-white ring-2 ring-emerald-400' : 'border-gray-700'
+                      }`}
+                      style={{ backgroundColor: c }}
+                      title={`Vert ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Bougie Baissière (Bear) */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-rose-400 font-bold flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: downColor }} />
+                    Bougie Baissière (Vente)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="color"
+                      value={downColor}
+                      onChange={(e) => {
+                        setDownColor(e.target.value);
+                        setWickDownColor(e.target.value);
+                      }}
+                      className="h-6 w-8 rounded cursor-pointer bg-transparent border-0"
+                    />
+                    <span className="font-mono text-[10px] text-gray-400">{downColor}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {['#ef4444', '#f43f5e', '#f97316', '#a855f7', '#1e293b', '#000000'].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        setDownColor(c);
+                        setWickDownColor(c);
+                      }}
+                      className={`h-5 w-5 rounded-full border transition ${
+                        downColor === c ? 'scale-110 border-white ring-2 ring-rose-400' : 'border-gray-700'
+                      }`}
+                      style={{ backgroundColor: c }}
+                      title={`Rouge ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Arrière-plan & Grille */}
+            <div className="space-y-3 pt-2 border-t border-gray-800">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
+                Arrière-plan & Grille
+              </label>
+
+              {/* Fond du Graphique */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-300 font-semibold">Fond du Graphique</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="color"
+                      value={chartBg.startsWith('#') ? chartBg : '#090d16'}
+                      onChange={(e) => setChartBg(e.target.value)}
+                      className="h-6 w-8 rounded cursor-pointer bg-transparent border-0"
+                    />
+                    <span className="font-mono text-[10px] text-gray-400">{chartBg}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {['#090d16', '#000000', '#0a0a14', '#0b1329', '#0f172a', '#ffffff'].map((bg) => (
+                    <button
+                      key={bg}
+                      onClick={() => setChartBg(bg)}
+                      className={`h-5 w-5 rounded-full border transition ${
+                        chartBg === bg ? 'scale-110 border-brand-400 ring-2 ring-brand-400' : 'border-gray-600'
+                      }`}
+                      style={{ backgroundColor: bg }}
+                      title={bg}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Grille */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-300 font-semibold">Afficher les lignes de grille</span>
+                  <input
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) => setShowGrid(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-700 bg-gray-800 text-brand-500 focus:ring-0"
+                  />
+                </div>
+                {showGrid && (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { label: 'Discrète', val: 'rgba(30, 41, 59, 0.4)' },
+                      { label: 'Subtile', val: 'rgba(51, 65, 85, 0.25)' },
+                      { label: 'Visible', val: 'rgba(71, 85, 105, 0.55)' },
+                    ].map((g) => (
+                      <button
+                        key={g.label}
+                        onClick={() => setGridColor(g.val)}
+                        className={`px-2 py-1 rounded-lg border text-[10px] font-bold transition ${
+                          gridColor === g.val
+                            ? 'border-brand-500 bg-brand-500/20 text-brand-300'
+                            : 'border-gray-800 bg-gray-900 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4. Type de Graphique */}
+            <div className="space-y-2 pt-2 border-t border-gray-800">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
+                Type de Graphique
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { id: 'candlestick', label: 'Bougies (Japonaises)' },
+                  { id: 'bar', label: 'Barres OHLC' },
+                  { id: 'line', label: 'Ligne' },
+                  { id: 'area', label: 'Surface (Area)' },
+                ].map((ct) => (
+                  <button
+                    key={ct.id}
+                    onClick={() => setChartType(ct.id)}
+                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition ${
+                      chartType === ct.id
+                        ? 'border-brand-500 bg-brand-500/20 text-brand-300'
+                        : 'border-gray-800 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                    }`}
+                  >
+                    {ct.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reset Button */}
+            <div className="pt-2 border-t border-gray-800 flex justify-end">
+              <button
+                onClick={() => {
+                  setUpColor('#10b981');
+                  setDownColor('#ef4444');
+                  setWickUpColor('#10b981');
+                  setWickDownColor('#ef4444');
+                  setChartBg('#090d16');
+                  setGridColor('rgba(30, 41, 59, 0.4)');
+                  setShowGrid(true);
+                  setChartTheme(THEME_COLORS[0]);
+                  toast.success('Couleurs du graphique réinitialisées aux valeurs par défaut.');
+                }}
+                className="text-xs text-gray-400 hover:text-amber-400 transition"
+              >
+                ↺ Réinitialiser les couleurs
+              </button>
             </div>
           </aside>
         )}
@@ -3974,15 +4290,22 @@ export default function Backtesting() {
                   { label: '3 Mois', days: 90 },
                   { label: '6 Mois', days: 180 },
                   { label: '1 An', days: 365 },
+                  { label: '2 Ans', days: 730 },
+                  { label: '5 Ans (2021-2026)', days: 1825 },
+                  { label: 'Année 2024', year: 2024 },
                   { label: 'Année 2025', year: 2025 },
                   { label: 'Année 2026', year: 2026 },
+                  { label: 'Historique Complet', all: true },
                 ].map((p, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => {
                       const now = new Date();
-                      if (p.year) {
+                      if (p.all) {
+                        setModalStartDate('2020-01-01');
+                        setModalEndDate(now.toISOString().slice(0, 10));
+                      } else if (p.year) {
                         setModalStartDate(`${p.year}-01-01`);
                         setModalEndDate(`${p.year}-12-31`);
                       } else {

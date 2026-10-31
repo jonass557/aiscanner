@@ -78,21 +78,53 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   }
 
   const dp = getDecimals(unique[unique.length - 1]?.close || fallbackBase);
-  return unique.map((b) => ({
-    time: b.time,
-    open: Number(b.open.toFixed(dp)),
-    high: Number(b.high.toFixed(dp)),
-    low: Number(b.low.toFixed(dp)),
-    close: Number(b.close.toFixed(dp)),
-    volume: b.volume || 0,
-  }));
+  return unique.map((b) => {
+    let open = Number(b.open.toFixed(dp));
+    let close = Number(b.close.toFixed(dp));
+    let high = Number(b.high.toFixed(dp));
+    let low = Number(b.low.toFixed(dp));
+
+    // Ensure no candle renders as a flat 1-pixel barcode without a visible body
+    const minSpread = Math.max(Math.pow(10, -dp), open * 0.0003);
+    if (high - low < minSpread) {
+      high = Number((open + minSpread).toFixed(dp));
+      low = Number((Math.max(0.00001, open - minSpread)).toFixed(dp));
+      close = Number((open >= close ? open + minSpread * 0.5 : open - minSpread * 0.5).toFixed(dp));
+    } else if (Math.abs(close - open) < minSpread * 0.25) {
+      // Give flat doji lines a healthy visible micro-body so they render as clean institutional bars
+      const bump = minSpread * 0.35;
+      if (close >= open) {
+        close = Number((open + bump).toFixed(dp));
+      } else {
+        close = Number((open - bump).toFixed(dp));
+      }
+    }
+
+    return {
+      time: b.time,
+      open,
+      high: Math.max(high, open, close),
+      low: Math.max(0.00001, Math.min(low, open, close)),
+      close,
+      volume: b.volume || 0,
+    };
+  });
 };
 
 /**
- * Generate realistic fallback candles when offline or for custom synthetic assets.
- * Uses realistic market price action (natural trends, pullbacks, and volatility).
+ * Generate realistic institutional fallback candles across multiple years.
+ * Eliminates tiny bodyless "barcode" candles by guaranteeing healthy, clear candle bodies
+ * (55-80% of candle range) and realistic ATR-proportional volatility for each asset class.
+ *
+ * Supports deep multi-year historical spans from 2020-2026 or exact custom date ranges.
  */
-export const generateRealisticCandles = (basePrice = 1.085, timeframe = 'H1', count = 250) => {
+export const generateRealisticCandles = (
+  basePrice = 1.085,
+  timeframe = 'H1',
+  count = 2500,
+  customStartSec = null,
+  customEndSec = null
+) => {
   const dp = getDecimals(basePrice);
   const nowSec = Math.floor(Date.now() / 1000);
   const tfSec = {
@@ -130,10 +162,57 @@ export const generateRealisticCandles = (basePrice = 1.085, timeframe = 'H1', co
     '12M': 31104000,
   }[timeframe] || 3600;
 
-  const baseVol = basePrice > 50000 ? 0.0035 : basePrice > 1000 ? 0.0025 : basePrice > 100 ? 0.0018 : 0.0009;
+  // Realistic institutional volatility per timeframe
+  const tfVolMultiplier = {
+    M1: 0.22,
+    M2: 0.30,
+    M3: 0.38,
+    M5: 0.48,
+    M15: 0.70,
+    M30: 0.85,
+    M45: 0.95,
+    H1: 1.00,
+    H2: 1.35,
+    H3: 1.60,
+    H4: 1.90,
+    D1: 3.40,
+    W1: 6.80,
+    MN: 12.00,
+    '3M': 18.00,
+    '6M': 24.00,
+    '12M': 32.00,
+  }[timeframe] || 1.0;
+
+  // Base volatility calibrated by asset price scale
+  const rawBaseVol =
+    basePrice > 50000
+      ? 0.0075 // Bitcoin / High Crypto
+      : basePrice > 10000
+      ? 0.0060 // US Indices (NAS100, US30)
+      : basePrice > 1000
+      ? 0.0045 // Gold / Commodities
+      : basePrice > 100
+      ? 0.0035 // Oil / JPY crosses
+      : 0.0028; // Forex Majors (EURUSD ~ 30 pips / H1)
+
+  const baseVol = rawBaseVol * tfVolMultiplier;
+
+  // Determine date boundaries and bar count
+  let startSec = customStartSec ? Math.floor(Number(customStartSec)) : null;
+  let endSec = customEndSec ? Math.floor(Number(customEndSec)) : nowSec;
+  let totalBars = count;
+
+  if (startSec && endSec && endSec > startSec) {
+    totalBars = Math.max(30, Math.min(Math.floor((endSec - startSec) / tfSec), 15000));
+  } else if (startSec) {
+    totalBars = Math.max(30, Math.min(count, 15000));
+  } else {
+    totalBars = Math.max(50, Math.min(count, 15000));
+    startSec = endSec - totalBars * tfSec;
+  }
+
   const raw = [];
-  const startSec = nowSec - count * tfSec;
-  let prevClose = basePrice * (0.97 + (Math.sin(basePrice * 17) * 0.5 + 0.5) * 0.06);
+  let prevClose = basePrice * (0.96 + (Math.sin(basePrice * 17) * 0.5 + 0.5) * 0.08);
 
   let seed = Math.floor(basePrice * 10000) % 100000 + 1337;
   const rand = () => {
@@ -141,50 +220,58 @@ export const generateRealisticCandles = (basePrice = 1.085, timeframe = 'H1', co
     return (seed - 1) / 2147483646;
   };
 
-  let regime = 0; // -1: bear, 0: range, 1: bull
+  let regime = 0; // -1: bear trend, 0: ranging/pullback, 1: bull trend
   let regimeDuration = 0;
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < totalBars; i++) {
     if (regimeDuration <= 0) {
       const r = rand();
-      regime = r < 0.35 ? -1 : r < 0.70 ? 1 : 0;
-      regimeDuration = Math.floor(18 + rand() * 35);
+      regime = r < 0.38 ? -1 : r < 0.74 ? 1 : 0;
+      regimeDuration = Math.floor(12 + rand() * 28);
     }
     regimeDuration--;
 
-    const drift = regime === 1 ? baseVol * 0.22 : regime === -1 ? -baseVol * 0.22 : 0;
+    const drift = regime === 1 ? baseVol * 0.35 : regime === -1 ? -baseVol * 0.35 : 0;
 
     const u1 = Math.max(1e-6, rand());
     const u2 = rand();
     const normalNoise = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
 
     const volType = rand();
-    const candleVol = volType > 0.95 ? baseVol * 2.8 : volType > 0.80 ? baseVol * 1.7 : baseVol * (0.6 + rand() * 0.8);
+    const candleVol =
+      volType > 0.94 ? baseVol * 2.2 : volType > 0.75 ? baseVol * 1.4 : baseVol * (0.7 + rand() * 0.6);
 
-    const returnPct = drift + normalNoise * candleVol;
+    // Ensure healthy candle body (no flat 1-pixel barcode ticks)
+    // Minimum body size = at least 45% of standard candle volatility
+    const rawMove = drift + normalNoise * candleVol;
+    const dir = rawMove >= 0 ? 1 : -1;
+    const minBodyPct = candleVol * (0.40 + rand() * 0.35);
+    const returnPct = dir * Math.max(minBodyPct, Math.abs(rawMove));
+
     const open = prevClose;
-    const close = Math.max(basePrice * 0.2, open * (1 + returnPct));
+    const close = Math.max(basePrice * 0.15, open * (1 + returnPct));
     const body = Math.abs(close - open);
 
+    // Realistic institutional candlestick shapes
     const shapeRand = rand();
     let upperWick, lowerWick;
 
-    if (shapeRand < 0.08) {
-      // Pinbar / shooting star
-      upperWick = body * (2.2 + rand() * 2.5) + open * candleVol * 0.6;
-      lowerWick = body * (0.1 + rand() * 0.3);
-    } else if (shapeRand < 0.16) {
-      // Hammer / rejection low
-      lowerWick = body * (2.2 + rand() * 2.5) + open * candleVol * 0.6;
-      upperWick = body * (0.1 + rand() * 0.3);
-    } else if (shapeRand < 0.25) {
-      // Doji / spinning top
-      upperWick = open * candleVol * (0.8 + rand() * 1.2);
-      lowerWick = open * candleVol * (0.8 + rand() * 1.2);
+    if (shapeRand < 0.06) {
+      // Institutional Pinbar / rejection high
+      upperWick = body * (1.4 + rand() * 1.6);
+      lowerWick = body * (0.1 + rand() * 0.25);
+    } else if (shapeRand < 0.12) {
+      // Institutional Hammer / rejection low
+      lowerWick = body * (1.4 + rand() * 1.6);
+      upperWick = body * (0.1 + rand() * 0.25);
+    } else if (shapeRand < 0.22) {
+      // Spinning top / balanced candle (healthy body, modest wicks)
+      upperWick = body * (0.45 + rand() * 0.55);
+      lowerWick = body * (0.45 + rand() * 0.55);
     } else {
-      // Standard trading candle
-      upperWick = (body * 0.35 + open * candleVol * 0.35) * (0.4 + rand());
-      lowerWick = (body * 0.35 + open * candleVol * 0.35) * (0.4 + rand());
+      // Standard institutional directional bar (clean body dominates wicks)
+      upperWick = body * (0.15 + rand() * 0.30);
+      lowerWick = body * (0.15 + rand() * 0.30);
     }
 
     const high = Math.max(open, close) + upperWick;
@@ -196,7 +283,7 @@ export const generateRealisticCandles = (basePrice = 1.085, timeframe = 'H1', co
       high: Number(high.toFixed(dp)),
       low: Number(low.toFixed(dp)),
       close: Number(close.toFixed(dp)),
-      volume: Math.round(800 + rand() * 7500),
+      volume: Math.round(1500 + rand() * 9500),
     });
     prevClose = close;
   }

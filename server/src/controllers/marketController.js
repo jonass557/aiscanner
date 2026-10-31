@@ -20,10 +20,10 @@ export const getSnapshot = asyncHandler(async (req, res) => {
 
   const tf = normalizeTimeframe(timeframe);
   const requestedLimit = Number(req.query.limit);
-  // Support high-depth / unlimited history requests up to 5000 bars for backtesting
+  // Support high-depth / multi-year history requests up to 15000 bars for backtesting
   const candleLimit = requestedLimit === 0 || req.query.limit === 'max'
-    ? 5000
-    : Math.min(Math.max(requestedLimit || 200, 30), 5000);
+    ? 15000
+    : Math.min(Math.max(requestedLimit || 200, 30), 15000);
   const snapshot = await getMarketSnapshot(symbol, tf, candleLimit);
 
   if (!snapshot) {

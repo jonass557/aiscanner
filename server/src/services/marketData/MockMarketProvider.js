@@ -53,20 +53,20 @@ export class MockMarketProvider extends BaseMarketProvider {
 
     const baseVol =
       {
-        M1: 0.0007,
-        M2: 0.0009,
-        M3: 0.0011,
-        M5: 0.0013,
-        M15: 0.0018,
-        M30: 0.0024,
-        M45: 0.0028,
-        H1: 0.0035,
-        H2: 0.0048,
-        H3: 0.0058,
-        H4: 0.0070,
-        D1: 0.0120,
-        W1: 0.0220,
-      }[timeframe] || 0.0035;
+        M1: 0.0012,
+        M2: 0.0016,
+        M3: 0.0020,
+        M5: 0.0025,
+        M15: 0.0035,
+        M30: 0.0045,
+        M45: 0.0052,
+        H1: 0.0065,
+        H2: 0.0085,
+        H3: 0.0100,
+        H4: 0.0125,
+        D1: 0.0220,
+        W1: 0.0450,
+      }[timeframe] || 0.0065;
 
     const candles = [];
     const now = Date.now();
@@ -81,13 +81,13 @@ export class MockMarketProvider extends BaseMarketProvider {
     for (let i = limit - 1; i >= 0; i -= 1) {
       if (regimeDuration <= 0) {
         const r = rand();
-        regime = r < 0.35 ? -1 : r < 0.70 ? 1 : 0;
-        regimeDuration = Math.floor(18 + rand() * 35);
+        regime = r < 0.38 ? -1 : r < 0.74 ? 1 : 0;
+        regimeDuration = Math.floor(12 + rand() * 28);
       }
       regimeDuration -= 1;
 
       // Drift is moderate so bull/bear pullbacks are naturally mixed (not solid single-color runs)
-      const drift = regime === 1 ? baseVol * 0.22 : regime === -1 ? -baseVol * 0.22 : 0;
+      const drift = regime === 1 ? baseVol * 0.35 : regime === -1 ? -baseVol * 0.35 : 0;
 
       // Box-Muller standard normal noise
       const u1 = Math.max(1e-6, rand());
@@ -96,33 +96,38 @@ export class MockMarketProvider extends BaseMarketProvider {
 
       // Volatility clustering: 80% normal, 15% medium, 5% high breakout
       const volPicker = rand();
-      const barVol = volPicker > 0.95 ? baseVol * 2.8 : volPicker > 0.80 ? baseVol * 1.7 : baseVol * (0.6 + rand() * 0.8);
+      const barVol = volPicker > 0.94 ? baseVol * 2.2 : volPicker > 0.75 ? baseVol * 1.4 : baseVol * (0.7 + rand() * 0.6);
 
-      const returnPct = drift + normalNoise * barVol;
+      // Guarantee clear, healthy candle body (no flat 1-pixel barcode ticks)
+      const rawMove = drift + normalNoise * barVol;
+      const dir = rawMove >= 0 ? 1 : -1;
+      const minBodyPct = barVol * (0.40 + rand() * 0.35);
+      const returnPct = dir * Math.max(minBodyPct, Math.abs(rawMove));
+
       const open = price;
-      const close = Math.max(base * 0.2, open * (1 + returnPct));
+      const close = Math.max(base * 0.15, open * (1 + returnPct));
       const body = Math.abs(close - open);
 
-      // Diverse candlestick forms (pinbars, dojis, engulfing)
+      // Diverse candlestick forms (clean bodies dominate wicks)
       const shapeType = rand();
       let upperWick, lowerWick;
 
-      if (shapeType < 0.08) {
+      if (shapeType < 0.06) {
         // Pinbar / shooting star
-        upperWick = body * (2.2 + rand() * 2.5) + open * barVol * 0.6;
-        lowerWick = body * (0.1 + rand() * 0.3);
-      } else if (shapeType < 0.16) {
+        upperWick = body * (1.4 + rand() * 1.6);
+        lowerWick = body * (0.1 + rand() * 0.25);
+      } else if (shapeType < 0.12) {
         // Hammer / rejection low
-        lowerWick = body * (2.2 + rand() * 2.5) + open * barVol * 0.6;
-        upperWick = body * (0.1 + rand() * 0.3);
-      } else if (shapeType < 0.25) {
-        // Doji / spinning top
-        upperWick = open * barVol * (0.8 + rand() * 1.2);
-        lowerWick = open * barVol * (0.8 + rand() * 1.2);
+        lowerWick = body * (1.4 + rand() * 1.6);
+        upperWick = body * (0.1 + rand() * 0.25);
+      } else if (shapeType < 0.22) {
+        // Spinning top (healthy body, modest wicks)
+        upperWick = body * (0.45 + rand() * 0.55);
+        lowerWick = body * (0.45 + rand() * 0.55);
       } else {
-        // Standard trading candle
-        upperWick = (body * 0.35 + open * barVol * 0.35) * (0.4 + rand());
-        lowerWick = (body * 0.35 + open * barVol * 0.35) * (0.4 + rand());
+        // Standard institutional trading candle
+        upperWick = body * (0.15 + rand() * 0.30);
+        lowerWick = body * (0.15 + rand() * 0.30);
       }
 
       const high = Math.max(open, close) + upperWick;
@@ -134,7 +139,7 @@ export class MockMarketProvider extends BaseMarketProvider {
         high: Number(high.toFixed(dp)),
         low: Number(low.toFixed(dp)),
         close: Number(close.toFixed(dp)),
-        volume: Math.round(1200 + rand() * 8800),
+        volume: Math.round(1500 + rand() * 9500),
       });
       price = close;
     }
@@ -142,7 +147,7 @@ export class MockMarketProvider extends BaseMarketProvider {
   }
 
   async getCandles(entry, timeframe = 'H1', limit = 120) {
-    const effectiveLimit = Math.max(30, Math.min(Number(limit) || 120, 5000));
+    const effectiveLimit = Math.max(30, Math.min(Number(limit) || 120, 15000));
     return this._generate(entry, timeframe, effectiveLimit);
   }
 
