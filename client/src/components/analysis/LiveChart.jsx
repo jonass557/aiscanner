@@ -113,10 +113,17 @@ export default function LiveChart({
 
       if (!loadedBars || loadedBars.length < 25) {
         const basePrice =
+          tradePlan?.entry ? Number(tradePlan.entry) :
           activeSymbol.includes('XAU') ? 2685 :
           activeSymbol.includes('BTC') ? 68500 :
           activeSymbol.includes('US30') ? 43200 :
+          (activeSymbol.includes('NAS') || activeSymbol.includes('100') || activeSymbol.includes('USTEC')) ? 20450 :
+          (activeSymbol.includes('SPX') || activeSymbol.includes('500')) ? 5800 :
+          (activeSymbol.includes('GER') || activeSymbol.includes('DAX')) ? 19500 :
+          activeSymbol.includes('ETH') ? 2600 :
+          activeSymbol.includes('SOL') ? 175 :
           activeSymbol.includes('JPY') ? 153.2 :
+          activeSymbol.includes('GBP') ? 1.295 :
           activeSymbol.includes('VOL75') ? 325000 : 1.085;
 
         loadedBars = generateRealisticCandles(basePrice, activeTf, 500);
@@ -132,7 +139,7 @@ export default function LiveChart({
     } finally {
       setRefreshing(false);
     }
-  }, [activeSymbol, activeTf]);
+  }, [activeSymbol, activeTf, tradePlan]);
 
   // Initial load when symbol or timeframe changes
   useEffect(() => {
@@ -151,7 +158,7 @@ export default function LiveChart({
     if (!candles || candles.length < 20) return null;
 
     const stratText = typeof strategy === 'string' ? strategy : strategy?.rules?.join('\n') || '';
-    const stratKey =
+    const strategyKey =
       stratText.toLowerCase().includes('support') || stratText.toLowerCase().includes('résistance')
         ? 'support_resistance'
         : stratText.toLowerCase().includes('trend') || stratText.toLowerCase().includes('ema')

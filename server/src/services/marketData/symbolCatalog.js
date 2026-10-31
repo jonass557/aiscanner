@@ -149,11 +149,11 @@ const ALIASES = {
   bnbusd: 'BNBUSD', bnb: 'BNBUSD', 'bnb/usd': 'BNBUSD', 'bnb-usd': 'BNBUSD', bnbusdt: 'BNBUSD',
   adausd: 'ADAUSD', ada: 'ADAUSD', 'ada/usd': 'ADAUSD', adausdt: 'ADAUSD',
   dogeusd: 'DOGEUSD', doge: 'DOGEUSD', 'doge/usd': 'DOGEUSD', dogeusdt: 'DOGEUSD',
-  us30: 'US30', 'us 30': 'US30', dow: 'US30', 'dow jones': 'US30', dji: 'US30', '^dji': 'US30',
-  nas100: 'NAS100', us100: 'NAS100', 'us 100': 'NAS100', nasdaq: 'NAS100', 'nas 100': 'NAS100', ustec: 'NAS100', '^ixic': 'NAS100',
-  spx500: 'SPX500', us500: 'SPX500', 'us 500': 'SPX500', 'spx 500': 'SPX500', sp500: 'SPX500', 's&p': 'SPX500', '^gspc': 'SPX500',
-  ger40: 'GER40', 'ger 40': 'GER40', dax: 'GER40', dax40: 'GER40', de40: 'GER40', '^gdaxi': 'GER40',
-  uk100: 'UK100', 'uk 100': 'UK100', ftse: 'UK100', '^ftse': 'UK100',
+  us30: 'US30', 'us 30': 'US30', 'us/30': 'US30', dow: 'US30', 'dow jones': 'US30', dji: 'US30', '^dji': 'US30',
+  nas100: 'NAS100', us100: 'NAS100', 'us 100': 'NAS100', 'nas/100': 'NAS100', 'us/100': 'NAS100', nasdaq: 'NAS100', 'nas 100': 'NAS100', ustec: 'NAS100', '^ixic': 'NAS100',
+  spx500: 'SPX500', us500: 'SPX500', 'us 500': 'SPX500', 'spx/500': 'SPX500', 'us/500': 'SPX500', 'spx 500': 'SPX500', sp500: 'SPX500', 's&p': 'SPX500', '^gspc': 'SPX500',
+  ger40: 'GER40', 'ger 40': 'GER40', 'ger/40': 'GER40', dax: 'GER40', dax40: 'GER40', de40: 'GER40', '^gdaxi': 'GER40',
+  uk100: 'UK100', 'uk 100': 'UK100', 'uk/100': 'UK100', ftse: 'UK100', '^ftse': 'UK100',
   fra40: 'FRA40', 'fra 40': 'FRA40', cac40: 'FRA40', '^fchi': 'FRA40',
   jpn225: 'JPN225', 'jpn 225': 'JPN225', nikkei: 'JPN225', '^n225': 'JPN225',
   'volatility 75': 'Volatility 75 Index', 'vol 75': 'Volatility 75 Index', v75: 'Volatility 75 Index', vol75: 'Volatility 75 Index', 'volatility 75 index': 'Volatility 75 Index',
@@ -193,9 +193,12 @@ export const resolveSymbol = (text, { fuzzy = true } = {}) => {
   // Exact catalog symbol first.
   const direct = SYMBOL_CATALOG.find((s) => s.symbol.toLowerCase() === norm);
   if (direct) return direct;
-  // Alias lookup (exact).
-  const viaAlias = ALIASES[norm];
+  // Alias lookup (exact or unslashed).
+  const unslashed = norm.replace(/[/\s._-]/g, '');
+  const viaAlias = ALIASES[norm] || ALIASES[unslashed];
   if (viaAlias) return SYMBOL_CATALOG.find((s) => s.symbol === viaAlias) || null;
+  const directUnslashed = SYMBOL_CATALOG.find((s) => s.symbol.toLowerCase() === unslashed);
+  if (directUnslashed) return directUnslashed;
   // Fuzzy substring — only for tokens long enough to be unambiguous (avoids
   // "et" matching "ethusd"). Requires 4+ chars.
   if (fuzzy && norm.length >= 4) {
