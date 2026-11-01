@@ -8,6 +8,7 @@ import {
   resetEmergency,
   connectBrokerAccount,
   getBrokerAccounts,
+  selectBrokerAccount,
   deleteBrokerAccount,
   executeManualOrder,
   getOrders,
@@ -30,6 +31,7 @@ router.post('/emergency-stop/reset', resetEmergency);
 // Broker Accounts
 router.get('/broker-accounts', getBrokerAccounts);
 router.post('/broker-accounts', connectBrokerAccount);
+router.post('/broker-accounts/:id/select', selectBrokerAccount);
 router.delete('/broker-accounts/:id', deleteBrokerAccount);
 
 // Orders & Execution

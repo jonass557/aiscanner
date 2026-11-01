@@ -13,13 +13,15 @@ const router = Router();
 // All strategy routes require authentication
 router.use(protect);
 
-// Publicly readable by all authenticated users (Chart Vision, Scanner, Replay)
+// Read all available strategies (System + User's personal)
 router.get('/', getStrategies);
 
-// Admin-only management routes
+// Admin-only global management view
 router.get('/admin', requireAdmin, getAdminStrategies);
-router.post('/', requireAdmin, createStrategy);
-router.put('/:id', requireAdmin, updateStrategy);
-router.delete('/:id', requireAdmin, deleteStrategy);
+
+// Create, update, delete strategies (Admins for system strategies, users for their own)
+router.post('/', createStrategy);
+router.put('/:id', updateStrategy);
+router.delete('/:id', deleteStrategy);
 
 export default router;

@@ -23,7 +23,8 @@ export default function Login() {
     try {
       const user = await login(form);
       toast.success('Ravi de vous revoir !');
-      navigate(user.role === 'admin' ? '/admin' : from, { replace: true });
+      // Always redirect to the features dashboard (/dashboard) upon login
+      navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {

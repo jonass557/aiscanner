@@ -67,6 +67,31 @@ export default function AssistantChat() {
     onResult: (t) => sendRef.current?.(t),
   });
 
+  const newConversation = useCallback(() => {
+    setConversationId(null);
+    setMessages([]);
+    setInput('');
+  }, []);
+
+  const loadList = useCallback(async () => {
+    try {
+      const { data } = await assistantApi.conversations();
+      setConversations(data?.data?.conversations || []);
+    } catch {
+      setConversations([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadList();
+  }, [loadList]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, interim, sending]);
+
   const send = useCallback(
     async (text) => {
       const clean = String(text || '').trim();
@@ -115,16 +140,6 @@ export default function AssistantChat() {
   );
 
   sendRef.current = send;
-
-  const loadList = useCallback(async () => {
-    try {
-      const { data } = await assistantApi.conversations();
-      setConversations(data?.data?.conversations || []);
-    } catch {
-      /* non-blocking */
-      setConversations([]);
-    }
-  }, []);
 
   const openConversation = async (id) => {
     setSidebarOpen(false);

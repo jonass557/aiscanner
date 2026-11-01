@@ -802,77 +802,78 @@ export default function ChartVision() {
         {/* LEFT SIDEBAR WITH "ORDRE", "ZONES", "CONFLUENCES" DROPDOWNS */}
         <div className={`flex flex-col gap-2 shrink-0 transition-all duration-300 ${openDrawer ? 'w-full lg:w-80' : 'w-full lg:w-14'}`}>
           {/* Sidebar Action Buttons Rail */}
-          <div className="flex lg:flex-col gap-1.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/80 p-1.5 backdrop-blur shadow-sm">
+          <div className="flex lg:flex-col gap-1.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 p-1.5 backdrop-blur shadow-md">
             {/* 1. ORDRE BUTTON */}
             <button
               onClick={() => handleToggleDrawer('order')}
-              className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition w-full ${
+              className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black transition w-full ${
                 openDrawer === 'order'
-                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/25'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700'
               }`}
               title="Afficher / Masquer l'Ordre Suggéré"
             >
-              <Target className="h-4 w-4 shrink-0 text-amber-400" />
+              <Target className={`h-4 w-4 shrink-0 ${openDrawer === 'order' ? 'text-white' : 'text-amber-500'}`} />
               <span className="font-extrabold uppercase tracking-wide">Ordre</span>
               {openDrawer === 'order' ? (
                 <ChevronDown className="h-3.5 w-3.5 ml-auto hidden lg:inline" />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5 ml-auto hidden lg:inline" />
+                <ChevronRight className="h-3.5 w-3.5 ml-auto hidden lg:inline opacity-60" />
               )}
             </button>
 
             {/* 2. ZONES BUTTON */}
             <button
               onClick={() => handleToggleDrawer('zones')}
-              className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition w-full ${
+              className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black transition w-full ${
                 openDrawer === 'zones'
-                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/25'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  ? 'bg-sky-600 text-white shadow-lg shadow-sky-500/30'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700'
               }`}
               title="Afficher / Masquer les Zones & Liquidités"
             >
-              <Layers className="h-4 w-4 shrink-0 text-sky-400" />
+              <Layers className={`h-4 w-4 shrink-0 ${openDrawer === 'zones' ? 'text-white' : 'text-sky-500'}`} />
               <span className="font-extrabold uppercase tracking-wide">Zones</span>
               {openDrawer === 'zones' ? (
                 <ChevronDown className="h-3.5 w-3.5 ml-auto hidden lg:inline" />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5 ml-auto hidden lg:inline" />
+                <ChevronRight className="h-3.5 w-3.5 ml-auto hidden lg:inline opacity-60" />
               )}
             </button>
 
             {/* 3. CONFLUENCES BUTTON */}
             <button
               onClick={() => handleToggleDrawer('confluences')}
-              className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition w-full ${
+              className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black transition w-full ${
                 openDrawer === 'confluences'
-                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/25'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700'
               }`}
               title="Afficher / Masquer les Confluences Stratégiques"
             >
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+              <CheckCircle2 className={`h-4 w-4 shrink-0 ${openDrawer === 'confluences' ? 'text-white' : 'text-emerald-500'}`} />
               <span className="font-extrabold uppercase tracking-wide">Confluences</span>
               {openDrawer === 'confluences' ? (
                 <ChevronDown className="h-3.5 w-3.5 ml-auto hidden lg:inline" />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5 ml-auto hidden lg:inline" />
+                <ChevronRight className="h-3.5 w-3.5 ml-auto hidden lg:inline opacity-60" />
               )}
             </button>
           </div>
 
           {/* ACTIVE DRAWER CONTENT (ONLY WHEN OPEN) */}
           {openDrawer && (
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/95 p-3.5 shadow-xl backdrop-blur-md space-y-3 overflow-y-auto max-h-[640px]">
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xl backdrop-blur-md space-y-3.5 overflow-y-auto max-h-[640px]">
               {/* DRAWER: ORDRE */}
               {openDrawer === 'order' && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
-                      Ordre Suggéré
+                  <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-2.5">
+                    <span className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white flex items-center gap-1.5">
+                      <Target className="h-3.5 w-3.5 text-amber-500" />
+                      Ordre d'Exécution Suggéré
                     </span>
                     {analysis && (
-                      <span className="rounded bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-400">
+                      <span className="rounded-lg bg-brand-500/15 border border-brand-500/30 px-2 py-0.5 text-[11px] font-black text-brand-600 dark:text-brand-300 font-mono">
                         R:R {analysis.riskReward}
                       </span>
                     )}
@@ -880,56 +881,56 @@ export default function ChartVision() {
 
                   {analysis ? (
                     <>
-                      <div className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-800/80 p-3">
+                      <div className="flex items-center justify-between rounded-xl bg-gray-100 dark:bg-gray-800/90 p-3 border border-gray-200 dark:border-gray-700">
                         <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Biais Actif
                           </span>
                           <p
-                            className={`text-xl font-black ${
-                              analysis.direction === 'BUY' ? 'text-emerald-400' : 'text-rose-400'
+                            className={`text-lg font-black ${
+                              analysis.direction === 'BUY' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                             }`}
                           >
-                            {analysis.direction === 'BUY' ? 'ACHAT (LONG)' : 'VENTE (SHORT)'}
+                            {analysis.direction === 'BUY' ? '▲ ACHAT (LONG)' : '▼ VENTE (SHORT)'}
                           </p>
                         </div>
                         <div className="text-right">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                            Win Rate
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Win Rate IA
                           </span>
-                          <p className="text-xl font-black text-brand-400">{analysis.biasScore}%</p>
+                          <p className="text-lg font-black text-brand-600 dark:text-brand-400">{analysis.biasScore}%</p>
                         </div>
                       </div>
 
                       {/* Execution Levels */}
-                      <div className="space-y-1.5 font-mono text-xs">
-                        <div className="flex items-center justify-between rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-2 text-blue-300">
-                          <span className="font-sans font-bold text-[11px]">Entrée (Entry):</span>
-                          <span className="font-black text-sm">{analysis.entry}</span>
+                      <div className="space-y-2 font-mono text-xs">
+                        <div className="flex items-center justify-between rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-3.5 py-2.5 text-blue-950 dark:text-blue-100">
+                          <span className="font-sans font-bold text-xs text-blue-800 dark:text-blue-300">Entrée (Entry):</span>
+                          <span className="font-black text-sm text-blue-900 dark:text-blue-100 font-mono">{analysis.entry}</span>
                         </div>
-                        <div className="flex items-center justify-between rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-red-300">
-                          <span className="font-sans font-bold text-[11px]">Stop Loss (SL):</span>
-                          <span className="font-black text-sm">{analysis.sl}</span>
+                        <div className="flex items-center justify-between rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 px-3.5 py-2.5 text-rose-950 dark:text-rose-100">
+                          <span className="font-sans font-bold text-xs text-rose-800 dark:text-rose-300">Stop Loss (SL):</span>
+                          <span className="font-black text-sm text-rose-900 dark:text-rose-100 font-mono">{analysis.sl}</span>
                         </div>
-                        <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-emerald-300">
-                          <span className="font-sans font-bold text-[11px]">Take Profit 1:</span>
-                          <span className="font-black text-sm">{analysis.tp1}</span>
+                        <div className="flex items-center justify-between rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-3.5 py-2.5 text-emerald-950 dark:text-emerald-100">
+                          <span className="font-sans font-bold text-xs text-emerald-800 dark:text-emerald-300">Take Profit 1:</span>
+                          <span className="font-black text-sm text-emerald-900 dark:text-emerald-100 font-mono">{analysis.tp1}</span>
                         </div>
-                        <div className="flex items-center justify-between rounded-lg bg-cyan-500/10 border border-cyan-500/20 px-3 py-2 text-cyan-300">
-                          <span className="font-sans font-bold text-[11px]">Take Profit 2 (Max):</span>
-                          <span className="font-black text-sm">{analysis.tp2}</span>
+                        <div className="flex items-center justify-between rounded-xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 px-3.5 py-2.5 text-cyan-950 dark:text-cyan-100">
+                          <span className="font-sans font-bold text-xs text-cyan-800 dark:text-cyan-300">Take Profit 2 (Max):</span>
+                          <span className="font-black text-sm text-cyan-900 dark:text-cyan-100 font-mono">{analysis.tp2}</span>
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-2.5 text-xs text-gray-400">
-                        <span className="font-bold text-gray-200 block mb-0.5">Structure:</span>
-                        <span>{analysis.structure}</span>
+                      <div className="rounded-xl bg-gray-100 dark:bg-gray-800/70 p-3 text-xs border border-gray-200 dark:border-gray-700">
+                        <span className="font-bold text-gray-900 dark:text-gray-100 block mb-0.5">Structure de Marché :</span>
+                        <span className="text-gray-700 dark:text-gray-300">{analysis.structure}</span>
                       </div>
                     </>
                   ) : (
-                    <div className="py-6 text-center text-xs text-gray-400">
+                    <div className="py-6 text-center text-xs text-gray-500 dark:text-gray-400">
                       <Spinner />
-                      <p className="mt-2">Détection de l'ordre...</p>
+                      <p className="mt-2 font-medium">Détection de l'ordre...</p>
                     </div>
                   )}
                 </div>
@@ -938,56 +939,57 @@ export default function ChartVision() {
               {/* DRAWER: ZONES & LIQUIDITÉS */}
               {openDrawer === 'zones' && (
                 <div className="space-y-3">
-                  <div className="border-b border-gray-100 dark:border-gray-800 pb-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
-                      Zones & Liquidités Détectées
+                  <div className="border-b border-gray-200 dark:border-gray-800 pb-2.5">
+                    <span className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-sky-500" />
+                      Zones Clés & Liquidités Détectées
                     </span>
                   </div>
 
                   {analysis ? (
                     <>
                       {/* Supply OB */}
-                      <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 space-y-1">
+                      <div className="rounded-xl border border-rose-300 dark:border-rose-700/60 bg-rose-50 dark:bg-rose-950/40 p-3 space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-black text-red-400">SUPPLY (Zone Vendeuse)</span>
+                          <span className="font-black text-rose-700 dark:text-rose-300">SUPPLY (Zone Vendeuse Institutionnelle)</span>
                         </div>
-                        <p className="font-mono text-sm font-bold text-red-300">
+                        <p className="font-mono text-base font-black text-rose-950 dark:text-rose-100">
                           {analysis.supplyZone.bottom} — {analysis.supplyZone.top}
                         </p>
-                        <p className="text-[10px] text-gray-400">Zone institutionnelle de rejet ou TP.</p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-300">Zone institutionnelle de rejet ou d'encaissement de bénéfices (TP).</p>
                       </div>
 
                       {/* Demand OB */}
-                      <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 space-y-1">
+                      <div className="rounded-xl border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 p-3 space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-black text-emerald-400">DEMAND (Zone Acheteuse)</span>
+                          <span className="font-black text-emerald-700 dark:text-emerald-300">DEMAND (Zone Acheteuse Institutionnelle)</span>
                         </div>
-                        <p className="font-mono text-sm font-bold text-emerald-300">
+                        <p className="font-mono text-base font-black text-emerald-950 dark:text-emerald-100">
                           {analysis.demandZone.bottom} — {analysis.demandZone.top}
                         </p>
-                        <p className="text-[10px] text-gray-400">Zone institutionnelle d'accumulation.</p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-300">Zone institutionnelle d'accumulation et d'achat stratégique.</p>
                       </div>
 
                       {/* Liquidity pools */}
                       <div className="space-y-1.5 pt-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 block">
                           Poches de Liquidité Clés
                         </span>
                         {analysis.liquidityPools?.map((liq, i) => (
                           <div
                             key={i}
-                            className="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800/80 px-2.5 py-1.5 text-xs"
+                            className="flex items-center justify-between rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs"
                           >
-                            <span className="text-gray-300 text-[11px] truncate">{liq.type}</span>
-                            <span className="font-mono font-bold text-sky-400">{liq.price}</span>
+                            <span className="text-gray-800 dark:text-gray-200 font-semibold text-xs truncate">{liq.type}</span>
+                            <span className="font-mono font-black text-sky-700 dark:text-sky-300 text-sm">{liq.price}</span>
                           </div>
                         ))}
                       </div>
                     </>
                   ) : (
-                    <div className="py-6 text-center text-xs text-gray-400">
+                    <div className="py-6 text-center text-xs text-gray-500 dark:text-gray-400">
                       <Spinner />
-                      <p className="mt-2">Cartographie des zones...</p>
+                      <p className="mt-2 font-medium">Cartographie des zones...</p>
                     </div>
                   )}
                 </div>
@@ -996,9 +998,10 @@ export default function ChartVision() {
               {/* DRAWER: CONFLUENCES */}
               {openDrawer === 'confluences' && (
                 <div className="space-y-3">
-                  <div className="border-b border-gray-100 dark:border-gray-800 pb-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
-                      Confluences Stratégiques
+                  <div className="border-b border-gray-200 dark:border-gray-800 pb-2.5">
+                    <span className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                      Confluences Stratégiques Validées
                     </span>
                   </div>
 
@@ -1007,17 +1010,17 @@ export default function ChartVision() {
                       {analysis.confluences?.map((c, i) => (
                         <li
                           key={i}
-                          className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 p-2 text-xs text-gray-300"
+                          className="flex items-start gap-2.5 rounded-xl bg-gray-100 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 p-2.5 text-xs text-gray-900 dark:text-gray-100 font-medium leading-relaxed"
                         >
-                          <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                           <span>{c}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <div className="py-6 text-center text-xs text-gray-400">
+                    <div className="py-6 text-center text-xs text-gray-500 dark:text-gray-400">
                       <Spinner />
-                      <p className="mt-2">Validation des règles...</p>
+                      <p className="mt-2 font-medium">Validation des règles...</p>
                     </div>
                   )}
                 </div>

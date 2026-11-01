@@ -215,15 +215,13 @@ export const connectBrokerAccount = asyncHandler(async (req, res) => {
 
   await account.save();
 
-  // If user has no active account, make this the active one
+  // Set newly connected account as the active one
   let config = await ManagedTradingConfig.findOne({ userId });
   if (!config) {
     config = await ManagedTradingConfig.create({ userId });
   }
-  if (!config.activeBrokerAccountId) {
-    config.activeBrokerAccountId = account._id;
-    await config.save();
-  }
+  config.activeBrokerAccountId = account._id;
+  await config.save();
 
   logger.info(`Broker account connected: ${broker} (${account.accountId}) for user ${userId}`);
   return sendSuccess(res, 201, {
@@ -243,6 +241,31 @@ export const getBrokerAccounts = asyncHandler(async (req, res) => {
   const accounts = await BrokerAccount.find({ userId }).sort({ createdAt: -1 });
 
   return sendSuccess(res, 200, { accounts });
+});
+
+/**
+ * POST /api/v1/managed-trading/broker-accounts/:id/select
+ */
+export const selectBrokerAccount = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { id } = req.params;
+  const account = await BrokerAccount.findOne({ _id: id, userId });
+  if (!account) {
+    throw ApiError.notFound('Compte courtier introuvable.');
+  }
+
+  let config = await ManagedTradingConfig.findOne({ userId });
+  if (!config) {
+    config = await ManagedTradingConfig.create({ userId });
+  }
+  config.activeBrokerAccountId = account._id;
+  await config.save();
+
+  return sendSuccess(res, 200, {
+    config,
+    activeAccount: account,
+    message: `Compte ${account.accountName} activé avec succès.`,
+  });
 });
 
 /**

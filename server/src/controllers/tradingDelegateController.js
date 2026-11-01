@@ -19,7 +19,10 @@ export const getConfig = asyncHandler(async (req, res) => {
   config.ensureDailyReset();
   await config.save();
 
-  return sendSuccess(res, 200, { config });
+  return sendSuccess(res, {
+    statusCode: 200,
+    data: { config },
+  });
 });
 
 /**
@@ -64,9 +67,10 @@ export const updateConfig = asyncHandler(async (req, res) => {
   config.ensureDailyReset();
   await config.save();
 
-  return sendSuccess(res, 200, {
-    config,
+  return sendSuccess(res, {
+    statusCode: 200,
     message: 'Configuration de surveillance mise à jour avec succès.',
+    data: { config },
   });
 });
 
@@ -89,11 +93,12 @@ export const toggleDelegate = asyncHandler(async (req, res) => {
 
   logger.info(`Trading Delegate ${config.isEnabled ? 'ACTIVATED' : 'PAUSED'} for user ${userId}`);
 
-  return sendSuccess(res, 200, {
-    config,
+  return sendSuccess(res, {
+    statusCode: 200,
     message: config.isEnabled
       ? 'Délégation de surveillance activée côté serveur avec succès.'
       : 'Délégation de surveillance mise en pause.',
+    data: { config },
   });
 });
 
@@ -126,11 +131,12 @@ export const togglePassiveMode = asyncHandler(async (req, res) => {
 
   await config.save();
 
-  return sendSuccess(res, 200, {
-    config,
+  return sendSuccess(res, {
+    statusCode: 200,
     message: activate
       ? 'Mode "Je n\'ai pas le temps de trader" activé ! Le serveur surveille vos marchés et vous alertera uniquement sur les setups majeurs.'
       : 'Mode "Je n\'ai pas le temps de trader" désactivé.',
+    data: { config },
   });
 });
 
@@ -160,7 +166,10 @@ export const getOpportunities = asyncHandler(async (req, res) => {
 
   const total = await Opportunity.countDocuments(query);
 
-  return sendSuccess(res, 200, { opportunities: items, total, page: Number(page) });
+  return sendSuccess(res, {
+    statusCode: 200,
+    data: { opportunities: items, total, page: Number(page) },
+  });
 });
 
 /**
@@ -174,7 +183,10 @@ export const getOpportunityDetail = asyncHandler(async (req, res) => {
     throw ApiError.notFound('Opportunité introuvable.');
   }
 
-  return sendSuccess(res, 200, { opportunity });
+  return sendSuccess(res, {
+    statusCode: 200,
+    data: { opportunity },
+  });
 });
 
 /**
@@ -191,7 +203,10 @@ export const getNotifications = asyncHandler(async (req, res) => {
 
   const unreadCount = await InAppNotification.countDocuments({ userId, isRead: false });
 
-  return sendSuccess(res, 200, { notifications, unreadCount });
+  return sendSuccess(res, {
+    statusCode: 200,
+    data: { notifications, unreadCount },
+  });
 });
 
 /**
@@ -205,7 +220,10 @@ export const markNotificationRead = asyncHandler(async (req, res) => {
     { new: true }
   );
 
-  return sendSuccess(res, 200, { notification: notif });
+  return sendSuccess(res, {
+    statusCode: 200,
+    data: { notification: notif },
+  });
 });
 
 /**
@@ -215,7 +233,10 @@ export const markAllNotificationsRead = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   await InAppNotification.updateMany({ userId, isRead: false }, { $set: { isRead: true, readAt: new Date() } });
 
-  return sendSuccess(res, 200, { message: 'Toutes les notifications ont été marquées comme lues.' });
+  return sendSuccess(res, {
+    statusCode: 200,
+    message: 'Toutes les notifications ont été marquées comme lues.',
+  });
 });
 
 /**
@@ -224,8 +245,9 @@ export const markAllNotificationsRead = asyncHandler(async (req, res) => {
  */
 export const triggerSweep = asyncHandler(async (req, res) => {
   const sweepResult = await runDelegateSweep();
-  return sendSuccess(res, 200, {
-    result: sweepResult,
+  return sendSuccess(res, {
+    statusCode: 200,
     message: 'Balayage de surveillance terminé.',
+    data: { result: sweepResult },
   });
 });

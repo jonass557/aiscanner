@@ -95,66 +95,76 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   }
 
   const dp = getDecimals(unique[unique.length - 1]?.close || fallbackBase);
-  return unique.map((b, idx) => {
+
+  // Filter out duplicate dead ticks (market closed) where high === low and volume === 0
+  const activeBars = [];
+  for (let i = 0; i < unique.length; i++) {
+    const b = unique[i];
+    if (activeBars.length > 0) {
+      const prev = activeBars[activeBars.length - 1];
+      const isDeadTick =
+        Math.abs(b.high - b.low) < 1e-6 &&
+        Math.abs(b.close - prev.close) < 1e-6 &&
+        (!b.volume || b.volume === 0);
+      if (isDeadTick) continue; // skip weekend frozen ticks
+    }
+    activeBars.push(b);
+  }
+
+  const barsToMap = activeBars.length > 0 ? activeBars : unique;
+  let currentFlowPrice = barsToMap[0] ? Number(barsToMap[0].open.toFixed(dp)) : fallbackBase;
+
+  return barsToMap.map((b, idx) => {
     let open = Number(b.open.toFixed(dp));
     let close = Number(b.close.toFixed(dp));
     let high = Number(b.high.toFixed(dp));
     let low = Number(b.low.toFixed(dp));
 
-    // Connect opening prices with previous bar close for continuous market flow
+    // Connect open with previous close for continuous smooth market flow
     if (idx > 0) {
-      const prevClose = Number(unique[idx - 1].close.toFixed(dp));
-      const spreadPips = Math.abs(open - prevClose);
-      if (spreadPips < prevClose * 0.008) {
-        open = prevClose;
-        high = Math.max(high, open, close);
-        low = Math.max(0.00001, Math.min(low, open, close));
-      }
+      open = currentFlowPrice;
     }
 
     // Eliminate flat barcode / zero-body tick candles:
     // Guarantee genuine Japanese candlestick bodies (65-85% of total bar range)
     const candleRange = high - low;
     const bodySize = Math.abs(close - open);
-    const minSpread = Math.max(Math.pow(10, -dp) * 4, open * 0.0006);
+    const minSpread = Math.max(Math.pow(10, -dp) * 12, open * 0.0012);
 
     if (candleRange < minSpread) {
       // Natural organic wave movement so adjacent bars never align flat like a barcode
-      const phase = Math.sin((b.time || idx) * 0.05 + idx * 0.3) * 0.5 + 0.5;
-      const waveSpread = minSpread * (0.85 + phase * 0.45);
+      const phase = Math.sin((b.time || idx) * 0.08 + idx * 0.35) * 0.5 + 0.5;
+      const waveSpread = minSpread * (1.1 + phase * 0.6);
       const isBull = phase > 0.48;
-      const bodyRatio = 0.72; // Bold, healthy rectangular body
-      const halfBody = (waveSpread * bodyRatio) / 2;
+      const bodyRatio = 0.75; // Bold, healthy rectangular body
+      const bodyAmount = waveSpread * bodyRatio;
 
-      const mid = open;
       if (isBull) {
-        open = Number((mid - halfBody).toFixed(dp));
-        close = Number((mid + halfBody).toFixed(dp));
+        close = Number((open + bodyAmount).toFixed(dp));
       } else {
-        open = Number((mid + halfBody).toFixed(dp));
-        close = Number((mid - halfBody).toFixed(dp));
+        close = Number(Math.max(0.00001, open - bodyAmount).toFixed(dp));
       }
+
       // Modest wicks that highlight, rather than bury, the candle body
-      const wickExtra = (waveSpread * (1 - bodyRatio)) / 2;
-      high = Number((Math.max(open, close) + wickExtra * 0.9).toFixed(dp));
-      low = Number((Math.max(0.00001, Math.min(open, close) - wickExtra * 0.9)).toFixed(dp));
-    } else if (bodySize < candleRange * 0.60) {
+      const wickExtra = (waveSpread * (1 - bodyRatio)) * 0.5;
+      high = Number((Math.max(open, close) + wickExtra).toFixed(dp));
+      low = Number(Math.max(0.00001, Math.min(open, close) - wickExtra).toFixed(dp));
+    } else if (bodySize < candleRange * 0.55) {
       // Rebalance body so it renders as a clean, healthy institutional rectangular candle
-      const targetBody = Math.max(minSpread * 0.9, candleRange * 0.70);
-      const isBull = close >= open || (idx > 0 && close >= unique[idx - 1].close);
-      const mid = (high + low) / 2;
+      const targetBody = Math.max(minSpread * 0.85, candleRange * 0.70);
+      const isBull = close >= open || (idx > 0 && close >= barsToMap[idx - 1].close);
 
       if (isBull) {
-        open = Number((mid - targetBody * 0.48).toFixed(dp));
-        close = Number((mid + targetBody * 0.52).toFixed(dp));
+        close = Number((open + targetBody).toFixed(dp));
       } else {
-        open = Number((mid + targetBody * 0.48).toFixed(dp));
-        close = Number((mid - targetBody * 0.52).toFixed(dp));
+        close = Number(Math.max(0.00001, open - targetBody).toFixed(dp));
       }
 
       high = Number(Math.max(high, open, close).toFixed(dp));
       low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
     }
+
+    currentFlowPrice = close;
 
     return {
       time: b.time,
@@ -162,7 +172,7 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
       high: Math.max(high, open, close),
       low: Math.max(0.00001, Math.min(low, open, close)),
       close,
-      volume: b.volume || 0,
+      volume: b.volume || 1000,
     };
   });
 };

@@ -8,26 +8,33 @@ import mongoose from 'mongoose';
  */
 const strategySchema = new mongoose.Schema(
   {
-    key: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    key: { type: String, required: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true },
     category: {
       type: String,
-      enum: ['smc', 'support_resistance', 'ict', 'price_action', 'trend', 'custom'],
       default: 'smc',
     },
     description: { type: String, default: '' },
     // Rules and confluences required for this strategy
     rules: { type: [String], default: [] },
+    // Multi-timeframes considered (e.g. ['H4', 'H1', 'M15', 'M5', 'M1'])
+    timeframes: { type: [String], default: ['H1'] },
+    // Technical indicators utilized (e.g. ['RSI', 'EMA 200', 'MACD', 'Bollinger', 'VWAP', 'Stochastic', 'ATR'])
+    indicators: { type: [String], default: [] },
+    // Preferred trading session (e.g. 'Londres', 'New York', 'Asie', 'Toutes')
+    session: { type: String, default: 'Toutes' },
+    // Target asset category (e.g. 'forex', 'crypto', 'indices', 'commodities', 'synthetic', '')
+    market: { type: String, default: '' },
+    // Personal trading plan and risk management guidelines
+    tradingPlan: { type: String, default: '' },
     // Supply & Demand mode: 'order_block_fvg' (SMC), 'support_resistance' (S/R), 'pivot_levels', etc.
     supplyDemandType: {
       type: String,
-      enum: ['order_block_fvg', 'support_resistance', 'pivot_levels', 'dynamic_ema'],
       default: 'order_block_fvg',
     },
     // Liquidity mode: 'bsl_ssl' (Buy/Sell-side liquidity for SMC), 'swing_high_low' (classic S/R stops), etc.
     liquidityRules: {
       type: String,
-      enum: ['bsl_ssl', 'swing_high_low', 'channel_bounds'],
       default: 'bsl_ssl',
     },
     targetRiskReward: { type: Number, default: 3.0, min: 1.0 },
@@ -40,6 +47,7 @@ const strategySchema = new mongoose.Schema(
 );
 
 strategySchema.index({ isActive: 1, key: 1 });
+strategySchema.index({ createdBy: 1, isActive: 1 });
 
 const Strategy = mongoose.model('Strategy', strategySchema);
 export default Strategy;

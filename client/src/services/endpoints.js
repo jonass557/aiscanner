@@ -168,6 +168,7 @@ export const managedTradingApi = {
   resetEmergency: () => api.post('/managed-trading/emergency-stop/reset'),
   getBrokerAccounts: () => api.get('/managed-trading/broker-accounts'),
   connectBrokerAccount: (payload) => api.post('/managed-trading/broker-accounts', payload),
+  selectBrokerAccount: (id) => api.post(`/managed-trading/broker-accounts/${id}/select`),
   deleteBrokerAccount: (id) => api.delete(`/managed-trading/broker-accounts/${id}`),
   executeManualOrder: (payload) => api.post('/managed-trading/orders/execute-manual', payload),
   getOrders: (params) => api.get('/managed-trading/orders', { params }),

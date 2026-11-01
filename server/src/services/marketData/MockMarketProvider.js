@@ -53,20 +53,20 @@ export class MockMarketProvider extends BaseMarketProvider {
 
     const baseVol =
       {
-        M1: 0.0012,
-        M2: 0.0016,
-        M3: 0.0020,
-        M5: 0.0025,
-        M15: 0.0035,
-        M30: 0.0045,
-        M45: 0.0052,
-        H1: 0.0065,
-        H2: 0.0085,
-        H3: 0.0100,
-        H4: 0.0125,
-        D1: 0.0220,
-        W1: 0.0450,
-      }[timeframe] || 0.0065;
+        M1: 0.0022,
+        M2: 0.0028,
+        M3: 0.0034,
+        M5: 0.0042,
+        M15: 0.0055,
+        M30: 0.0068,
+        M45: 0.0076,
+        H1: 0.0090,
+        H2: 0.0120,
+        H3: 0.0145,
+        H4: 0.0180,
+        D1: 0.0280,
+        W1: 0.0550,
+      }[timeframe] || 0.0090;
 
     const candles = [];
     const now = Date.now();
@@ -101,33 +101,33 @@ export class MockMarketProvider extends BaseMarketProvider {
       // Guarantee clear, healthy candle body (no flat 1-pixel barcode ticks)
       const rawMove = drift + normalNoise * barVol;
       const dir = rawMove >= 0 ? 1 : -1;
-      const minBodyPct = barVol * (0.40 + rand() * 0.35);
+      const minBodyPct = barVol * (0.65 + rand() * 0.40);
       const returnPct = dir * Math.max(minBodyPct, Math.abs(rawMove));
 
       const open = price;
       const close = Math.max(base * 0.15, open * (1 + returnPct));
       const body = Math.abs(close - open);
 
-      // Diverse candlestick forms (clean bodies dominate wicks)
+      // Diverse candlestick forms (clean rectangular bodies dominate wicks)
       const shapeType = rand();
       let upperWick, lowerWick;
 
-      if (shapeType < 0.06) {
-        // Pinbar / shooting star
-        upperWick = body * (1.4 + rand() * 1.6);
-        lowerWick = body * (0.1 + rand() * 0.25);
-      } else if (shapeType < 0.12) {
+      if (shapeType < 0.08) {
+        // Pinbar / rejection high
+        upperWick = body * (0.45 + rand() * 0.35);
+        lowerWick = body * (0.05 + rand() * 0.10);
+      } else if (shapeType < 0.16) {
         // Hammer / rejection low
-        lowerWick = body * (1.4 + rand() * 1.6);
-        upperWick = body * (0.1 + rand() * 0.25);
-      } else if (shapeType < 0.22) {
-        // Spinning top (healthy body, modest wicks)
-        upperWick = body * (0.45 + rand() * 0.55);
-        lowerWick = body * (0.45 + rand() * 0.55);
+        lowerWick = body * (0.45 + rand() * 0.35);
+        upperWick = body * (0.05 + rand() * 0.10);
+      } else if (shapeType < 0.28) {
+        // Balanced trading candle
+        upperWick = body * (0.18 + rand() * 0.18);
+        lowerWick = body * (0.18 + rand() * 0.18);
       } else {
-        // Standard institutional trading candle
-        upperWick = body * (0.15 + rand() * 0.30);
-        lowerWick = body * (0.15 + rand() * 0.30);
+        // Standard institutional trading candle (bold body clearly dominates)
+        upperWick = body * (0.08 + rand() * 0.15);
+        lowerWick = body * (0.08 + rand() * 0.15);
       }
 
       const high = Math.max(open, close) + upperWick;

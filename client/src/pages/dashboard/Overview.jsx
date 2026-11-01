@@ -83,8 +83,8 @@ export default function Overview() {
         },
         {
           id: 'opportunities',
-          labelFr: 'Opportunités Live',
-          labelEn: 'Live Opportunities',
+          labelFr: 'Robot',
+          labelEn: 'Robot',
           to: '/dashboard/opportunities',
           icon: Bot,
           bg: 'bg-gradient-to-br from-pink-500 to-rose-600',

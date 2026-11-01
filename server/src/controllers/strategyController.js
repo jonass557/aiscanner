@@ -93,11 +93,32 @@ const ensureDefaultStrategies = async () => {
 
 /**
  * GET /strategies
- * Returns all active strategies (accessible to all authenticated users).
+ * Returns all active system strategies PLUS personal strategies created by the current user.
  */
-export const getStrategies = asyncHandler(async (_req, res) => {
+export const getStrategies = asyncHandler(async (req, res) => {
   await ensureDefaultStrategies();
-  const strategies = await Strategy.find({ isActive: true }).sort({ isSystem: -1, createdAt: 1 });
+  const userId = req.user?._id;
+  const filter = {
+    isActive: true,
+    $or: [{ isSystem: true }, { createdBy: null }],
+  };
+  if (userId) {
+    filter.$or.push({ createdBy: userId });
+  }
+
+  const raw = await Strategy.find(filter)
+    .populate('createdBy', 'firstName lastName email')
+    .sort({ isSystem: -1, createdAt: -1 })
+    .lean();
+
+  const strategies = raw.map((s) => ({
+    ...s,
+    isOwner: Boolean(
+      req.user?.role === 'admin' ||
+      (userId && s.createdBy && (s.createdBy._id || s.createdBy).toString() === userId.toString())
+    ),
+  }));
+
   return sendSuccess(res, { data: { strategies } });
 });
 
@@ -112,8 +133,9 @@ export const getAdminStrategies = asyncHandler(async (_req, res) => {
 });
 
 /**
- * POST /strategies (Admin only)
- * Adds a new strategy to the system.
+ * POST /strategies
+ * Adds a new strategy to the system. Authenticated users can save their personal strategies,
+ * and administrators can create system-wide or custom strategies.
  */
 export const createStrategy = asyncHandler(async (req, res) => {
   const {
@@ -122,17 +144,23 @@ export const createStrategy = asyncHandler(async (req, res) => {
     category,
     description,
     rules,
+    timeframes,
+    indicators,
+    session,
+    market,
+    tradingPlan,
     supplyDemandType,
     liquidityRules,
     targetRiskReward,
     winRateEstimate,
+    isSystem,
   } = req.body;
 
   if (!name || !name.trim()) throw ApiError.badRequest('Le nom de la stratégie est requis.');
 
-  const generatedKey = (key || name).toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
-  const existing = await Strategy.findOne({ key: generatedKey });
-  if (existing) throw ApiError.conflict('Une stratégie avec cet identifiant ou ce nom existe déjà.');
+  const baseKey = (key || name).toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').slice(0, 30);
+  const userSuffix = req.user?._id ? `_${req.user._id.toString().slice(-6)}` : '';
+  const finalKey = `${baseKey}${userSuffix}_${Date.now().toString().slice(-4)}`;
 
   const parsedRules = Array.isArray(rules)
     ? rules
@@ -140,57 +168,101 @@ export const createStrategy = asyncHandler(async (req, res) => {
     ? rules.split('\n').map((r) => r.trim()).filter(Boolean)
     : [];
 
+  const parsedTimeframes = Array.isArray(timeframes)
+    ? timeframes
+    : typeof timeframes === 'string'
+    ? timeframes.split(/[,;\s]+/).map((t) => t.trim().toUpperCase()).filter(Boolean)
+    : ['H1'];
+
+  const parsedIndicators = Array.isArray(indicators)
+    ? indicators
+    : typeof indicators === 'string'
+    ? indicators.split(/[,;\n]+/).map((i) => i.trim()).filter(Boolean)
+    : [];
+
+  const isAdmin = req.user?.role === 'admin';
+
   const strategy = await Strategy.create({
     name: name.trim(),
-    key: generatedKey,
-    category: category || 'smc',
+    key: finalKey,
+    category: category || 'custom',
     description: description || '',
     rules: parsedRules,
+    timeframes: parsedTimeframes.length > 0 ? parsedTimeframes : ['H1'],
+    indicators: parsedIndicators,
+    session: session || 'Toutes',
+    market: market || '',
+    tradingPlan: tradingPlan || '',
     supplyDemandType: supplyDemandType || 'order_block_fvg',
     liquidityRules: liquidityRules || 'bsl_ssl',
     targetRiskReward: Number(targetRiskReward) || 3.0,
     winRateEstimate: Number(winRateEstimate) || 85,
-    isSystem: false,
+    isSystem: isAdmin ? Boolean(isSystem) : false,
     isActive: true,
     createdBy: req.user._id,
   });
 
   return sendSuccess(res, {
     statusCode: 201,
-    message: 'Stratégie ajoutée avec succès au système.',
-    data: { strategy },
+    message: 'Stratégie enregistrée avec succès.',
+    data: { strategy: { ...strategy.toObject(), isOwner: true } },
   });
 });
 
 /**
- * PUT /strategies/:id (Admin only)
- * Updates an existing strategy.
+ * PUT /strategies/:id
+ * Updates an existing strategy (Owner or Admin).
  */
 export const updateStrategy = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const updates = req.body;
+  const strategy = await Strategy.findById(id);
+  if (!strategy) throw ApiError.notFound('Stratégie introuvable.');
 
+  const isOwner = strategy.createdBy && strategy.createdBy.equals(req.user._id);
+  const isAdmin = req.user.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    throw ApiError.forbidden('Vous ne pouvez modifier que les stratégies que vous avez créées.');
+  }
+
+  const updates = { ...req.body };
   if (updates.rules && typeof updates.rules === 'string') {
     updates.rules = updates.rules.split('\n').map((r) => r.trim()).filter(Boolean);
   }
+  if (updates.timeframes && typeof updates.timeframes === 'string') {
+    updates.timeframes = updates.timeframes.split(/[,;\s]+/).map((t) => t.trim().toUpperCase()).filter(Boolean);
+  }
+  if (updates.indicators && typeof updates.indicators === 'string') {
+    updates.indicators = updates.indicators.split(/[,;\n]+/).map((i) => i.trim()).filter(Boolean);
+  }
+  if (!isAdmin) {
+    delete updates.isSystem; // Prevent non-admins from changing system flag
+  }
 
-  const strategy = await Strategy.findByIdAndUpdate(id, updates, { new: true });
-  if (!strategy) throw ApiError.notFound('Stratégie introuvable.');
+  const updated = await Strategy.findByIdAndUpdate(id, updates, { new: true });
 
   return sendSuccess(res, {
-    message: 'Stratégie mise à jour.',
-    data: { strategy },
+    message: 'Stratégie mise à jour avec succès.',
+    data: { strategy: { ...updated.toObject(), isOwner: true } },
   });
 });
 
 /**
- * DELETE /strategies/:id (Admin only)
- * Deletes a strategy from the database.
+ * DELETE /strategies/:id
+ * Deletes a strategy from the database (Owner or Admin).
  */
 export const deleteStrategy = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const strategy = await Strategy.findById(id);
   if (!strategy) throw ApiError.notFound('Stratégie introuvable.');
+
+  const isOwner = strategy.createdBy && strategy.createdBy.equals(req.user._id);
+  const isAdmin = req.user.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    throw ApiError.forbidden('Vous ne pouvez supprimer que les stratégies que vous avez créées.');
+  }
+  if (strategy.isSystem && !isAdmin) {
+    throw ApiError.forbidden('Les stratégies système de base ne peuvent être supprimées que par un administrateur.');
+  }
 
   await Strategy.findByIdAndDelete(id);
   return sendSuccess(res, { message: `Stratégie "${strategy.name}" supprimée avec succès.` });

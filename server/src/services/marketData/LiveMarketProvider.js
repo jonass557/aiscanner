@@ -159,9 +159,16 @@ export const sanitizeYahooCandles = (rawBars) => {
 
         // Connect opening prices with previous bar close for continuous market flow
         if (valid.length > 0) {
-          const prevClose = valid[valid.length - 1].close;
+          const prev = valid[valid.length - 1];
+          // Drop zero-volume duplicate ticks when market is closed (e.g. weekend forex ticks)
+          const isStagnantTick =
+            Math.abs(open - prev.close) < 1e-6 &&
+            Math.abs(high - low) < 1e-6 &&
+            (!b.volume || b.volume === 0);
+          if (isStagnantTick) continue;
+
+          const prevClose = prev.close;
           const spreadPips = Math.abs(open - prevClose);
-          // If overnight/inter-bar gap is smaller than 0.8% of price, bind open to prevClose
           if (spreadPips < prevClose * 0.008) {
             open = prevClose;
             high = Math.max(high, open, close);
@@ -171,17 +178,28 @@ export const sanitizeYahooCandles = (rawBars) => {
 
         const range = high - low;
         const body = Math.abs(close - open);
-        const minSpread = Math.max(Math.pow(10, -dp) * 2, open * 0.00035);
+        const minSpread = Math.max(Math.pow(10, -dp) * 5, open * 0.0008);
 
         // Fix Yahoo Finance indicative spread spikes & flat barcode candles (tiny bodies with long wicks)
         if (range < minSpread) {
-          const halfSpread = minSpread * 0.5;
-          high = Number((open + halfSpread * 1.3).toFixed(dp));
-          low = Number(Math.max(0.00001, open - halfSpread * 1.3).toFixed(dp));
-          close = Number((open >= close ? open - halfSpread : open + halfSpread).toFixed(dp));
-        } else if (body < range * 0.40) {
+          const isBull = valid.length > 0 ? close >= valid[valid.length - 1].close : true;
+          const targetBody = minSpread * 0.72;
+          const mid = open;
+
+          if (isBull) {
+            open = Number((mid - targetBody * 0.45).toFixed(dp));
+            close = Number((mid + targetBody * 0.55).toFixed(dp));
+          } else {
+            open = Number((mid + targetBody * 0.45).toFixed(dp));
+            close = Number((mid - targetBody * 0.55).toFixed(dp));
+          }
+
+          const wick = (minSpread - targetBody) * 0.5;
+          high = Number((Math.max(open, close) + wick).toFixed(dp));
+          low = Number(Math.max(0.00001, Math.min(open, close) - wick).toFixed(dp));
+        } else if (body < range * 0.45) {
           // Body is too narrow compared to wick range — rebalance into a solid, healthy Japanese candlestick
-          const targetBody = Math.max(minSpread * 0.8, range * 0.55);
+          const targetBody = Math.max(minSpread * 0.85, range * 0.65);
           const isBull = close >= open || (valid.length > 0 && close >= valid[valid.length - 1].close);
           const mid = (high + low) / 2;
 

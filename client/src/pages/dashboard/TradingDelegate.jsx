@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { delegateApi } from '../../services/endpoints.js';
+import { delegateApi, strategyApi } from '../../services/endpoints.js';
 import toast from 'react-hot-toast';
 
 const MARKET_OPTIONS = [
@@ -19,7 +19,7 @@ const MARKET_OPTIONS = [
   { id: 'synthetic', label: 'Indices Synthétiques Deriv' },
 ];
 
-const TIMEFRAME_OPTIONS = ['M15', 'H1', 'H4', 'D1'];
+const TIMEFRAME_OPTIONS = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
 const STRATEGY_OPTIONS = ['SMC', 'ICT', 'Price-Action', 'Supply-Demand'];
 const SESSION_OPTIONS = [
   { id: 'Any', label: 'Toutes Sessions' },
@@ -47,6 +47,9 @@ export default function TradingDelegate() {
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
 
   // Form State for Delegate Settings & Custom Strategy
+  const [strategiesList, setStrategiesList] = useState([]);
+  const [selectedStrategyId, setSelectedStrategyId] = useState('');
+  const [savingStrategy, setSavingStrategy] = useState(false);
   const [strategyName, setStrategyName] = useState('Smart Money Concepts & Order Block Rejection');
   const [strategyDescription, setStrategyDescription] = useState('Surveiller les balayages de liquidité (liquidity grabs) sur les sommets/creux de session, le rejet sur Fair Value Gaps (FVG) et Order Blocks (OB) avec confirmation en clôture de bougie.');
   const [tradingPlan, setTradingPlan] = useState('Risque maîtrisé de 1% max du capital par trade. Déplacement du Stop Loss à Breakeven après atteinte de TP1 (1:1.5) et sortie finale sur TP2 (1:2.5).');
@@ -68,15 +71,20 @@ export default function TradingDelegate() {
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Load delegate data from backend
+  // Load delegate data and strategies from backend
   const loadData = useCallback(async (isBg = false) => {
     if (!isBg) setRefreshing(true);
     try {
-      const [cfgRes, oppRes, notifRes] = await Promise.all([
+      const [cfgRes, oppRes, notifRes, stratRes] = await Promise.all([
         delegateApi.getConfig(),
         delegateApi.getOpportunities({ status: statusFilter || undefined, limit: 40 }),
         delegateApi.getNotifications({ limit: 30 }),
+        strategyApi.list().catch(() => null),
       ]);
+
+      if (stratRes?.data?.data?.strategies) {
+        setStrategiesList(stratRes.data.data.strategies);
+      }
 
       if (cfgRes?.data?.data?.config) {
         const c = cfgRes.data.data.config;
@@ -120,6 +128,103 @@ export default function TradingDelegate() {
       setRefreshing(false);
     }
   }, [statusFilter]);
+
+  // Strategy CRUD Handlers
+  const handleSelectSavedStrategy = (stratId) => {
+    setSelectedStrategyId(stratId);
+    if (!stratId) return;
+    const found = strategiesList.find((s) => s._id === stratId);
+    if (!found) return;
+    setStrategyName(found.name);
+    setStrategyDescription(found.description || '');
+    if (found.tradingPlan) setTradingPlan(found.tradingPlan);
+    if (found.riskRules) setRiskRules(found.riskRules);
+    if (Array.isArray(found.timeframes) && found.timeframes.length > 0) {
+      setSelectedTimeframes(found.timeframes);
+    }
+    toast.success(`Stratégie "${found.name}" chargée.`);
+  };
+
+  const handleSaveAsNewStrategy = async () => {
+    if (!strategyName.trim()) {
+      toast.error('Veuillez donner un nom à votre stratégie.');
+      return;
+    }
+    setSavingStrategy(true);
+    try {
+      const payload = {
+        name: strategyName.trim(),
+        key: `strat_${Date.now()}`,
+        description: strategyDescription,
+        tradingPlan,
+        riskRules,
+        timeframes: selectedTimeframes,
+        market: selectedMarkets[0] || 'forex',
+        session: selectedSession,
+      };
+      const { data } = await strategyApi.create(payload);
+      toast.success(data?.message || 'Nouvelle stratégie enregistrée avec succès !');
+      const stratRes = await strategyApi.list().catch(() => null);
+      if (stratRes?.data?.data?.strategies) {
+        setStrategiesList(stratRes.data.data.strategies);
+      }
+      if (data?.data?.strategy?._id) {
+        setSelectedStrategyId(data.data.strategy._id);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Erreur lors de l\'enregistrement');
+    } finally {
+      setSavingStrategy(false);
+    }
+  };
+
+  const handleUpdateCurrentStrategy = async () => {
+    if (!selectedStrategyId) {
+      toast.error('Sélectionnez d\'abord une stratégie à modifier.');
+      return;
+    }
+    setSavingStrategy(true);
+    try {
+      const payload = {
+        name: strategyName.trim(),
+        description: strategyDescription,
+        tradingPlan,
+        riskRules,
+        timeframes: selectedTimeframes,
+        market: selectedMarkets[0] || 'forex',
+        session: selectedSession,
+      };
+      await strategyApi.update(selectedStrategyId, payload);
+      toast.success('Stratégie mise à jour avec succès !');
+      const stratRes = await strategyApi.list().catch(() => null);
+      if (stratRes?.data?.data?.strategies) {
+        setStrategiesList(stratRes.data.data.strategies);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Erreur de mise à jour');
+    } finally {
+      setSavingStrategy(false);
+    }
+  };
+
+  const handleDeleteCurrentStrategy = async () => {
+    if (!selectedStrategyId) return;
+    if (!window.confirm('Voulez-vous vraiment supprimer cette stratégie ?')) return;
+    setSavingStrategy(true);
+    try {
+      await strategyApi.remove(selectedStrategyId);
+      toast.success('Stratégie supprimée avec succès.');
+      setSelectedStrategyId('');
+      const stratRes = await strategyApi.list().catch(() => null);
+      if (stratRes?.data?.data?.strategies) {
+        setStrategiesList(stratRes.data.data.strategies);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Erreur de suppression');
+    } finally {
+      setSavingStrategy(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -210,11 +315,12 @@ export default function TradingDelegate() {
   const handleTogglePassiveMode = async () => {
     try {
       const { data } = await delegateApi.passiveMode({ activate: !config?.isPassiveMode });
-      setConfig(data.data.config);
-      toast.success(data.message);
+      const updated = data?.data?.config || data?.config;
+      if (updated) setConfig(updated);
+      toast.success(data?.message || (isEn ? 'Passive mode updated.' : 'Mode passif mis à jour avec succès.'));
       loadData();
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Erreur');
+      toast.error(err?.response?.data?.message || err?.message || 'Erreur');
     }
   };
 
@@ -428,6 +534,61 @@ export default function TradingDelegate() {
 
         {showConfigSection && (
           <form onSubmit={handleSaveAndLaunchSurveillance} className="mt-4 space-y-4">
+            {/* Strategy Selection & Management Bar */}
+            <div className="rounded-xl border border-brand-200 dark:border-brand-900/60 bg-brand-50/50 dark:bg-brand-950/30 p-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+                  <span className="text-xs font-black text-gray-900 dark:text-white">
+                    {isEn ? 'Saved Strategies & Custom Plans' : 'Mes Stratégies Enregistrées & Plans'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleSaveAsNewStrategy}
+                    disabled={savingStrategy}
+                    className="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-bold text-[11px] shadow-sm transition flex items-center gap-1"
+                  >
+                    <span>+</span> {isEn ? 'Save As New Strategy' : 'Enregistrer Nouvelle Stratégie'}
+                  </button>
+                  {selectedStrategyId && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleUpdateCurrentStrategy}
+                        disabled={savingStrategy}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm transition"
+                      >
+                        {isEn ? 'Update' : 'Modifier'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteCurrentStrategy}
+                        disabled={savingStrategy}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] shadow-sm transition"
+                      >
+                        {isEn ? 'Delete' : 'Supprimer'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <select
+                value={selectedStrategyId}
+                onChange={(e) => handleSelectSavedStrategy(e.target.value)}
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-bold text-gray-900 dark:text-white"
+              >
+                <option value="">-- {isEn ? 'Choose a saved strategy or write custom' : 'Sélectionner une stratégie enregistrée ou rédiger ci-dessous'} --</option>
+                {strategiesList.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name} {s.isOwner ? '(Ma Stratégie)' : '(Système)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Strategy Name & Rules */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
