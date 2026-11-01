@@ -61,6 +61,9 @@ export const SETTING_DEFS = [
 
   // --- Features: behavioral toggles -----------------------------------------
   { key: 'features.requireEmailVerification', path: 'features.requireEmailVerification', category: 'features', secret: false, type: 'boolean' },
+
+  // --- Contact & Support ----------------------------------------------------
+  { key: 'contact.whatsappUrl', path: 'contact.whatsappUrl', category: 'features', secret: false },
 ];
 
 const DEF_BY_KEY = new Map(SETTING_DEFS.map((d) => [d.key, d]));

@@ -11,9 +11,9 @@ export const PLANS = {
     name: 'Free',
     price: 0,
     currency: 'USD',
-    scansPerMonth: 5,
+    scansPerMonth: -1,
     features: [
-      '5 scans per month',
+      'Scans illimités',
       'Basic technical analysis',
       '7-day history retention',
       'PDF export',
@@ -24,9 +24,9 @@ export const PLANS = {
     name: 'Pro',
     price: 29,
     currency: 'USD',
-    scansPerMonth: 100,
+    scansPerMonth: -1,
     features: [
-      '100 scans per month',
+      'Scans illimités',
       'Advanced SMC analysis',
       'Unlimited history',
       'PDF + CSV export',
@@ -41,7 +41,7 @@ export const PLANS = {
     currency: 'USD',
     scansPerMonth: -1,
     features: [
-      'Unlimited scans',
+      'Scans illimités',
       'Everything in Pro',
       'API access',
       'Real-time analysis',

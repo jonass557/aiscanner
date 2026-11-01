@@ -137,14 +137,14 @@ export const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw ApiError.notFound('User not found.');
 
-  const { plan, status, role, scansPerMonth, addCredits, isVerified } = req.body;
+  const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate } = req.body;
 
   if (plan) {
     // Admin override: allow assigning any plan, active or not, free or paid.
     const planDoc = await Plan.findOne({ id: plan }).lean();
     if (!planDoc) throw ApiError.badRequest('Invalid plan.');
     user.subscription.plan = planDoc.id;
-    user.subscription.scansPerMonth = planDoc.scansPerMonth;
+    user.subscription.scansPerMonth = -1; // illimité
     user.subscription.status = 'active';
     user.subscription.startDate = new Date();
     const end = new Date();
@@ -153,12 +153,38 @@ export const updateUser = asyncHandler(async (req, res) => {
   }
   if (status) user.subscription.status = status;
   if (role) user.role = role;
-  if (typeof scansPerMonth === 'number') user.subscription.scansPerMonth = scansPerMonth;
+  if (typeof scansPerMonth === 'number') user.subscription.scansPerMonth = -1;
   if (typeof addCredits === 'number') {
     // Grant credits by reducing scansUsed (never below 0).
     user.subscription.scansUsed = Math.max(0, user.subscription.scansUsed - addCredits);
   }
   if (typeof isVerified === 'boolean') user.isVerified = isVerified;
+
+  // Modification ou prolongation individuelle du free trial
+  if (typeof trialDays === 'number') {
+    user.trial = user.trial || {};
+    user.trial.days = trialDays;
+    user.trial.isActive = trialDays > 0;
+    user.trial.startedAt = user.trial.startedAt || new Date();
+    user.trial.endsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+    user.subscription.status = 'active';
+    user.subscription.endDate = user.trial.endsAt;
+  }
+  if (typeof extendTrialDays === 'number' && extendTrialDays > 0) {
+    user.trial = user.trial || {};
+    const baseDate = (user.trial.endsAt && new Date(user.trial.endsAt) > new Date())
+      ? new Date(user.trial.endsAt)
+      : new Date();
+    const newEnd = new Date(baseDate.getTime() + extendTrialDays * 24 * 60 * 60 * 1000);
+    user.trial.endsAt = newEnd;
+    user.trial.isActive = true;
+    user.trial.days = Math.max(0, Math.ceil((newEnd - (user.trial.startedAt || new Date())) / (1000 * 60 * 60 * 24)));
+    user.subscription.status = 'active';
+    user.subscription.endDate = newEnd;
+  }
+  if (subscriptionEndDate) {
+    user.subscription.endDate = new Date(subscriptionEndDate);
+  }
 
   await user.save();
   await logAdmin('update_user', {

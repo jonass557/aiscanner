@@ -29,11 +29,17 @@ const emptyStrategy = {
   category: 'smc',
   description: '',
   rules: [],
+  timeframes: ['H1'],
+  indicators: [],
+  session: 'Toutes',
+  market: '',
+  tradingPlan: '',
   supplyDemandType: 'order_block_fvg',
   liquidityRules: 'bsl_ssl',
   targetRiskReward: 3.0,
   winRateEstimate: 85,
   isActive: true,
+  isSystem: true,
 };
 
 const CATEGORIES = [
@@ -65,6 +71,9 @@ export default function AdminStrategies() {
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [rulesText, setRulesText] = useState('');
+  const [timeframesText, setTimeframesText] = useState('H1, H4, M15');
+  const [indicatorsText, setIndicatorsText] = useState('RSI, EMA 200, MACD');
+  const [tradingPlanText, setTradingPlanText] = useState('');
   const [search, setSearch] = useState('');
 
   const load = async () => {
@@ -88,12 +97,18 @@ export default function AdminStrategies() {
     setRulesText(
       'Validation de la tendance institutionnelle\nZone d\'intérêt Supply/Demand non mitigée\nPrise de liquidité préalable\nSignal de confirmation bougie de rejet\nRatio Risque/Rendement minimum 1:2.5'
     );
+    setTimeframesText('H1, H4, M15');
+    setIndicatorsText('RSI, EMA 200, MACD');
+    setTradingPlanText('Entrée stricte sur confirmation. Stop Loss placé derrière le bloc d\'ordre ou le dernier creux structurel.');
     setIsNew(true);
   };
 
   const openEdit = (strat) => {
     setEditing({ ...emptyStrategy, ...strat });
     setRulesText((strat.rules || []).join('\n'));
+    setTimeframesText(Array.isArray(strat.timeframes) ? strat.timeframes.join(', ') : (strat.timeframes || 'H1'));
+    setIndicatorsText(Array.isArray(strat.indicators) ? strat.indicators.join(', ') : (strat.indicators || ''));
+    setTradingPlanText(strat.tradingPlan || '');
     setIsNew(false);
   };
 
@@ -116,9 +131,15 @@ export default function AdminStrategies() {
     setSaving(true);
     try {
       const parsedRules = rulesText.split('\n').map((r) => r.trim()).filter(Boolean);
+      const parsedTimeframes = timeframesText.split(/[,;\s]+/).map((t) => t.trim().toUpperCase()).filter(Boolean);
+      const parsedIndicators = indicatorsText.split(/[,;\n]+/).map((i) => i.trim()).filter(Boolean);
+
       const payload = {
         ...editing,
         rules: parsedRules,
+        timeframes: parsedTimeframes.length > 0 ? parsedTimeframes : ['H1'],
+        indicators: parsedIndicators,
+        tradingPlan: tradingPlanText.trim(),
         targetRiskReward: Number(editing.targetRiskReward) || 3.0,
         winRateEstimate: Number(editing.winRateEstimate) || 85,
       };
@@ -128,7 +149,7 @@ export default function AdminStrategies() {
         toast.success('Nouvelle stratégie créée et intégrée au moteur !');
       } else {
         await strategyApi.update(editing._id, payload);
-        toast.success('Stratégie mise à jour avec succès.');
+        toast.success('Stratégie système mise à jour avec succès. Tous les robots appliqueront ces règles.');
       }
       setEditing(null);
       await load();
@@ -368,9 +389,10 @@ export default function AdminStrategies() {
       {/* Edit / Create Modal */}
       {editing && (
         <Modal
-          isOpen={true}
+          open={Boolean(editing)}
           onClose={() => setEditing(null)}
-          title={isNew ? 'Créer une nouvelle Stratégie' : `Modifier "${editing.name}"`}
+          title={isNew ? 'Créer une nouvelle Stratégie' : `Modifier la Stratégie "${editing.name}"`}
+          size="xl"
         >
           <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1 pr-2">
             <div>
@@ -414,6 +436,66 @@ export default function AdminStrategies() {
                     <option key={cat.value} value={cat.value}>{cat.label}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-500 mb-1">
+                  Timeframes cibles (séparés par virgules)
+                </label>
+                <input
+                  type="text"
+                  value={timeframesText}
+                  onChange={(e) => setTimeframesText(e.target.value)}
+                  placeholder="M1, M5, M15, H1, H4, D1"
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-500 mb-1">
+                  Indicateurs Techniques pris en compte
+                </label>
+                <input
+                  type="text"
+                  value={indicatorsText}
+                  onChange={(e) => setIndicatorsText(e.target.value)}
+                  placeholder="RSI 14, EMA 200, MACD, Bollinger, ATR"
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-500 mb-1">
+                  Session Préférée
+                </label>
+                <select
+                  value={editing.session || 'Toutes'}
+                  onChange={(e) => setField('session', e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+                >
+                  <option value="Toutes">Toutes les Sessions</option>
+                  <option value="Londres">Session Londres</option>
+                  <option value="New York">Session New York</option>
+                  <option value="Asie">Session Asie (Tokyo)</option>
+                  <option value="Killzones">Killzones ICT (London Open / NY AM)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-500 mb-1">
+                  Marché / Actifs Cibles
+                </label>
+                <input
+                  type="text"
+                  value={editing.market || ''}
+                  onChange={(e) => setField('market', e.target.value)}
+                  placeholder="Tous (Forex, Crypto, Indices, Métaux, Synthétiques)"
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+                />
               </div>
             </div>
 
@@ -494,7 +576,20 @@ export default function AdminStrategies() {
 
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-500 mb-1">
-                Règles de Trading & Confluences (une règle par ligne)
+                Plan de Trading & Directives d'Exécution du Robot
+              </label>
+              <textarea
+                rows={3}
+                value={tradingPlanText}
+                onChange={(e) => setTradingPlanText(e.target.value)}
+                placeholder="Directives d'exécution précises appliquées à la lettre par les robots (gestion des positions, partials, invalidation)..."
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-500 mb-1">
+                Règles de Trading & Confluences (une règle par ligne, exécutées à la lettre)
               </label>
               <textarea
                 rows={4}
@@ -505,7 +600,7 @@ export default function AdminStrategies() {
               />
             </div>
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-4 pt-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -514,7 +609,19 @@ export default function AdminStrategies() {
                   className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 h-4 w-4"
                 />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Stratégie active et visible immédiatement par les utilisateurs
+                  Stratégie active et visible immédiatement
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editing.isSystem}
+                  onChange={(e) => setField('isSystem', e.target.checked)}
+                  className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 h-4 w-4"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Stratégie Système globale (accessible à tous les utilisateurs et robots)
                 </span>
               </label>
             </div>

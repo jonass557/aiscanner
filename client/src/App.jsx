@@ -2,6 +2,8 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Spinner from './components/ui/Spinner.jsx';
+import PageTracker from './components/common/PageTracker.jsx';
+import WhatsAppButton from './components/common/WhatsAppButton.jsx';
 
 // Landing + auth are eager (small, first-paint critical for marketing).
 import LandingPage from './pages/LandingPage.jsx';
@@ -37,6 +39,7 @@ const Settings = lazy(() => import('./pages/dashboard/Settings.jsx'));
 
 const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview.jsx'));
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics.jsx'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
 const AdminStrategies = lazy(() => import('./pages/admin/AdminStrategies.jsx'));
 const AdminPlans = lazy(() => import('./pages/admin/AdminPlans.jsx'));
@@ -98,6 +101,7 @@ export default function App() {
           }
         >
           <Route index element={<AdminOverview />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="strategies" element={<AdminStrategies />} />
           <Route path="plans" element={<AdminPlans />} />
@@ -108,6 +112,8 @@ export default function App() {
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />
       </Routes>
+      <PageTracker />
+      <WhatsAppButton />
     </Suspense>
   );
 }

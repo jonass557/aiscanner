@@ -14,10 +14,12 @@ const SIZES = {
 /**
  * Accessible modal with backdrop, escape-to-close, body scroll lock and vertical overflow scroll.
  */
-export default function Modal({ open, onClose, title, children, footer, size = 'md', className = '' }) {
+export default function Modal({ open, isOpen, onClose, title, children, footer, size = 'md', className = '' }) {
+  const isVisible = Boolean(open ?? isOpen);
+
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose?.();
-    if (open) {
+    if (isVisible) {
       document.addEventListener('keydown', onKey);
       document.body.style.overflow = 'hidden';
     }
@@ -25,13 +27,13 @@ export default function Modal({ open, onClose, title, children, footer, size = '
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [isVisible, onClose]);
 
   const sizeClass = SIZES[size] || SIZES.md;
 
   return (
     <AnimatePresence>
-      {open && (
+      {isVisible && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
           initial={{ opacity: 0 }}

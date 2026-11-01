@@ -11,6 +11,21 @@ import { getErrorMessage } from '../../services/api.js';
 /** Client-side password rule mirroring the backend Joi schema. */
 const passwordValid = (p) => p.length >= 8 && /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p);
 
+const getDeviceFingerprint = () => {
+  let fp = localStorage.getItem('aiscanner_device_fp');
+  if (!fp) {
+    const raw = `${navigator.userAgent}_${screen.width}x${screen.height}_${screen.colorDepth}_${Intl.DateTimeFormat().resolvedOptions().timeZone}_${navigator.language}`;
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+      hash |= 0;
+    }
+    fp = `DEV_${Math.abs(hash).toString(36)}_${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem('aiscanner_device_fp', fp);
+  }
+  return fp;
+};
+
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -45,9 +60,20 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await register(form);
-      toast.success('Compte créé avec succès ! Bienvenue.');
-      navigate('/dashboard', { replace: true });
+      const selectedPlan = searchParams.get('plan') || 'pro';
+      const fp = getDeviceFingerprint();
+      const res = await register({
+        ...form,
+        plan: selectedPlan,
+        deviceFingerprint: fp,
+      });
+
+      toast.success('Compte créé avec succès ! Un code OTP vous a été envoyé par email.');
+      if (res?.data?.requireEmailVerification) {
+        navigate('/verify-email', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -57,8 +83,8 @@ export default function Register() {
 
   return (
     <AuthShell
-      title="Créer votre compte"
-      subtitle="Commencez avec 5 analyses gratuites chaque mois."
+      title="Créer votre compte & Démarrer l'Essai Gratuit"
+      subtitle="Profitez de toutes les fonctionnalités et des scans illimités sans engagement."
       footer={
         <>
           Vous avez déjà un compte ?{' '}

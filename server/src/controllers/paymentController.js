@@ -17,12 +17,16 @@ const OPERATORS = ['mtn', 'moov', 'orange', 'wave', 'standard', 'card'];
 const activatePlan = async (user, plan) => {
   user.subscription.plan = plan.id;
   user.subscription.status = 'active';
-  user.subscription.scansPerMonth = plan.scansPerMonth;
+  user.subscription.scansPerMonth = -1; // illimité pour tous les forfaits
   user.subscription.scansUsed = 0; // reset quota on subscription
   user.subscription.startDate = new Date();
+  const months = (plan.promo?.enabled && plan.promo?.durationMonths > 0) ? plan.promo.durationMonths : 1;
   const end = new Date();
-  end.setMonth(end.getMonth() + 1);
+  end.setMonth(end.getMonth() + months);
   user.subscription.endDate = end;
+  if (user.trial) {
+    user.trial.isActive = false; // Fin de l'essai gratuit, abonnement actif
+  }
   await user.save();
 
   await logAuth('subscription_paid', {
@@ -56,6 +60,7 @@ export const getPaymentConfig = asyncHandler(async (req, res) => {
       sebpay: {
         configured: Boolean(settingsService.getValue('payments.sebpay.secretKey') || config.payments.sebpay?.secretKey),
       },
+      whatsappUrl: settingsService.getValue('contact.whatsappUrl') || config.contact?.whatsappUrl || 'https://wa.me/22900000000',
     },
   });
 });
@@ -93,8 +98,13 @@ export const initiateIkeepay = asyncHandler(async (req, res) => {
   // Generate unique order reference (e.g. REF_1730000000000_1234)
   const orderId = `REF_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
 
+  // Prise en compte du tarif promotionnel configuré par l'admin après le free trial
+  const effectivePrice = (plan.promo?.enabled && Number(plan.promo?.price) > 0)
+    ? Number(plan.promo.price)
+    : plan.price;
+
   const session = provider.createCheckoutSession({
-    amount: plan.price,
+    amount: effectivePrice,
     currency: plan.currency || 'USD',
     orderId,
     redirectUrl: redirectUrl || `${config.frontendUrl}/dashboard/subscription?status=success&ref=${orderId}`,
@@ -103,7 +113,7 @@ export const initiateIkeepay = asyncHandler(async (req, res) => {
   const payment = await Payment.create({
     user: req.user._id,
     planId: plan.id,
-    amount: plan.price,
+    amount: effectivePrice,
     currency: plan.currency || 'USD',
     provider: 'ikeepay',
     externalRef: orderId,

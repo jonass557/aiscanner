@@ -326,24 +326,50 @@ export default function Subscription() {
                   )}
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">{plan.name}</h3>
-                    {trialAvailable && (
+                    {plan.promo?.enabled ? (
+                      <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                        PROMO POST-ESSAI
+                      </span>
+                    ) : trialAvailable ? (
                       <Badge tone="green">
                         <Gift className="h-3 w-3" /> {plan.trial.days}j offerts
                       </Badge>
+                    ) : null}
+                  </div>
+                  <div className="mt-3">
+                    {plan.promo?.enabled && Number(plan.promo.price) > 0 ? (
+                      <div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-black text-amber-600 dark:text-amber-400">
+                            {plan.promo.price}
+                          </span>
+                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                            {plan.currency || 'USD'}
+                          </span>
+                          <span className="text-sm text-gray-400 line-through">
+                            {plan.price} {plan.currency}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 mt-0.5">
+                          Offre spéciale : tarif pour les {plan.promo.durationMonths} {plan.promo.durationMonths === 1 ? 'premier mois' : 'premiers mois'}, puis {plan.price} {plan.currency}/mois
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-extrabold text-gray-900 dark:text-white">
+                          {plan.price === 0 ? 'Gratuit' : `${plan.price}`}
+                        </span>
+                        {plan.price > 0 && (
+                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                            {plan.currency || 'USD'} / mois
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold text-gray-900 dark:text-white">
-                      {plan.price === 0 ? 'Gratuit' : `${plan.price}`}
-                    </span>
-                    {plan.price > 0 && (
-                      <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                        {plan.currency || 'USD'} / mois
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    {plan.scansPerMonth === -1 ? 'Scans de graphiques illimités' : `${plan.scansPerMonth} scans automatiques / mois`}
+                  <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                    Scans et analyses illimités (∞)
                   </p>
 
                   <ul className="mt-6 flex-1 space-y-3">

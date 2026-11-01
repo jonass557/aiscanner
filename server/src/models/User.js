@@ -71,10 +71,18 @@ const userSchema = new mongoose.Schema(
       default: 'user',
     },
 
-    // Free-trial tracking (set when a plan with trial.enabled is activated).
+    // Anti-Abuse device & IP tracking
+    registrationIp: { type: String, default: '' },
+    deviceFingerprint: { type: String, default: '' },
+
+    // Free-trial tracking (per-user custom days, expiration & anti-abuse)
     trial: {
       startedAt: Date,
+      endsAt: Date,
+      days: { type: Number, default: 0 },
       appliedFor: String, // plan id the trial was applied to
+      isActive: { type: Boolean, default: false },
+      isUsed: { type: Boolean, default: false },
     },
 
     // Trading preferences — personalize AI Trading Assistant responses.
@@ -112,11 +120,12 @@ const userSchema = new mongoose.Schema(
 // Indexes (email already indexed via `unique: true` on the field)
 userSchema.index({ 'subscription.plan': 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ registrationIp: 1 });
+userSchema.index({ deviceFingerprint: 1 });
 
-// Virtual: scans remaining this month
+// Virtual: scans remaining this month (all plans are unlimited)
 userSchema.virtual('subscription.scansRemaining').get(function () {
-  if (this.subscription.plan === 'premium') return Infinity;
-  return Math.max(0, this.subscription.scansPerMonth - this.subscription.scansUsed);
+  return Infinity;
 });
 
 // Hash password before saving
@@ -145,25 +154,22 @@ userSchema.methods.checkAndResetMonthlyScans = function () {
   return false;
 };
 
-// Check if user can scan
+// Check if user can scan (unlimited scans on all active accounts and trials)
 userSchema.methods.canScan = function () {
-  this.checkAndResetMonthlyScans();
+  if (this.role === 'admin') return true;
 
-  if (this.subscription.plan === 'premium') return true;
-  if (this.subscription.status !== 'active') return false;
-
-  return this.subscription.scansUsed < this.subscription.scansPerMonth;
-};
-
-// Decrement scan credit
-userSchema.methods.useScan = async function () {
-  this.checkAndResetMonthlyScans();
-
-  if (!this.canScan()) {
-    throw new Error('No scans remaining');
+  // Active free trial
+  if (this.trial?.isActive && this.trial?.endsAt && new Date() < new Date(this.trial.endsAt)) {
+    return true;
   }
 
-  this.subscription.scansUsed += 1;
+  // Active paid or free plan
+  return this.subscription?.status === 'active';
+};
+
+// Increment scan count for tracking
+userSchema.methods.useScan = async function () {
+  this.subscription.scansUsed = (this.subscription.scansUsed || 0) + 1;
   await this.save();
 };
 

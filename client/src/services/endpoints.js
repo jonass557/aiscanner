@@ -149,6 +149,7 @@ export const adminApi = {
   createPlan: (payload) => api.post('/admin/plans', payload),
   updatePlan: (id, payload) => api.patch(`/admin/plans/${id}`, payload),
   togglePlan: (id) => api.post(`/admin/plans/${id}/toggle`),
+  analytics: () => api.get('/analytics/admin'),
   deletePlan: (id) => api.delete(`/admin/plans/${id}`),
 };
 
@@ -205,4 +206,9 @@ export const downloadBlob = (blob, filename) => {
   a.click();
   a.remove();
   window.URL.revokeObjectURL(url);
+};
+
+export const analyticsApi = {
+  track: (payload) => api.post('/analytics/track', payload).catch(() => null),
+  adminAnalytics: () => api.get('/analytics/admin'),
 };

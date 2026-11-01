@@ -18,6 +18,7 @@ import strategyRoutes from './strategyRoutes.js';
 import calculatorRoutes from './calculatorRoutes.js';
 import managedTradingRoutes from './managedTradingRoutes.js';
 import tradingDelegateRoutes from './tradingDelegateRoutes.js';
+import analyticsRoutes from './analyticsRoutes.js';
 
 /**
  * Root API router. Mounts each domain's routes under /api/v1.
@@ -41,6 +42,7 @@ router.use('/opportunities', requireDbConnection, opportunityRoutes);
 router.use('/journal', requireDbConnection, journalRoutes);
 router.use('/managed-trading', requireDbConnection, managedTradingRoutes);
 router.use('/delegate', requireDbConnection, tradingDelegateRoutes);
+router.use('/analytics', requireDbConnection, analyticsRoutes);
 router.use('/strategies', requireDbConnection, strategyRoutes);
 router.use('/voice', requireDbConnection, voiceRoutes);
 router.use('/assistant', requireDbConnection, assistantRoutes);

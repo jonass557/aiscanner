@@ -57,6 +57,10 @@ const FIELD_META = {
     hint: "Exige un code OTP par email avant de scanner. Désactivé, l'accès est immédiat.",
     toggle: true,
   },
+  'contact.whatsappUrl': {
+    label: 'Lien du Support WhatsApp (Bouton flottant)',
+    hint: 'Lien WhatsApp affiché sur le bouton flottant (ex: https://wa.me/22900000000 ou lien de groupe).',
+  },
 };
 
 const CATEGORY_TITLES = {

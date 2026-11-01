@@ -16,7 +16,7 @@ const planSchema = new mongoose.Schema(
     name: { type: String, required: true },
     price: { type: Number, default: 0, min: 0 },
     currency: { type: String, default: 'USD' },
-    scansPerMonth: { type: Number, default: 5 }, // -1 = unlimited
+    scansPerMonth: { type: Number, default: -1 }, // -1 = unlimited scans for all plans
     features: { type: [String], default: [] },
 
     // Admin controls
@@ -24,6 +24,13 @@ const planSchema = new mongoose.Schema(
     trial: {
       enabled: { type: Boolean, default: false },
       days: { type: Number, default: 7, min: 0 },
+    },
+    // Special post-free trial promotion (e.g., 3,000 for 1 month then normal price)
+    promo: {
+      enabled: { type: Boolean, default: false },
+      price: { type: Number, default: 0, min: 0 },
+      durationMonths: { type: Number, default: 1, min: 1 },
+      description: { type: String, default: '' },
     },
     order: { type: Number, default: 0 }, // display order on the pricing page
   },

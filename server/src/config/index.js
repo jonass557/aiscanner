@@ -138,6 +138,10 @@ const config = {
     password: process.env.ADMIN_PASSWORD || 'Admin123!ChangeThis',
   },
 
+  contact: {
+    whatsappUrl: process.env.WHATSAPP_SUPPORT_URL || 'https://wa.me/22900000000',
+  },
+
   // Feature flags — toggle product behaviors without code changes.
   features: {
     // Gate sensitive actions (scan, multi-timeframe, trade validator) behind a
