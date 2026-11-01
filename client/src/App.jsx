@@ -43,9 +43,11 @@ const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics.jsx'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
 const AdminStrategies = lazy(() => import('./pages/admin/AdminStrategies.jsx'));
 const AdminPlans = lazy(() => import('./pages/admin/AdminPlans.jsx'));
+const AdminReviews = lazy(() => import('./pages/admin/AdminReviews.jsx'));
 const AdminLogs = lazy(() => import('./pages/admin/AdminLogs.jsx'));
 const AdminAIConfig = lazy(() => import('./pages/admin/AdminAIConfig.jsx'));
 
+const ToolsPage = lazy(() => import('./pages/ToolsPage.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 export default function App() {
@@ -54,6 +56,8 @@ export default function App() {
       <Routes>
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/tools" element={<ToolsPage />} />
+        <Route path="/plans" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -105,6 +109,7 @@ export default function App() {
           <Route path="users" element={<AdminUsers />} />
           <Route path="strategies" element={<AdminStrategies />} />
           <Route path="plans" element={<AdminPlans />} />
+          <Route path="reviews" element={<AdminReviews />} />
           <Route path="logs" element={<AdminLogs />} />
           <Route path="ai-config" element={<AdminAIConfig />} />
         </Route>

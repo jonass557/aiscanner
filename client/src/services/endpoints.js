@@ -212,3 +212,11 @@ export const analyticsApi = {
   track: (payload) => api.post('/analytics/track', payload).catch(() => null),
   adminAnalytics: () => api.get('/analytics/admin'),
 };
+
+export const reviewApi = {
+  getPublic: () => api.get('/reviews'),
+  getAdmin: () => api.get('/reviews/admin'),
+  create: (payload) => api.post('/reviews', payload),
+  update: (id, payload) => api.put(`/reviews/${id}`, payload),
+  delete: (id) => api.delete(`/reviews/${id}`),
+};

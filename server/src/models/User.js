@@ -63,6 +63,18 @@ const userSchema = new mongoose.Schema(
         type: Date,
         default: Date.now,
       },
+      renewalCount: {
+        type: Number,
+        default: 0,
+      },
+      lastRenewedAt: {
+        type: Date,
+        default: null,
+      },
+      isRenewed: {
+        type: Boolean,
+        default: false,
+      },
     },
 
     role: {

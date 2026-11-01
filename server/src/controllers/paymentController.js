@@ -27,12 +27,25 @@ const activatePlan = async (user, plan) => {
   if (user.trial) {
     user.trial.isActive = false; // Fin de l'essai gratuit, abonnement actif
   }
+  const isRenewal = Boolean(user.subscription.startDate && (user.subscription.status === 'active' || user.subscription.renewalCount > 0));
+  if (isRenewal) {
+    user.subscription.renewalCount = (user.subscription.renewalCount || 0) + 1;
+    user.subscription.lastRenewedAt = new Date();
+    user.subscription.isRenewed = true;
+  }
+
   await user.save();
 
   await logAuth('subscription_paid', {
-    message: `Paid subscription activated: ${plan.name}`,
+    message: isRenewal
+      ? `🔄 Renouvellement d'abonnement : ${user.email} (${plan.name}) — Renouvellement #${user.subscription.renewalCount}`
+      : `Souscription abonnement : ${plan.name}`,
     userId: user._id,
-    metadata: { planId: plan.id, scansPerMonth: plan.scansPerMonth },
+    metadata: {
+      planId: plan.id,
+      renewalCount: user.subscription.renewalCount,
+      endDate: user.subscription.endDate,
+    },
   });
 };
 

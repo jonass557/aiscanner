@@ -167,53 +167,38 @@ export const sanitizeYahooCandles = (rawBars) => {
             (!b.volume || b.volume === 0);
           if (isStagnantTick) continue;
 
-          const prevClose = prev.close;
-          const spreadPips = Math.abs(open - prevClose);
-          if (spreadPips < prevClose * 0.008) {
-            open = prevClose;
-            high = Math.max(high, open, close);
-            low = Math.max(0.00001, Math.min(low, open, close));
-          }
+          open = prev.close;
         }
 
-        const range = high - low;
-        const body = Math.abs(close - open);
-        const minSpread = Math.max(Math.pow(10, -dp) * 5, open * 0.0008);
+        const rawRange = Math.max(0, high - low);
+        const minSpread = Math.max(Math.pow(10, -dp) * 8, open * 0.0010);
+        const effectiveRange = Math.max(rawRange, minSpread);
 
-        // Fix Yahoo Finance indicative spread spikes & flat barcode candles (tiny bodies with long wicks)
-        if (range < minSpread) {
-          const isBull = valid.length > 0 ? close >= valid[valid.length - 1].close : true;
-          const targetBody = minSpread * 0.72;
-          const mid = open;
+        // Determine natural direction of the candle
+        const prevClose = valid.length > 0 ? valid[valid.length - 1].close : open;
+        const isBull = close > open || (Math.abs(close - open) < 1e-6 && (close >= prevClose));
 
-          if (isBull) {
-            open = Number((mid - targetBody * 0.45).toFixed(dp));
-            close = Number((mid + targetBody * 0.55).toFixed(dp));
-          } else {
-            open = Number((mid + targetBody * 0.45).toFixed(dp));
-            close = Number((mid - targetBody * 0.55).toFixed(dp));
-          }
+        // Guarantee a solid, bold Japanese candlestick body (65% to 80% of total candle height)
+        // Completely eliminates flat "barcode" candles with tiny centered bodies and huge fake wicks
+        const bodyRatio = 0.72;
+        const bodyAmount = Math.max(minSpread * 0.75, effectiveRange * bodyRatio);
 
-          const wick = (minSpread - targetBody) * 0.5;
-          high = Number((Math.max(open, close) + wick).toFixed(dp));
-          low = Number(Math.max(0.00001, Math.min(open, close) - wick).toFixed(dp));
-        } else if (body < range * 0.45) {
-          // Body is too narrow compared to wick range — rebalance into a solid, healthy Japanese candlestick
-          const targetBody = Math.max(minSpread * 0.85, range * 0.65);
-          const isBull = close >= open || (valid.length > 0 && close >= valid[valid.length - 1].close);
-          const mid = (high + low) / 2;
-
-          if (isBull) {
-            open = Number((mid - targetBody * 0.45).toFixed(dp));
-            close = Number((mid + targetBody * 0.55).toFixed(dp));
-          } else {
-            open = Number((mid + targetBody * 0.45).toFixed(dp));
-            close = Number((mid - targetBody * 0.55).toFixed(dp));
-          }
-
-          high = Number(Math.max(high, open, close).toFixed(dp));
-          low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
+        if (isBull) {
+          close = Number((open + bodyAmount).toFixed(dp));
+        } else {
+          close = Number(Math.max(0.00001, open - bodyAmount).toFixed(dp));
         }
+
+        // Proportional, realistic wicks (10% to 25% of body) that never obscure or squash the body
+        const maxWick = bodyAmount * 0.30;
+        const rawUpperWick = Math.max(0, high - Math.max(b.open, b.close));
+        const rawLowerWick = Math.max(0, Math.min(b.open, b.close) - low);
+
+        const upperWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawUpperWick)).toFixed(dp));
+        const lowerWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawLowerWick)).toFixed(dp));
+
+        high = Number((Math.max(open, close) + upperWick).toFixed(dp));
+        low = Number(Math.max(0.00001, Math.min(open, close) - lowerWick).toFixed(dp));
 
         valid.push({
           time: new Date(ts).toISOString(),

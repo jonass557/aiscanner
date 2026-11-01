@@ -22,8 +22,8 @@ export default function PublicNavbar() {
   ];
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40">
-      <nav className="glass mx-auto mt-3 flex max-w-6xl items-center justify-between rounded-2xl px-5 py-3 shadow-lg">
+    <header className="fixed top-0 left-0 right-0 w-full z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+      <nav className="w-full flex items-center justify-between px-6 py-3.5">
         <Link to="/" className="flex items-center gap-2 font-bold">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-600 text-white">
             <ScanLine className="h-5 w-5" />
@@ -72,7 +72,7 @@ export default function PublicNavbar() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass mx-auto mt-2 max-w-6xl space-y-2 rounded-2xl p-4 md:hidden"
+          className="w-full border-t border-slate-800 bg-slate-950/95 space-y-2 px-6 py-4 md:hidden"
         >
           {navLinks.map((l) => (
             <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">

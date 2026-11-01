@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, ShieldCheck, Zap, Mic, Activity } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import AnimatedTradingRobotPreview from './AnimatedTradingRobotPreview.jsx';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -55,18 +56,18 @@ export default function Hero() {
           custom={3}
           className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
-          <Link
-            to="/register?join=true"
+          <a
+            href="#pricing"
             className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-8 py-3.5 text-base font-bold text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:brightness-110 active:scale-95"
           >
             {t('heroCta')} <ArrowRight className="h-5 w-5" />
-          </Link>
-          <a
-            href="#tools"
+          </a>
+          <Link
+            to="/tools"
             className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-7 py-3.5 text-base font-semibold text-slate-200 transition hover:border-cyan-500/50 hover:bg-slate-800"
           >
             {isEn ? 'Discover all AI tools' : 'Découvrir tous les outils IA'}
-          </a>
+          </Link>
         </motion.div>
 
         <motion.div
@@ -90,54 +91,14 @@ export default function Hero() {
           </span>
         </motion.div>
 
-        {/* Live Demo High-Fidelity Card */}
+        {/* Live Animated Trading Robot and Candlestick Chart */}
         <motion.div
           initial={{ opacity: 0, y: 40, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 0.5, duration: 0.7 }}
-          className="mx-auto mt-14 max-w-3xl"
+          className="mx-auto mt-14"
         >
-          <div className="relative rounded-2xl border border-cyan-500/30 bg-gradient-to-b from-slate-900/90 to-slate-950/95 p-3 shadow-2xl shadow-cyan-500/10 backdrop-blur-xl">
-            <div className="rounded-xl border border-slate-800/80 bg-slate-950 p-6 text-left">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                <div>
-                  <span className="text-xs font-mono font-semibold uppercase tracking-wider text-cyan-400">
-                    {isEn ? 'Automatic Detection · Live Forex' : 'Détection Automatique · Forex Live'}
-                  </span>
-                  <p className="text-2xl font-black text-white">EURUSD · Timeframe H1</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400 ring-1 ring-emerald-500/40">
-                    {isEn ? 'STRONG BUY · 91% CONFIDENCE' : 'ACHAT FORT (BUY) · 91% CONFIANCE'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3">
-                  <p className="text-[10px] font-semibold uppercase text-slate-400">{isEn ? 'Entry Zone' : "Zone d'Entrée"}</p>
-                  <p className="mt-1 font-mono text-base font-bold text-cyan-300">1.08450</p>
-                </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3">
-                  <p className="text-[10px] font-semibold uppercase text-slate-400">{isEn ? 'Stop Loss (Safety)' : 'Stop Loss (Sécurité)'}</p>
-                  <p className="mt-1 font-mono text-base font-bold text-rose-400">1.08180 (-27 pips)</p>
-                </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3">
-                  <p className="text-[10px] font-semibold uppercase text-slate-400">{isEn ? 'Take Profit 1 & 2' : 'Take Profit 1 & 2'}</p>
-                  <p className="mt-1 font-mono text-base font-bold text-emerald-400">1.09350 (+90 pips)</p>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl border border-cyan-500/20 bg-cyan-950/20 p-3 text-xs text-slate-300">
-                <p className="font-semibold text-cyan-300">{isEn ? 'SMC Institutional Rationale:' : 'Analyse Institutionnelle SMC :'}</p>
-                <p className="mt-1">
-                  {isEn
-                    ? 'Massive rejection on H1 bullish Order Block following Sell-Side Liquidity Sweep. Bullish market structure shift confirmed by Break of Structure (BOS). Outstanding Risk/Reward ratio of 1:3.3.'
-                    : 'Rejet massif sur Order Block acheteur 1H après balayage de la liquidité vendeuse (Sell-Side Liquidity Sweep). Structure haussière validée par Break of Structure (BOS). Ratio Risque/Rendement exceptionnel de 1:3.3.'}
-                </p>
-              </div>
-            </div>
-          </div>
+          <AnimatedTradingRobotPreview isEn={isEn} />
         </motion.div>
       </div>
     </section>

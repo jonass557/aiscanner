@@ -211,6 +211,13 @@ export default function AdminUsers() {
                         <span className="font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded">
                           {u.subscription?.plan || 'pro'}
                         </span>
+                        {u.subscription?.renewalCount > 0 && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                              🔄 Réabonné ({u.subscription.renewalCount}x)
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       <td className="px-4 py-3">

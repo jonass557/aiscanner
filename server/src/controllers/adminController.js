@@ -29,6 +29,8 @@ export const getAdminStats = asyncHandler(async (req, res) => {
     usersByPlan,
     scansByDecision,
     recentUsers,
+    totalRenewals,
+    recentRenewals,
     qualityByProvider,
   ] = await Promise.all([
     User.countDocuments(),
@@ -39,6 +41,8 @@ export const getAdminStats = asyncHandler(async (req, res) => {
     User.aggregate([{ $group: { _id: '$subscription.plan', count: { $sum: 1 } } }]),
     Analysis.aggregate([{ $group: { _id: '$decision', count: { $sum: 1 } } }]),
     User.find().sort({ createdAt: -1 }).limit(5).lean(),
+    User.countDocuments({ 'subscription.renewalCount': { $gt: 0 } }),
+    User.find({ 'subscription.renewalCount': { $gt: 0 } }).sort({ 'subscription.lastRenewedAt': -1 }).limit(5).lean(),
     // Quality feedback loop (Engine 5): 👍/👎 counts + avg confidence per
     // vision provider / engine version, so admins can compare model quality.
     Analysis.aggregate([
@@ -72,6 +76,7 @@ export const getAdminStats = asyncHandler(async (req, res) => {
       },
       revenue: { estimatedMonthly: estimatedRevenue, currency: 'USD' },
       recentUsers,
+      renewals: { total: totalRenewals, recent: recentRenewals },
       quality: qualityByProvider.map((q) => ({
         provider: q._id.provider,
         model: q._id.model,

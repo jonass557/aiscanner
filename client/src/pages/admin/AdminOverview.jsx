@@ -18,10 +18,10 @@ export default function AdminOverview() {
   if (loading) return <Spinner label="Loading admin stats…" />;
 
   const kpis = [
-    { label: 'Total users', value: formatNumber(stats.users.total), icon: Users, tone: 'purple' },
-    { label: 'Verified users', value: formatNumber(stats.users.verified), icon: CheckCircle2, tone: 'green' },
-    { label: 'Total scans', value: formatNumber(stats.scans.total), icon: ScanLine, tone: 'blue' },
-    { label: 'Est. MRR', value: `$${formatNumber(stats.revenue.estimatedMonthly)}`, icon: DollarSign, tone: 'yellow' },
+    { label: 'Total utilisateurs', value: formatNumber(stats.users.total), icon: Users, tone: 'purple' },
+    { label: 'Utilisateurs vérifiés', value: formatNumber(stats.users.verified), icon: CheckCircle2, tone: 'green' },
+    { label: 'Total réabonnements', value: formatNumber(stats.renewals?.total || 0), icon: DollarSign, tone: 'blue' },
+    { label: 'Revenu Estimé', value: `${formatNumber(stats.revenue.estimatedMonthly)}`, icon: DollarSign, tone: 'yellow' },
   ];
 
   const planData = Object.entries(stats.users.byPlan || {}).map(([name, count]) => ({ name, count }));

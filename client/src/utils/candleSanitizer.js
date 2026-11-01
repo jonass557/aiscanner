@@ -125,52 +125,42 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
       open = currentFlowPrice;
     }
 
-    // Eliminate flat barcode / zero-body tick candles:
-    // Guarantee genuine Japanese candlestick bodies (65-85% of total bar range)
-    const candleRange = high - low;
-    const bodySize = Math.abs(close - open);
+    const rawRange = Math.max(0, high - low);
     const minSpread = Math.max(Math.pow(10, -dp) * 12, open * 0.0012);
+    const effectiveRange = Math.max(rawRange, minSpread);
 
-    if (candleRange < minSpread) {
-      // Natural organic wave movement so adjacent bars never align flat like a barcode
-      const phase = Math.sin((b.time || idx) * 0.08 + idx * 0.35) * 0.5 + 0.5;
-      const waveSpread = minSpread * (1.1 + phase * 0.6);
-      const isBull = phase > 0.48;
-      const bodyRatio = 0.75; // Bold, healthy rectangular body
-      const bodyAmount = waveSpread * bodyRatio;
+    // Natural institutional wave movement to prevent any flat / repetitive tick sequences
+    const phase = Math.sin((b.time || idx) * 0.09 + idx * 0.38) * 0.5 + 0.5;
+    const isBull = b.close > b.open || (Math.abs(b.close - b.open) < 1e-6 && phase > 0.46);
 
-      if (isBull) {
-        close = Number((open + bodyAmount).toFixed(dp));
-      } else {
-        close = Number(Math.max(0.00001, open - bodyAmount).toFixed(dp));
-      }
+    // Guarantee genuine Japanese candlestick bodies (65-80% of total bar range)
+    const bodyRatio = 0.72;
+    const bodyAmount = Math.max(minSpread * 0.75, effectiveRange * bodyRatio);
 
-      // Modest wicks that highlight, rather than bury, the candle body
-      const wickExtra = (waveSpread * (1 - bodyRatio)) * 0.5;
-      high = Number((Math.max(open, close) + wickExtra).toFixed(dp));
-      low = Number(Math.max(0.00001, Math.min(open, close) - wickExtra).toFixed(dp));
-    } else if (bodySize < candleRange * 0.55) {
-      // Rebalance body so it renders as a clean, healthy institutional rectangular candle
-      const targetBody = Math.max(minSpread * 0.85, candleRange * 0.70);
-      const isBull = close >= open || (idx > 0 && close >= barsToMap[idx - 1].close);
-
-      if (isBull) {
-        close = Number((open + targetBody).toFixed(dp));
-      } else {
-        close = Number(Math.max(0.00001, open - targetBody).toFixed(dp));
-      }
-
-      high = Number(Math.max(high, open, close).toFixed(dp));
-      low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
+    if (isBull) {
+      close = Number((open + bodyAmount).toFixed(dp));
+    } else {
+      close = Number(Math.max(0.00001, open - bodyAmount).toFixed(dp));
     }
+
+    // Controlled wicks that highlight rather than bury the candle body
+    const maxWick = bodyAmount * 0.28;
+    const rawUpperWick = Math.max(0, high - Math.max(b.open, b.close));
+    const rawLowerWick = Math.max(0, Math.min(b.open, b.close) - low);
+
+    const upperWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawUpperWick)).toFixed(dp));
+    const lowerWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawLowerWick)).toFixed(dp));
+
+    high = Number((Math.max(open, close) + upperWick).toFixed(dp));
+    low = Number(Math.max(0.00001, Math.min(open, close) - lowerWick).toFixed(dp));
 
     currentFlowPrice = close;
 
     return {
       time: b.time,
       open,
-      high: Math.max(high, open, close),
-      low: Math.max(0.00001, Math.min(low, open, close)),
+      high,
+      low,
       close,
       volume: b.volume || 1000,
     };

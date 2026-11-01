@@ -273,6 +273,17 @@ export default function ToolsShowcase() {
             </div>
           </motion.div>
         </AnimatePresence>
+
+        {/* Link to Dedicated Tools Page */}
+        <div className="mt-12 text-center">
+          <Link
+            to="/tools"
+            className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-slate-900/90 px-8 py-3.5 text-sm font-bold text-cyan-300 shadow-lg shadow-cyan-500/10 transition hover:bg-slate-800 hover:text-white hover:border-cyan-400"
+          >
+            <span>Explorer la suite complète des 11 outils IA</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
     </section>
   );
