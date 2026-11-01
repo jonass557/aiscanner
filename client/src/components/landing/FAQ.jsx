@@ -5,8 +5,8 @@ import { useLanguage } from '../../context/LanguageContext.jsx';
 
 const FAQS_FR = [
   {
-    q: 'Comment fonctionne l’essai gratuit de 7 jours ?',
-    a: 'L’essai gratuit de 7 jours est disponible immédiatement sur le Plan 1 Mois sans carte bancaire requise. Vous bénéficiez d’un accès complet à tous les outils IA avec un nombre illimité de scans pendant toute la durée de l’essai.',
+    q: 'Comment fonctionne l’essai gratuit ?',
+    a: 'L’essai gratuit est disponible sur le Plan 1 Mois sans carte bancaire requise. Vous bénéficiez d’un accès complet à tous les outils IA avec un nombre illimité de scans pendant toute la durée de l’essai.',
   },
   {
     q: 'Quelle est la précision des analyses et du Robot de Trading ?',
@@ -32,8 +32,8 @@ const FAQS_FR = [
 
 const FAQS_EN = [
   {
-    q: 'How does the 7-day free trial work?',
-    a: 'The 7-day free trial is available immediately on the 1-Month Plan with no credit card required. You get full access to all 11 AI tools with unlimited scans during the entire trial period.',
+    q: 'How does the free trial work?',
+    a: 'The free trial is available immediately on the 1-Month Plan with no credit card required. You get full access to all 11 AI tools with unlimited scans during the entire trial period.',
   },
   {
     q: 'How accurate is the AI Trading Robot and Analysis?',

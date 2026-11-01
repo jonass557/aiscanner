@@ -58,7 +58,7 @@ export default function PublicNavbar() {
           ) : (
             <>
               <Link to="/login" className="btn-ghost">{t('login')}</Link>
-              <Link to="/register?join=true" className="btn-primary">{t('startFree')}</Link>
+              <a href="#pricing" className="btn-primary">{t('startFree')}</a>
             </>
           )}
         </div>
@@ -90,7 +90,7 @@ export default function PublicNavbar() {
           </div>
           <div className="flex gap-2 pt-2">
             <Link to="/login" className="btn-secondary flex-1 text-center">{t('login')}</Link>
-            <Link to="/register?join=true" className="btn-primary flex-1 text-center">{t('startFree')}</Link>
+            <a href="#pricing" onClick={() => setOpen(false)} className="btn-primary flex-1 text-center">{t('startFree')}</a>
           </div>
         </motion.div>
       )}

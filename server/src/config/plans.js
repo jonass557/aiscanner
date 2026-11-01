@@ -14,7 +14,7 @@ export const PLANS = {
     scansPerMonth: -1,
     trial: { enabled: true, days: 7 },
     features: [
-      'Essai gratuit 7 jours inclus',
+      'Essai gratuit sans engagement',
       'Scans de graphiques 100% illimités',
       'Robot de Trading Haute Probabilité',
       'AI Scanner & Chart Vision',

@@ -31,9 +31,14 @@ export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Si l'utilisateur clique directement sur le lien externe (ex: https://aiscanner-ten.vercel.app/register),
-  // on le redirige immédiatement vers la page d'accueil pour lui présenter la plateforme d'abord.
-  const isDirectExternalClick = !searchParams.get('join') && !searchParams.get('plan') && !window.history.state?.idx;
+  const paramEmail = searchParams.get('email') || '';
+  const paramName = searchParams.get('name') || '';
+  const orderId = searchParams.get('orderId') || '';
+  const selectedPlan = searchParams.get('plan') || '1mois';
+
+  // Si l'utilisateur clique directement sur le lien externe (ex: https://aiscanner-ten.vercel.app/register)
+  // sans aucun paramètre ni plan ni commande, on le redirige vers la page d'accueil pour voir les forfaits d'abord.
+  const isDirectExternalClick = !searchParams.get('join') && !searchParams.get('plan') && !orderId && !window.history.state?.idx;
 
   useEffect(() => {
     if (isDirectExternalClick) {
@@ -41,7 +46,12 @@ export default function Register() {
     }
   }, [isDirectExternalClick, navigate]);
 
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
+  const [form, setForm] = useState({
+    firstName: paramName ? paramName.split(' ')[0] : '',
+    lastName: paramName ? paramName.split(' ').slice(1).join(' ') : '',
+    email: paramEmail,
+    password: '',
+  });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -60,17 +70,17 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const selectedPlan = searchParams.get('plan') || 'pro';
       const fp = getDeviceFingerprint();
       const res = await register({
         ...form,
         plan: selectedPlan,
         deviceFingerprint: fp,
+        orderId,
       });
 
       toast.success('Compte créé avec succès ! Un code OTP vous a été envoyé par email.');
-      if (res?.data?.requireEmailVerification) {
-        navigate('/verify-email', { replace: true });
+      if (res?.data?.requireEmailVerification || res?.requireEmailVerification) {
+        navigate(`/verify-email?email=${encodeURIComponent(form.email)}`, { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }
@@ -83,8 +93,8 @@ export default function Register() {
 
   return (
     <AuthShell
-      title="Créer votre compte & Démarrer l'Essai Gratuit"
-      subtitle="Profitez de toutes les fonctionnalités et des scans illimités sans engagement."
+      title={orderId ? "Finaliser votre inscription" : "Créer votre compte & Démarrer"}
+      subtitle={orderId ? "Votre commande a été enregistrée. Choisissez un mot de passe pour activer votre accès." : "Profitez de toutes les fonctionnalités et des scans illimités."}
       footer={
         <>
           Vous avez déjà un compte ?{' '}
@@ -94,6 +104,13 @@ export default function Register() {
         </>
       }
     >
+      {orderId && (
+        <div className="mb-5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-emerald-300 flex items-center justify-between">
+          <span>✅ Souscription validée ({selectedPlan.toUpperCase()})</span>
+          <span className="font-mono text-[10px] text-emerald-400">{orderId}</span>
+        </div>
+      )}
+
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Input
@@ -134,11 +151,11 @@ export default function Register() {
         />
 
         <Button type="submit" variant="primary" loading={loading} className="w-full">
-          Créer mon compte gratuitement
+          {orderId ? "Créer mon compte & Recevoir mon code OTP" : "Créer mon compte"}
         </Button>
 
         <p className="text-center text-xs text-slate-500">
-          En vous inscrivant, vous acceptez nos conditions d'utilisation. Pas de carte bancaire requise.
+          En vous inscrivant, vous acceptez nos conditions d'utilisation.
         </p>
       </form>
     </AuthShell>

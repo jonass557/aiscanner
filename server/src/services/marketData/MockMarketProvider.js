@@ -48,7 +48,8 @@ export class MockMarketProvider extends BaseMarketProvider {
   _generate(entry, timeframe, limit) {
     const base = entry.base || 100;
     const day = new Date().toISOString().slice(0, 10);
-    const rand = this._rng(this._seed(`${entry.symbol}|${timeframe}|${day}`));
+    const tf = String(timeframe || 'H1').trim().toUpperCase();
+    const rand = this._rng(this._seed(`${entry.symbol}|${tf}|${day}`));
     const dp = this._decimals(base);
 
     const baseVol =
@@ -66,12 +67,12 @@ export class MockMarketProvider extends BaseMarketProvider {
         H4: 0.0180,
         D1: 0.0280,
         W1: 0.0550,
-      }[timeframe] || 0.0090;
+      }[tf] || 0.0090;
 
     const candles = [];
     const now = Date.now();
     const tfMinutes =
-      { M1: 1, M2: 2, M3: 3, M5: 5, M15: 15, M30: 30, M45: 45, H1: 60, H2: 120, H3: 180, H4: 240, D1: 1440, W1: 10080 }[timeframe] || 60;
+      { M1: 1, M2: 2, M3: 3, M5: 5, M15: 15, M30: 30, M45: 45, H1: 60, H2: 120, H3: 180, H4: 240, D1: 1440, W1: 10080 }[tf] || 60;
     const tfMs = tfMinutes * 60 * 1000;
 
     let price = base * (0.97 + rand() * 0.06);

@@ -121,13 +121,27 @@ export default function LiveChart({
       let real = false;
       let source = 'live';
 
+      const basePrice =
+        tradePlan?.entry ? Number(tradePlan.entry) :
+        activeSymbol.includes('XAU') ? 2685 :
+        activeSymbol.includes('BTC') ? 68500 :
+        activeSymbol.includes('US30') ? 43200 :
+        (activeSymbol.includes('NAS') || activeSymbol.includes('100') || activeSymbol.includes('USTEC')) ? 20450 :
+        (activeSymbol.includes('SPX') || activeSymbol.includes('500')) ? 5800 :
+        (activeSymbol.includes('GER') || activeSymbol.includes('DAX')) ? 19500 :
+        activeSymbol.includes('ETH') ? 2600 :
+        activeSymbol.includes('SOL') ? 175 :
+        activeSymbol.includes('JPY') ? 153.2 :
+        activeSymbol.includes('GBP') ? 1.295 :
+        activeSymbol.includes('VOL75') ? 325000 : 1.085;
+
       try {
         const snap = await marketApi.snapshot(activeSymbol, activeTf, 1500);
         const marketData = snap.data?.data?.market;
         const raw = marketData?.candles || snap.data?.data?.candles;
 
         if (Array.isArray(raw) && raw.length > 25) {
-          loadedBars = sanitizeCandles(raw, 1.085);
+          loadedBars = sanitizeCandles(raw, basePrice);
           real = Boolean(marketData?.isRealData);
           source = marketData?.source || 'marché';
         }
@@ -136,20 +150,6 @@ export default function LiveChart({
       }
 
       if (!loadedBars || loadedBars.length < 25) {
-        const basePrice =
-          tradePlan?.entry ? Number(tradePlan.entry) :
-          activeSymbol.includes('XAU') ? 2685 :
-          activeSymbol.includes('BTC') ? 68500 :
-          activeSymbol.includes('US30') ? 43200 :
-          (activeSymbol.includes('NAS') || activeSymbol.includes('100') || activeSymbol.includes('USTEC')) ? 20450 :
-          (activeSymbol.includes('SPX') || activeSymbol.includes('500')) ? 5800 :
-          (activeSymbol.includes('GER') || activeSymbol.includes('DAX')) ? 19500 :
-          activeSymbol.includes('ETH') ? 2600 :
-          activeSymbol.includes('SOL') ? 175 :
-          activeSymbol.includes('JPY') ? 153.2 :
-          activeSymbol.includes('GBP') ? 1.295 :
-          activeSymbol.includes('VOL75') ? 325000 : 1.085;
-
         loadedBars = generateRealisticCandles(basePrice, activeTf, 500);
         real = false;
         source = 'simulé';

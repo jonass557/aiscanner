@@ -19,7 +19,7 @@ export const DEFAULT_PLANS = [
     currency: 'XOF',
     scansPerMonth: -1,
     features: [
-      'Essai gratuit 7 jours inclus',
+      'Essai gratuit sans engagement',
       'Scans de graphiques 100% illimités (∞)',
       'Robot de Trading Haute Probabilité',
       'AI Scanner & Chart Vision',

@@ -31,17 +31,17 @@ export default function CTA() {
 
           <p className="relative mx-auto mt-4 max-w-xl text-sm sm:text-base text-slate-300">
             {isEn
-              ? 'Join thousands of traders using next-generation AI. 7-day free trial on the 1-Month Plan, 100% unlimited scans, no credit card required.'
-              : 'Rejoignez les traders qui surperforment les marchés grâce à l’IA. Essai gratuit de 7 jours sur le Plan 1 Mois, scans 100% illimités, sans carte bancaire.'}
+              ? 'Join thousands of traders using next-generation AI. Free trial on the 1-Month Plan, 100% unlimited scans, no credit card required.'
+              : 'Rejoignez les traders qui surperforment les marchés grâce à l’IA. Essai gratuit sans engagement sur le Plan 1 Mois, scans 100% illimités, sans carte bancaire.'}
           </p>
 
           <div className="relative mt-8 flex flex-wrap items-center justify-center gap-4">
-            <Link
-              to="/register?plan=1mois&join=true"
+            <a
+              href="#pricing"
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-8 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:brightness-110 active:scale-95"
             >
-              {isEn ? 'Start 7-Day Free Trial' : 'Démarrer l’Essai Gratuit 7 Jours'} <ArrowRight className="h-5 w-5" />
-            </Link>
+              {isEn ? 'Start Free Trial' : 'Démarrer l’Essai Gratuit'} <ArrowRight className="h-5 w-5" />
+            </a>
             <Link
               to="/tools"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/90 px-7 py-3.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/50 hover:bg-slate-800"

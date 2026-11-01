@@ -208,6 +208,17 @@ export default function ToolsPage() {
         <div className="pointer-events-none fixed top-48 right-1/4 h-96 w-96 rounded-full bg-indigo-500/15 blur-[140px]" />
 
         <div className="mx-auto max-w-7xl px-6">
+          {/* Top Back Button */}
+          <div className="mb-6 flex items-center justify-between">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-2 text-xs font-bold text-slate-300 transition hover:border-cyan-500/50 hover:bg-slate-800 hover:text-white"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180 text-cyan-400" />
+              {isEn ? 'Back to Home' : 'Retour à l’accueil'}
+            </Link>
+          </div>
+
           {/* Header Section */}
           <div className="text-center max-w-3xl mx-auto">
             <span className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-cyan-300">
@@ -329,22 +340,22 @@ export default function ToolsPage() {
             </h2>
             <p className="mt-2 text-sm text-slate-300 max-w-xl mx-auto">
               {isEn
-                ? 'Start with our 7-day free trial on the 1-Month Plan. Access all institutional tools with unlimited scans.'
-                : 'Commencez dès aujourd’hui avec l’essai gratuit de 7 jours sur le Plan 1 Mois. Accédez à tous les outils d’élite sans restriction.'}
+                ? 'Start with our free trial on the 1-Month Plan. Access all institutional tools with unlimited scans.'
+                : 'Commencez dès aujourd’hui avec l’essai gratuit sur le Plan 1 Mois. Accédez à tous les outils d’élite sans restriction.'}
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
-              <Link
-                to="/register?plan=1mois&join=true"
+              <a
+                href="/#pricing"
                 className="rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-8 py-3.5 text-sm font-bold text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:brightness-110"
               >
-                {isEn ? 'Start 7-Day Free Trial' : 'Démarrer l’Essai Gratuit de 7 Jours'}
-              </Link>
-              <Link
-                to="/#pricing"
+                {isEn ? 'Start Free Trial' : 'Démarrer l’Essai Gratuit'}
+              </a>
+              <a
+                href="/#pricing"
                 className="rounded-xl border border-slate-700 bg-slate-900 px-7 py-3.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/50"
               >
                 {isEn ? 'View All Plans' : 'Voir les Plans d’Abonnement'}
-              </Link>
+              </a>
             </div>
           </div>
         </div>

@@ -95,24 +95,25 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   }
 
   const dp = getDecimals(unique[unique.length - 1]?.close || fallbackBase);
+  const minPip = Math.pow(10, -dp) * 2;
 
-  // Filter out duplicate dead ticks (market closed) where high === low and volume === 0
+  // Filter out duplicate dead ticks (market closed / weekend frozen ticks) where price has virtually no movement and volume === 0
   const activeBars = [];
   for (let i = 0; i < unique.length; i++) {
     const b = unique[i];
     if (activeBars.length > 0) {
       const prev = activeBars[activeBars.length - 1];
+      const range = b.high - b.low;
       const isDeadTick =
-        Math.abs(b.high - b.low) < 1e-6 &&
-        Math.abs(b.close - prev.close) < 1e-6 &&
+        range <= minPip &&
+        Math.abs(b.close - prev.close) <= minPip &&
         (!b.volume || b.volume === 0);
-      if (isDeadTick) continue; // skip weekend frozen ticks
+      if (isDeadTick) continue; // skip weekend frozen ticks that form flat barcodes
     }
     activeBars.push(b);
   }
 
   const barsToMap = activeBars.length > 0 ? activeBars : unique;
-  let currentFlowPrice = barsToMap[0] ? Number(barsToMap[0].open.toFixed(dp)) : fallbackBase;
 
   return barsToMap.map((b, idx) => {
     let open = Number(b.open.toFixed(dp));
@@ -120,41 +121,24 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
     let high = Number(b.high.toFixed(dp));
     let low = Number(b.low.toFixed(dp));
 
-    // Connect open with previous close for continuous smooth market flow
+    // Connect open with previous close for continuous smooth market flow if drift is within standard spread
     if (idx > 0) {
-      open = currentFlowPrice;
+      const prevClose = Number(barsToMap[idx - 1].close.toFixed(dp));
+      if (Math.abs(open - prevClose) < prevClose * 0.001) {
+        open = prevClose;
+      }
     }
 
-    const rawRange = Math.max(0, high - low);
-    const minSpread = Math.max(Math.pow(10, -dp) * 12, open * 0.0012);
-    const effectiveRange = Math.max(rawRange, minSpread);
+    // Preserve authentic real price action: ensure strict OHLC invariants
+    high = Number(Math.max(high, open, close).toFixed(dp));
+    low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
 
-    // Natural institutional wave movement to prevent any flat / repetitive tick sequences
-    const phase = Math.sin((b.time || idx) * 0.09 + idx * 0.38) * 0.5 + 0.5;
-    const isBull = b.close > b.open || (Math.abs(b.close - b.open) < 1e-6 && phase > 0.46);
-
-    // Guarantee genuine Japanese candlestick bodies (65-80% of total bar range)
-    const bodyRatio = 0.72;
-    const bodyAmount = Math.max(minSpread * 0.75, effectiveRange * bodyRatio);
-
-    if (isBull) {
-      close = Number((open + bodyAmount).toFixed(dp));
-    } else {
-      close = Number(Math.max(0.00001, open - bodyAmount).toFixed(dp));
+    // If an isolated bar has completely zero range (flat line high === low), give it a tiny natural tick
+    if (Math.abs(high - low) < Math.pow(10, -dp)) {
+      const spread = Math.max(Math.pow(10, -dp) * 4, open * 0.0003);
+      high = Number((high + spread * 0.6).toFixed(dp));
+      low = Number(Math.max(0.00001, low - spread * 0.4).toFixed(dp));
     }
-
-    // Controlled wicks that highlight rather than bury the candle body
-    const maxWick = bodyAmount * 0.28;
-    const rawUpperWick = Math.max(0, high - Math.max(b.open, b.close));
-    const rawLowerWick = Math.max(0, Math.min(b.open, b.close) - low);
-
-    const upperWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawUpperWick)).toFixed(dp));
-    const lowerWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawLowerWick)).toFixed(dp));
-
-    high = Number((Math.max(open, close) + upperWick).toFixed(dp));
-    low = Number(Math.max(0.00001, Math.min(open, close) - lowerWick).toFixed(dp));
-
-    currentFlowPrice = close;
 
     return {
       time: b.time,

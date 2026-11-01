@@ -157,48 +157,34 @@ export const sanitizeYahooCandles = (rawBars) => {
         let high = Number(Math.max(b.high, open, close).toFixed(dp));
         let low = Number(Math.max(0.00001, Math.min(b.low, open, close)).toFixed(dp));
 
-        // Connect opening prices with previous bar close for continuous market flow
+        // Connect opening prices with previous bar close for continuous market flow when gap is minimal
         if (valid.length > 0) {
           const prev = valid[valid.length - 1];
-          // Drop zero-volume duplicate ticks when market is closed (e.g. weekend forex ticks)
+          // Drop zero-volume duplicate ticks when market is closed (e.g. weekend forex ticks with virtually no movement)
+          const range = high - low;
+          const minPip = Math.pow(10, -dp) * 2;
           const isStagnantTick =
-            Math.abs(open - prev.close) < 1e-6 &&
-            Math.abs(high - low) < 1e-6 &&
+            range <= minPip &&
+            Math.abs(close - prev.close) <= minPip &&
             (!b.volume || b.volume === 0);
-          if (isStagnantTick) continue;
+          if (isStagnantTick) continue; // skip weekend frozen ticks
 
-          open = prev.close;
+          // Connect open to previous close if within normal continuous spread
+          if (Math.abs(open - prev.close) < prev.close * 0.001) {
+            open = prev.close;
+          }
         }
 
-        const rawRange = Math.max(0, high - low);
-        const minSpread = Math.max(Math.pow(10, -dp) * 8, open * 0.0010);
-        const effectiveRange = Math.max(rawRange, minSpread);
+        // Preserve authentic real price action from market feed
+        high = Number(Math.max(high, open, close).toFixed(dp));
+        low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
 
-        // Determine natural direction of the candle
-        const prevClose = valid.length > 0 ? valid[valid.length - 1].close : open;
-        const isBull = close > open || (Math.abs(close - open) < 1e-6 && (close >= prevClose));
-
-        // Guarantee a solid, bold Japanese candlestick body (65% to 80% of total candle height)
-        // Completely eliminates flat "barcode" candles with tiny centered bodies and huge fake wicks
-        const bodyRatio = 0.72;
-        const bodyAmount = Math.max(minSpread * 0.75, effectiveRange * bodyRatio);
-
-        if (isBull) {
-          close = Number((open + bodyAmount).toFixed(dp));
-        } else {
-          close = Number(Math.max(0.00001, open - bodyAmount).toFixed(dp));
+        // If an isolated bar has completely zero range, ensure a tiny natural tick spread
+        if (Math.abs(high - low) < Math.pow(10, -dp)) {
+          const spread = Math.max(Math.pow(10, -dp) * 4, open * 0.0003);
+          high = Number((high + spread * 0.6).toFixed(dp));
+          low = Number(Math.max(0.00001, low - spread * 0.4).toFixed(dp));
         }
-
-        // Proportional, realistic wicks (10% to 25% of body) that never obscure or squash the body
-        const maxWick = bodyAmount * 0.30;
-        const rawUpperWick = Math.max(0, high - Math.max(b.open, b.close));
-        const rawLowerWick = Math.max(0, Math.min(b.open, b.close) - low);
-
-        const upperWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawUpperWick)).toFixed(dp));
-        const lowerWick = Number(Math.min(maxWick, Math.max(bodyAmount * 0.12, rawLowerWick)).toFixed(dp));
-
-        high = Number((Math.max(open, close) + upperWick).toFixed(dp));
-        low = Number(Math.max(0.00001, Math.min(open, close) - lowerWick).toFixed(dp));
 
         valid.push({
           time: new Date(ts).toISOString(),

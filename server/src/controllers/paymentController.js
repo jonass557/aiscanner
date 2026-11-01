@@ -216,6 +216,131 @@ export const verifyIkeepay = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /payments/ikeepay/initiate-public  (PUBLIC)
+ * Allows unauthenticated visitors to start iKeePay checkout for any plan before registering.
+ */
+export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
+  const { planId, email, fullName, phone, redirectUrl } = req.body;
+  if (!planId) throw ApiError.badRequest('Le plan d’abonnement est requis.');
+  if (!email) throw ApiError.badRequest('Votre adresse email est requise.');
+
+  const plan = await getPlanById(planId, { activeOnly: true });
+  if (!plan) throw ApiError.badRequest('Plan invalide ou inactif.');
+
+  const effectivePrice = (plan.promo?.enabled && Number(plan.promo?.price) > 0)
+    ? Number(plan.promo.price)
+    : plan.price;
+
+  const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey || '';
+  const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey || '';
+  const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl;
+  const checkoutUrl = settingsService.getValue('payments.ikeepay.checkoutUrl') || config.payments.ikeepay?.checkoutUrl;
+  const mobileMoneyEnabled = settingsService.getValue('payments.ikeepay.mobileMoneyEnabled') ?? config.payments.ikeepay?.mobileMoneyEnabled;
+
+  const provider = new IkeepayProvider({
+    publicKey,
+    secretKey,
+    baseUrl,
+    checkoutUrl,
+    mobileMoneyEnabled,
+  });
+
+  const orderId = `REF_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+  const isFree = effectivePrice <= 0;
+  let session = null;
+
+  if (!isFree) {
+    if (!provider.isConfigured()) {
+      throw ApiError.badRequest("Le moyen de paiement iKeePay n'a pas encore été configuré par l'administrateur (Clé publique manquante dans l'admin).");
+    }
+
+    session = provider.createCheckoutSession({
+      amount: effectivePrice,
+      currency: plan.currency || 'USD',
+      orderId,
+      redirectUrl: redirectUrl || `${config.frontendUrl}/register?orderId=${orderId}&email=${encodeURIComponent(email)}&plan=${plan.id}&name=${encodeURIComponent(fullName || '')}`,
+    });
+  }
+
+  const payment = await Payment.create({
+    customerEmail: email.toLowerCase().trim(),
+    customerName: fullName || '',
+    customerPhone: phone || '',
+    planId: plan.id,
+    amount: effectivePrice,
+    currency: plan.currency || 'USD',
+    provider: 'ikeepay',
+    externalRef: orderId,
+    checkoutUrl: session?.checkoutUrl || '',
+    method: 'inline_checkout',
+    status: isFree ? 'approved' : 'pending',
+  });
+
+  return sendSuccess(res, {
+    statusCode: 201,
+    message: isFree ? 'Plan sélectionné avec succès.' : 'Session de paiement iKeePay initialisée.',
+    data: {
+      paymentId: payment._id,
+      orderId,
+      isFree,
+      publicKey: session?.publicKey || '',
+      amount: effectivePrice,
+      currency: plan.currency || 'USD',
+      checkoutUrl: session?.checkoutUrl || '',
+      mobileMoneyEnabled: session?.mobileMoneyEnabled ?? true,
+      email: email.toLowerCase().trim(),
+      fullName: fullName || '',
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        price: plan.price,
+        currency: plan.currency || 'USD',
+      },
+    },
+  });
+});
+
+/**
+ * POST /payments/ikeepay/verify-public  (PUBLIC)
+ * Verifies transaction with iKeePay before the user registers.
+ */
+export const verifyPublicIkeepay = asyncHandler(async (req, res) => {
+  const { orderId } = req.body;
+  if (!orderId) throw ApiError.badRequest('Order ID is required.');
+
+  const payment = await Payment.findOne({ externalRef: orderId });
+  if (!payment) throw ApiError.notFound('Paiement introuvable.');
+
+  if (payment.status === 'approved') {
+    return sendSuccess(res, {
+      message: 'Paiement déjà validé.',
+      data: { status: 'approved', orderId, planId: payment.planId, email: payment.customerEmail },
+    });
+  }
+
+  const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey || '';
+  const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey || '';
+  const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl;
+
+  const provider = new IkeepayProvider({ publicKey, secretKey, baseUrl });
+  const verification = await provider.verifyTransaction(orderId);
+
+  if (verification.valid || verification.status === 'approved' || verification.status === 'success') {
+    payment.status = 'approved';
+    await payment.save();
+    return sendSuccess(res, {
+      message: 'Paiement validé avec succès !',
+      data: { status: 'approved', orderId, planId: payment.planId, email: payment.customerEmail },
+    });
+  }
+
+  return sendSuccess(res, {
+    message: 'Vérification terminée.',
+    data: { status: payment.status, orderId, planId: payment.planId, email: payment.customerEmail },
+  });
+});
+
+/**
  * POST /payments/webhook/ikeepay  (PUBLIC)
  * iKeePay Webhook handler.
  * Payload example:

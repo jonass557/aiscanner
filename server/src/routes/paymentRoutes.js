@@ -11,6 +11,10 @@ router.post('/webhook/sebpay', paymentController.webhook);
 // Public or auth: payment configuration (active provider, public keys, options)
 router.get('/config', paymentController.getPaymentConfig);
 
+// Public iKeePay checkout flow for new users paying before registering
+router.post('/ikeepay/initiate-public', paymentController.initiatePublicIkeepay);
+router.post('/ikeepay/verify-public', paymentController.verifyPublicIkeepay);
+
 // Authenticated routes
 router.use(protect);
 router.post('/ikeepay/initiate', paymentController.initiateIkeepay);
