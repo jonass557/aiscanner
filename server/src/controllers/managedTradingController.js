@@ -6,6 +6,7 @@ import ManagedOrder from '../models/ManagedOrder.js';
 import Opportunity from '../models/Opportunity.js';
 import { executeManagedOrder, triggerEmergencyStop, resetEmergencyStop as serviceResetEmergency } from '../services/trading/orderExecutionService.js';
 import { getBrokerAdapter } from '../services/trading/brokerAdapters/BrokerAdapterFactory.js';
+import { getQuote } from '../services/marketData/index.js';
 import logger from '../config/logger.js';
 
 /**
@@ -373,15 +374,52 @@ export const getOrders = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/v1/managed-trading/positions
+ * Open positions enhanced with live market quotes and real-time PnL.
  */
 export const getPositions = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const openPositions = await ManagedOrder.find({
     userId,
     status: { $in: ['FILLED', 'ACCEPTED', 'SUBMITTED'] },
-  }).populate('brokerAccountId', 'accountName broker accountType currency');
+  }).populate('brokerAccountId', 'accountName broker accountType currency balance equity').lean();
 
-  return sendSuccess(res, 200, { positions: openPositions });
+  const enhancedPositions = await Promise.all(
+    openPositions.map(async (pos) => {
+      let currentPrice = pos.executionPrice || pos.requestedPrice || pos.signalPrice || 1.0;
+      try {
+        const quote = await getQuote(pos.symbol);
+        if (quote?.price && Number(quote.price) > 0) {
+          currentPrice = Number(quote.price);
+        }
+      } catch (err) {}
+
+      const entryPrice = Number(pos.executionPrice || pos.requestedPrice || pos.signalPrice || currentPrice);
+      const volume = Number(pos.volume || 1);
+      const isForex = !pos.symbol.includes('BTC') && !pos.symbol.includes('ETH') && !pos.symbol.includes('VOLATILITY') && !pos.symbol.includes('BOOM') && !pos.symbol.includes('CRASH') && pos.market === 'forex';
+      const contractSize = isForex ? 100000 : 1;
+
+      let pnl = 0;
+      let pnlPercent = 0;
+      if (entryPrice > 0) {
+        if (pos.direction === 'BUY') {
+          pnl = (currentPrice - entryPrice) * volume * contractSize;
+          pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+        } else {
+          pnl = (entryPrice - currentPrice) * volume * contractSize;
+          pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
+        }
+      }
+
+      return {
+        ...pos,
+        currentPrice: Number(currentPrice.toFixed(currentPrice > 100 ? 2 : 5)),
+        unrealizedPnL: Number(pnl.toFixed(2)),
+        pnlPercent: Number(pnlPercent.toFixed(2)),
+      };
+    })
+  );
+
+  return sendSuccess(res, 200, { positions: enhancedPositions });
 });
 
 /**
@@ -395,19 +433,109 @@ export const closePosition = asyncHandler(async (req, res) => {
   }
 
   const account = await BrokerAccount.findById(order.brokerAccountId);
+  let closePrice = order.executionPrice || order.requestedPrice;
+
+  try {
+    const quote = await getQuote(order.symbol);
+    if (quote?.price) closePrice = Number(quote.price);
+  } catch (err) {}
+
+  const entryPrice = Number(order.executionPrice || order.requestedPrice || closePrice);
+  const volume = Number(order.volume || 1);
+  const isForex = !order.symbol.includes('BTC') && !order.symbol.includes('ETH') && !order.symbol.includes('VOLATILITY') && !order.symbol.includes('BOOM') && !order.symbol.includes('CRASH') && order.market === 'forex';
+  const contractSize = isForex ? 100000 : 1;
+  const pnl = order.direction === 'BUY'
+    ? (closePrice - entryPrice) * volume * contractSize
+    : (entryPrice - closePrice) * volume * contractSize;
+
   if (account) {
-    const adapter = getBrokerAdapter(account.broker);
-    try {
-      await adapter.closePosition(account, order.brokerPositionId || order.brokerOrderId);
-    } catch (err) {
-      logger.warn(`Could not close on broker side: ${err.message}`);
+    if (account.accountType === 'paper' || account.broker === 'paper') {
+      account.balance = Math.max(0, Number(account.balance || 10000) + pnl);
+      account.equity = account.balance;
+      await account.save();
+    } else {
+      const adapter = getBrokerAdapter(account.broker);
+      try {
+        await adapter.closePosition(account, order.brokerPositionId || order.brokerOrderId);
+      } catch (err) {
+        logger.warn(`Could not close on broker side: ${err.message}`);
+      }
     }
   }
 
   order.status = 'CLOSED';
   order.closedAt = new Date();
   order.closeReason = 'manual_close';
+  order.closePrice = Number(Number(closePrice).toFixed(closePrice > 100 ? 2 : 5));
+  order.realizedPnL = Number(pnl.toFixed(2));
   await order.save();
 
-  return sendSuccess(res, 200, { order, message: 'Position fermée avec succès.' });
+  return sendSuccess(res, 200, {
+    order,
+    message: `Position fermée avec succès. P&L réalisé : ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $`,
+  });
+});
+
+/**
+ * POST /api/v1/managed-trading/broker-accounts/deposit-paper
+ * POST /api/v1/managed-trading/broker-accounts/:id/deposit-paper
+ * Recharge or reset paper/demo simulation balance.
+ */
+export const depositPaperBalance = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { amount = 5000, action = 'add' } = req.body || {};
+  const accountId = req.params.id || req.body?.accountId;
+
+  let account;
+  if (accountId) {
+    account = await BrokerAccount.findOne({ _id: accountId, userId });
+  }
+  if (!account) {
+    account = await BrokerAccount.findOne({
+      userId,
+      $or: [{ broker: 'paper' }, { accountType: 'paper' }],
+    });
+  }
+
+  const numAmount = Math.max(1, Number(amount) || 5000);
+
+  if (!account) {
+    account = await BrokerAccount.create({
+      userId,
+      broker: 'paper',
+      accountName: 'Portefeuille Virtuel (Simulation)',
+      accountId: `PAPER-${userId.toString().slice(-6).toUpperCase()}`,
+      accountType: 'paper',
+      authType: 'api_token',
+      encryptedToken: 'enc:v1:paper-sim',
+      permissions: ['read', 'trade'],
+      isTradeAuthorized: true,
+      currency: 'USD',
+      balance: numAmount,
+      equity: numAmount,
+      connectionStatus: 'connected',
+      lastConnectedAt: new Date(),
+      isDefault: true,
+    });
+
+    return sendSuccess(res, 200, {
+      account,
+      message: `Compte simulation créé et crédité de ${account.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })} $ !`,
+    });
+  }
+
+  if (action === 'set') {
+    account.balance = numAmount;
+    account.equity = numAmount;
+  } else {
+    account.balance = Math.min(10000000, (Number(account.balance) || 0) + numAmount);
+    account.equity = account.balance;
+  }
+
+  await account.save();
+
+  return sendSuccess(res, 200, {
+    account,
+    message: `Solde démo/simulation mis à jour avec succès : ${account.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })} $`,
+  });
 });

@@ -177,6 +177,10 @@ export const managedTradingApi = {
   getOrders: (params) => api.get('/managed-trading/orders', { params }),
   getPositions: () => api.get('/managed-trading/positions'),
   closePosition: (id) => api.post(`/managed-trading/positions/${id}/close`),
+  depositPaperBalance: (id, payload) =>
+    id
+      ? api.post(`/managed-trading/broker-accounts/${id}/deposit-paper`, payload)
+      : api.post('/managed-trading/broker-accounts/deposit-paper', payload),
 };
 
 export const delegateApi = {

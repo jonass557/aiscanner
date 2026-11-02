@@ -99,7 +99,7 @@ export default function AdminLayout() {
           <ArrowLeft className="h-4 w-4" /> Retour à l'application
         </Link>
         <button
-          onClick={() => { logout(); navigate('/login'); }}
+          onClick={() => { logout(); navigate('/'); }}
           className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-950/30 transition"
         >
           <LogOut className="h-4 w-4" /> Déconnexion

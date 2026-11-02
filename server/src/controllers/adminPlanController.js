@@ -31,12 +31,18 @@ export const createPlan = asyncHandler(async (req, res) => {
     name: req.body.name || id,
     price: req.body.price ?? 0,
     currency: req.body.currency || 'USD',
-    scansPerMonth: req.body.scansPerMonth ?? 5,
+    scansPerMonth: req.body.scansPerMonth ?? -1,
     features: Array.isArray(req.body.features) ? req.body.features : [],
     isActive: req.body.isActive ?? true,
     trial: {
       enabled: req.body.trial?.enabled ?? false,
       days: req.body.trial?.days ?? 7,
+    },
+    promo: {
+      enabled: Boolean(req.body.promo?.enabled),
+      price: Math.max(0, Number(req.body.promo?.price) || 0),
+      durationMonths: Math.max(1, Number(req.body.promo?.durationMonths) || 1),
+      description: String(req.body.promo?.description || ''),
     },
     order: req.body.order ?? 0,
   });
@@ -54,8 +60,16 @@ export const updatePlan = asyncHandler(async (req, res) => {
     if (req.body[field] !== undefined) plan[field] = req.body[field];
   }
   if (req.body.trial !== undefined) {
+    if (!plan.trial) plan.trial = {};
     if (req.body.trial.enabled !== undefined) plan.trial.enabled = Boolean(req.body.trial.enabled);
     if (req.body.trial.days !== undefined) plan.trial.days = Math.max(0, Number(req.body.trial.days) || 0);
+  }
+  if (req.body.promo !== undefined) {
+    if (!plan.promo) plan.promo = {};
+    if (req.body.promo.enabled !== undefined) plan.promo.enabled = Boolean(req.body.promo.enabled);
+    if (req.body.promo.price !== undefined) plan.promo.price = Math.max(0, Number(req.body.promo.price) || 0);
+    if (req.body.promo.durationMonths !== undefined) plan.promo.durationMonths = Math.max(1, Number(req.body.promo.durationMonths) || 1);
+    if (req.body.promo.description !== undefined) plan.promo.description = String(req.body.promo.description || '');
   }
 
   await plan.save();

@@ -1,3 +1,4 @@
+import { Navigate } from 'react-router-dom';
 import PublicNavbar from '../components/layout/PublicNavbar.jsx';
 import PublicFooter from '../components/layout/PublicFooter.jsx';
 import Hero from '../components/landing/Hero.jsx';
@@ -7,9 +8,17 @@ import Testimonials from '../components/landing/Testimonials.jsx';
 import HowItWorks from '../components/landing/HowItWorks.jsx';
 import FAQ from '../components/landing/FAQ.jsx';
 import CTA from '../components/landing/CTA.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 /** The public marketing landing page, showcasing all AI tools with high visual appeal. */
 export default function LandingPage() {
+  const { isAuthenticated, loading } = useAuth();
+
+  // If already logged in, redirect automatically to the features dashboard
+  if (!loading && isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-slate-950">
       <PublicNavbar />

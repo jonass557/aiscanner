@@ -72,6 +72,26 @@ export const DEFAULT_PLANS = [
     promo: { enabled: false, price: 28000, durationMonths: 6, description: 'Promotion Semestrielle VIP' },
     order: 3,
   },
+  {
+    id: '1an',
+    name: 'Plan 1 An VIP (Annuel)',
+    price: 65000,
+    currency: 'XOF',
+    scansPerMonth: -1,
+    features: [
+      'Abonnement Annuel VIP (-45% d’économie)',
+      'Scans de graphiques 100% illimités (∞)',
+      'Accès complet aux 11 outils IA de pointe',
+      'Signaux institutionnels en direct 24/7',
+      'Exécution automatique sur Deriv & Binance',
+      'Audit personnalisé et coaching de trade',
+      'Ligne directe WhatsApp VIP prioritaire',
+    ],
+    isActive: true,
+    trial: { enabled: false, days: 0 },
+    promo: { enabled: false, price: 55000, durationMonths: 12, description: 'Promotion Annuelle VIP' },
+    order: 4,
+  },
 ];
 
 /**

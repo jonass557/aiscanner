@@ -20,6 +20,63 @@ const OPERATORS = [
   { value: 'moov', label: 'Moov Money' },
 ];
 
+const FALLBACK_PLANS = [
+  {
+    id: '1mois',
+    name: 'Plan 1 Mois',
+    price: 7000,
+    currency: 'XOF',
+    scansPerMonth: -1,
+    trial: { enabled: true, days: 7 },
+    promo: { enabled: false, price: 3000, durationMonths: 1, description: 'Offre après essai' },
+    features: [
+      'Essai gratuit sans engagement',
+      'Scans & analyses illimités (∞)',
+      'Robot de Trading Haute Probabilité',
+      'AI Scanner & Chart Vision en direct',
+      'IA Trading Delegate & Alertes sentinelles',
+      'IA Mentor bilingue FR/EN vocal',
+      'Support prioritaire WhatsApp',
+    ],
+  },
+  {
+    id: '2mois',
+    name: 'Plan 2 Mois',
+    price: 13000,
+    currency: 'XOF',
+    scansPerMonth: -1,
+    trial: { enabled: false, days: 0 },
+    promo: { enabled: false, price: 10000, durationMonths: 2, description: 'Tarif promotionnel' },
+    features: [
+      'Économisez sur 2 mois d’abonnement',
+      'Scans & analyses illimités (∞)',
+      'Robot de Trading Haute Probabilité',
+      'AI Scanner & Chart Vision en direct',
+      'IA Managed Trading & Signaux live',
+      'Backtesting Studio & Replay illimité',
+      'Support prioritaire WhatsApp 24/7',
+    ],
+  },
+  {
+    id: '1an',
+    name: 'Plan 1 An VIP (Annuel)',
+    price: 65000,
+    currency: 'XOF',
+    scansPerMonth: -1,
+    trial: { enabled: false, days: 0 },
+    promo: { enabled: false, price: 55000, durationMonths: 12, description: 'Promotion Annuelle VIP' },
+    features: [
+      'Abonnement Annuel VIP (-45% d’économie)',
+      'Scans de graphiques 100% illimités (∞)',
+      'Accès complet aux 11 outils IA de pointe',
+      'Signaux institutionnels en direct 24/7',
+      'Exécution automatique sur Deriv & Binance',
+      'Audit sur mesure de vos configurations de trade',
+      'Ligne directe WhatsApp VIP dédiée',
+    ],
+  },
+];
+
 /**
  * Subscription Management & iKeePay Inline Checkout:
  * - Plans catalog (free, pro, premium) & live monthly usage
@@ -35,7 +92,7 @@ export default function Subscription() {
   const initialTab = searchParams.get('tab') === 'history' || searchParams.get('tab') === 'invoices' ? 'history' : 'plans';
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  const [plans, setPlans] = useState([]);
+  const [plans, setPlans] = useState(FALLBACK_PLANS);
   const [paymentConfig, setPaymentConfig] = useState(null);
   const [paymentsList, setPaymentsList] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -54,10 +111,14 @@ export default function Subscription() {
   const [sebpayPhone, setSebpayPhone] = useState('');
   const [payingSebpay, setPayingSebpay] = useState(false);
 
-  // Initial data loading
+  // Initial data loading: fetch dynamic database-backed plans from admin
   useEffect(() => {
     userApi.plans()
-      .then(({ data }) => setPlans(data?.data?.plans || []))
+      .then(({ data }) => {
+        if (Array.isArray(data?.data?.plans) && data.data.plans.length > 0) {
+          setPlans(data.data.plans);
+        }
+      })
       .catch(() => {});
 
     paymentApi.getConfig()
@@ -138,16 +199,15 @@ export default function Subscription() {
   const currentPlan = user?.subscription?.plan;
 
   /**
-   * User clicks to select or upgrade a plan
+   * User clicks to select, upgrade, or renew a plan
    */
   const choosePlan = async (plan) => {
-    if (plan.id === currentPlan) return;
-
     // Check if free trial is available for this user
     const trialAvailable = plan.trial?.enabled && user?.trial?.appliedFor !== plan.id;
 
     // Free plan or Free trial
     if (plan.price === 0 || trialAvailable) {
+      if (plan.id === currentPlan && !trialAvailable) return;
       setChanging(plan.id);
       try {
         const { data } = await userApi.changeSubscription(plan.id);
@@ -161,7 +221,7 @@ export default function Subscription() {
       return;
     }
 
-    // Paid Plan: check active payment provider
+    // Paid Plan: check active payment provider (allows upgrade or renewal)
     const isIkeepay = paymentConfig?.activeProvider === 'ikeepay' || paymentConfig?.ikeepay?.configured;
 
     if (isIkeepay) {
@@ -239,27 +299,27 @@ export default function Subscription() {
   const daysRemaining = expMs > nowMs ? Math.ceil((expMs - nowMs) / (1000 * 60 * 60 * 24)) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-100">
       {/* Top Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <CreditCard className="h-6 w-6 text-brand-500" /> Abonnements &amp; Facturation
+          <h1 className="text-2xl font-black text-white flex items-center gap-2.5">
+            <CreditCard className="h-6 w-6 text-cyan-400" /> Abonnements &amp; Facturation
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Gérez votre forfait, souscrivez en toute sécurité par iKeePay / Mobile Money et consultez vos factures.
+          <p className="mt-1 text-sm text-slate-400">
+            Gérez votre forfait, activez l'essai gratuit ou souscrivez instantanément en toute sécurité.
           </p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+        <div className="flex rounded-xl bg-slate-900 border border-slate-800 p-1">
           <button
             type="button"
             onClick={() => handleTabChange('plans')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
               activeTab === 'plans'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
-                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                ? 'bg-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <Zap className="h-3.5 w-3.5" /> Forfaits &amp; Souscription
@@ -267,10 +327,10 @@ export default function Subscription() {
           <button
             type="button"
             onClick={() => handleTabChange('history')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
               activeTab === 'history'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
-                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                ? 'bg-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <Receipt className="h-3.5 w-3.5" /> Historique &amp; Factures
@@ -281,10 +341,10 @@ export default function Subscription() {
       {activeTab === 'plans' ? (
         <>
           {/* Current usage & Expiration countdown banner */}
-          <div className="card p-6 border border-slate-700/80 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/30 shadow-xl">
+          <div className="rounded-2xl p-6 border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase font-semibold tracking-wider text-slate-400">Votre Forfait Actuel</p>
+                <p className="text-xs uppercase font-bold tracking-wider text-slate-400">Votre Forfait Actuel</p>
                 <div className="flex items-center gap-3 mt-1.5">
                   <span className="text-2xl font-black capitalize text-white">
                     {plans.find((p) => p.id === currentPlan)?.name || currentPlan || '1 Mois'}
@@ -296,13 +356,13 @@ export default function Subscription() {
               </div>
 
               {/* Expiration countdown box */}
-              <div className="rounded-2xl border border-slate-700/80 bg-slate-950/80 p-3.5 flex items-center gap-4 shadow-inner">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex items-center gap-4 shadow-inner">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
                   <Calendar className="h-5 w-5" />
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Temps restant avant expiration</span>
-                  <div className="text-sm font-extrabold text-slate-100 flex items-center gap-1.5">
+                  <div className="text-sm font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
                     {daysRemaining > 0 ? (
                       <span className="text-emerald-400 font-extrabold">{daysRemaining} jour{daysRemaining > 1 ? 's' : ''} restant{daysRemaining > 1 ? 's' : ''}</span>
                     ) : (
@@ -310,7 +370,7 @@ export default function Subscription() {
                     )}
                   </div>
                   {expirationDate && (
-                    <span className="text-[11px] text-slate-400 block">
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
                       Expire le {new Date(expirationDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
                     </span>
                   )}
@@ -318,10 +378,10 @@ export default function Subscription() {
               </div>
             </div>
 
-            <div className="mt-5 border-t border-slate-800 pt-3 flex items-center justify-between text-xs text-slate-300">
+            <div className="mt-5 border-t border-slate-800/80 pt-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-300">
               <span className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                Scans et détections IA : <strong>Illimités (∞)</strong>
+                Scans et détections IA : <strong className="text-emerald-400">Illimités (∞)</strong>
               </span>
               <span className="text-slate-400">
                 Besoin de changer de formule ? Sélectionnez un forfait ci-dessous pour upgrader instantanément.
@@ -329,7 +389,7 @@ export default function Subscription() {
             </div>
           </div>
 
-          {/* Pricing cards grid */}
+          {/* Pricing cards grid - High contrast dark styling */}
           <div className="grid gap-6 lg:grid-cols-3">
             {plans.map((plan) => {
               const isCurrent = plan.id === currentPlan;
@@ -339,70 +399,72 @@ export default function Subscription() {
               return (
                 <div
                   key={plan.id}
-                  className={`card relative flex flex-col p-6 transition-all duration-300 ${
+                  className={`relative flex flex-col p-6 rounded-2xl transition-all duration-300 ${
                     highlighted
-                      ? 'ring-2 ring-cyan-500 shadow-xl shadow-cyan-500/10 bg-slate-900/90'
-                      : 'border border-slate-800 bg-slate-900/60'
+                      ? 'border-2 border-cyan-500 bg-slate-900/95 shadow-2xl shadow-cyan-500/10 ring-1 ring-cyan-500/40'
+                      : 'border border-slate-800 bg-slate-900/90 shadow-xl hover:border-slate-700'
                   }`}
                 >
                   {highlighted && (
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-cyan-600 to-indigo-600 px-3.5 py-1 text-xs font-bold text-white shadow-md">
-                      POPULAIRE & ÉCONOMIQUE
+                      POPULAIRE &amp; ÉCONOMIQUE
                     </span>
                   )}
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">{plan.name}</h3>
+                    <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                     {plan.promo?.enabled ? (
-                      <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                      <span className="rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-400">
                         PROMO POST-ESSAI
                       </span>
                     ) : trialAvailable ? (
-                      <Badge tone="green">
+                      <Badge tone="green" className="font-bold">
                         <Gift className="h-3 w-3" /> {plan.trial.days}j offerts
                       </Badge>
                     ) : null}
                   </div>
-                  <div className="mt-3">
+
+                  <div className="mt-4">
                     {plan.promo?.enabled && Number(plan.promo.price) > 0 ? (
                       <div>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-black text-amber-600 dark:text-amber-400">
-                            {plan.promo.price}
+                          <span className="text-4xl font-black text-amber-400">
+                            {Number(plan.promo.price).toLocaleString()}
                           </span>
-                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                          <span className="text-sm font-semibold text-slate-400">
                             {plan.currency || 'XOF'}
                           </span>
-                          <span className="text-sm text-gray-400 line-through">
-                            {plan.price} {plan.currency}
+                          <span className="text-sm text-slate-500 line-through">
+                            {Number(plan.price).toLocaleString()} {plan.currency}
                           </span>
                         </div>
-                        <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 mt-0.5">
-                          Tarif spécial : {plan.promo.durationMonths} {plan.promo.durationMonths === 1 ? 'mois' : 'mois'}, puis {plan.price} {plan.currency}
+                        <p className="text-[11px] font-medium text-amber-300 mt-1">
+                          Tarif promo : {plan.promo.durationMonths} {plan.promo.durationMonths === 1 ? 'mois' : 'mois'}, puis {Number(plan.price).toLocaleString()} {plan.currency}
                         </p>
                       </div>
                     ) : (
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-extrabold text-gray-900 dark:text-white">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-4xl font-black text-white tracking-tight">
                           {plan.price === 0 ? 'Gratuit' : Number(plan.price).toLocaleString()}
                         </span>
                         {plan.price > 0 && (
-                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                          <span className="text-sm font-semibold text-slate-400">
                             {plan.currency || 'FCFA'}
                           </span>
                         )}
                       </div>
                     )}
                   </div>
-                  <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                    Scans et signaux IA illimités (∞)
+
+                  <p className="mt-2 text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                    Scans et signaux IA 100% illimités (∞)
                   </p>
 
                   <ul className="mt-6 flex-1 space-y-3">
                     {(plan.features || []).map((f) => (
                       <li key={f} className="flex items-start gap-2.5 text-sm">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500 font-bold" />
-                        <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">{f}</span>
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400 font-bold" />
+                        <span className="text-slate-200 text-xs sm:text-sm">{f}</span>
                       </li>
                     ))}
                   </ul>
@@ -412,7 +474,7 @@ export default function Subscription() {
                     disabled={changing === plan.id}
                     loading={changing === plan.id}
                     onClick={() => choosePlan(plan)}
-                    className="mt-6 w-full justify-center font-semibold"
+                    className="mt-6 w-full justify-center font-bold"
                   >
                     {isCurrent ? (
                       <><RefreshCw className="h-4 w-4" /> Prolonger / Renouveler</>
@@ -430,26 +492,26 @@ export default function Subscription() {
           </div>
 
           {/* Secure Payment Gateway Guarantee */}
-          <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-5 dark:border-gray-800 dark:bg-gray-900/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 dark:bg-emerald-500/20">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 <ShieldCheck className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Paiement 100% Sécurisé via iKeePay</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-sm font-bold text-white">Paiement 100% Sécurisé via iKeePay</p>
+                <p className="text-xs text-slate-400">
                   Cartes Visa, Mastercard et Mobile Money (Orange Money, MTN, Moov, Wave). Chiffrement bancaire SSL 256-bit.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
+              <span className="rounded-lg bg-slate-800/80 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700/60">
                 Mobile Money
               </span>
-              <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
+              <span className="rounded-lg bg-slate-800/80 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700/60">
                 Cartes Bancaires
               </span>
-              <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
+              <span className="rounded-lg bg-emerald-950/60 px-2.5 py-1 text-xs font-bold text-emerald-400 border border-emerald-800/60">
                 Activation Immédiate
               </span>
             </div>
@@ -459,8 +521,8 @@ export default function Subscription() {
         /* Invoices & Payment History Tab */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <History className="h-5 w-5 text-brand-500" /> Historique des Paiements &amp; Factures
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <History className="h-5 w-5 text-cyan-400" /> Historique des Paiements &amp; Factures
             </h2>
             <Button
               variant="secondary"
@@ -479,15 +541,15 @@ export default function Subscription() {
           {loadingHistory ? (
             <div className="flex justify-center py-16"><Spinner /></div>
           ) : paymentsList.length === 0 ? (
-            <div className="card text-center py-12 border border-gray-200 dark:border-gray-800">
-              <Receipt className="h-10 w-10 text-gray-400 mx-auto mb-2 opacity-60" />
-              <p className="font-semibold text-gray-700 dark:text-gray-300">Aucun paiement enregistré pour l'instant</p>
-              <p className="text-xs text-gray-500 mt-1">Vos factures et reçus apparaîtront ici dès votre premier règlement.</p>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 text-center py-12 p-6 shadow-xl">
+              <Receipt className="h-10 w-10 text-slate-500 mx-auto mb-2 opacity-60" />
+              <p className="font-semibold text-slate-200">Aucun paiement enregistré pour l'instant</p>
+              <p className="text-xs text-slate-400 mt-1">Vos factures et reçus apparaîtront ici dès votre premier règlement.</p>
             </div>
           ) : (
-            <div className="card overflow-x-auto p-0 border border-gray-200 dark:border-gray-800">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-xl overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="border-b border-gray-100 bg-gray-50/50 text-xs uppercase font-semibold text-gray-500 dark:border-gray-800 dark:bg-gray-800/50">
+                <thead className="border-b border-slate-800 bg-slate-950/70 text-xs uppercase font-bold text-slate-400">
                   <tr>
                     <th className="px-5 py-3.5">Référence / Date</th>
                     <th className="px-5 py-3.5">Plan</th>
@@ -496,22 +558,22 @@ export default function Subscription() {
                     <th className="px-5 py-3.5">Statut</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                <tbody className="divide-y divide-slate-800/80 text-slate-200">
                   {paymentsList.map((p) => (
-                    <tr key={p._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition">
+                    <tr key={p._id} className="hover:bg-slate-800/30 transition">
                       <td className="px-5 py-4">
-                        <div className="font-mono text-xs font-semibold text-gray-900 dark:text-white">
+                        <div className="font-mono text-xs font-bold text-white">
                           {p.externalRef || p.providerRef || p._id}
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5">{formatDate(p.createdAt)}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{formatDate(p.createdAt)}</div>
                       </td>
-                      <td className="px-5 py-4 font-semibold capitalize text-gray-900 dark:text-white">
+                      <td className="px-5 py-4 font-semibold capitalize text-white">
                         {p.planId}
                       </td>
-                      <td className="px-5 py-4 font-bold text-gray-900 dark:text-white">
-                        {p.amount} {p.currency}
+                      <td className="px-5 py-4 font-bold text-white">
+                        {Number(p.amount).toLocaleString()} {p.currency}
                       </td>
-                      <td className="px-5 py-4 text-xs font-medium capitalize text-gray-600 dark:text-gray-300">
+                      <td className="px-5 py-4 text-xs font-medium capitalize text-slate-300">
                         {p.provider === 'ikeepay' ? 'iKeePay (Inline)' : p.provider}
                       </td>
                       <td className="px-5 py-4">

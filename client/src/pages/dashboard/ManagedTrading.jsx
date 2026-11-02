@@ -161,6 +161,10 @@ export default function ManagedTrading() {
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [guideBrokerTab, setGuideBrokerTab] = useState('deriv');
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [depositModalOpen, setDepositModalOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState(5000);
+  const [customDeposit, setCustomDeposit] = useState('');
+  const [depositing, setDepositing] = useState(false);
 
   // Add Broker Account Form
   const [newBroker, setNewBroker] = useState('deriv');
@@ -342,6 +346,46 @@ export default function ManagedTrading() {
     }, 25000);
     return () => clearInterval(interval);
   }, [loadData]);
+
+  // Fast polling of open positions to display real-time live price variations & PnL
+  useEffect(() => {
+    if (openPositions.length === 0) return;
+    const posInterval = setInterval(async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const { data } = await managedTradingApi.getPositions();
+        if (data?.data?.positions) {
+          setOpenPositions(data.data.positions);
+        }
+      } catch (err) {}
+    }, 4000);
+    return () => clearInterval(posInterval);
+  }, [openPositions.length]);
+
+  // Paper / Simulation Balance Deposit & Recharge Handler
+  const handleDepositPaper = async (amountToDeposit, actionType = 'add') => {
+    setDepositing(true);
+    try {
+      const finalAmount = Number(amountToDeposit) || 5000;
+      const targetAccId =
+        activeAccount?.accountType === 'paper' || activeAccount?.broker === 'paper'
+          ? activeAccount._id
+          : brokerAccounts.find((a) => a.accountType === 'paper' || a.broker === 'paper')?._id || '';
+
+      const { data } = await managedTradingApi.depositPaperBalance(targetAccId, {
+        amount: finalAmount,
+        action: actionType,
+      });
+      toast.success(data?.message || 'Solde simulation rechargé avec succès !');
+      setDepositModalOpen(false);
+      setCustomDeposit('');
+      loadData(true);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Erreur lors du rechargement du solde');
+    } finally {
+      setDepositing(false);
+    }
+  };
 
   // Robust active account resolution: matches ID or automatically selects the first connected account
   const activeAccount = useMemo(() => {
@@ -1569,23 +1613,34 @@ export default function ManagedTrading() {
               {activeAccount ? activeAccount.accountName : isEn ? 'No Account Active' : 'Aucun compte actif'}
             </p>
           )}
-          <div className="mt-2 flex items-center gap-2">
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                activeAccount?.isTradeAuthorized || activeAccount?.accountType === 'paper'
-                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                  : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-              }`}
+          <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                  activeAccount?.isTradeAuthorized || activeAccount?.accountType === 'paper'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                }`}
+              >
+                ● {activeAccount?.accountType === 'paper'
+                  ? 'Simulation Démo'
+                  : activeAccount?.isTradeAuthorized
+                  ? 'Trading Autorisé'
+                  : 'Lecture Seule'}
+              </span>
+              <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
+                {Number(activeAccount?.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeAccount?.currency || 'USD'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setDepositModalOpen(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400 border border-cyan-500/30 transition shadow-sm"
+              title="Ajouter ou recharger le solde de simulation"
             >
-              ● {activeAccount?.accountType === 'paper'
-                ? 'Simulation'
-                : activeAccount?.isTradeAuthorized
-                ? 'Trading Autorisé'
-                : 'Lecture Seule'}
-            </span>
-            <span className="text-xs font-mono font-semibold text-gray-600 dark:text-gray-400">
-              {activeAccount?.balance?.toFixed(2) || '0.00'} {activeAccount?.currency || 'USD'}
-            </span>
+              <Plus className="h-3 w-3" /> {isEn ? 'Deposit Demo' : 'Ajouter Solde Démo'}
+            </button>
           </div>
         </div>
 
@@ -1680,55 +1735,149 @@ export default function ManagedTrading() {
                 </p>
                 <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
                   {isEn
-                    ? 'Orders will appear here once executed and confirmed by the broker with their real fill price.'
-                    : 'Les ordres exécutés et confirmés par le courtier apparaîtront ici avec leur prix réel d\'exécution.'}
+                    ? 'Orders will appear here once executed and confirmed with their real fill price, live tick variation, and real-time PnL.'
+                    : 'Les ordres exécutés apparaîtront ici avec leur prix d\'entrée, cours en direct, et calcul en temps réel du gain ou de la perte.'}
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="text-[11px] font-bold uppercase text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                    <tr>
-                      <th className="py-2.5 px-3">Ticket ID</th>
-                      <th className="py-2.5 px-3">Actif</th>
-                      <th className="py-2.5 px-3">Sens</th>
-                      <th className="py-2.5 px-3">Volume</th>
-                      <th className="py-2.5 px-3">Prix Exécution</th>
-                      <th className="py-2.5 px-3">Stop Loss</th>
-                      <th className="py-2.5 px-3">Take Profit</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {openPositions.map((pos) => (
-                      <tr key={pos._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-850/50">
-                        <td className="py-3 px-3 font-mono text-gray-500 font-semibold">{pos.brokerOrderId || pos._id.slice(-6)}</td>
-                        <td className="py-3 px-3 font-bold text-gray-900 dark:text-white">{pos.symbol}</td>
-                        <td className="py-3 px-3">
-                          <span
-                            className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
-                              pos.direction === 'BUY' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60'
-                            }`}
-                          >
-                            {pos.direction}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 font-mono font-semibold">{pos.volume} lots</td>
-                        <td className="py-3 px-3 font-mono font-bold text-gray-900 dark:text-white">{pos.executionPrice || pos.requestedPrice}</td>
-                        <td className="py-3 px-3 font-mono text-rose-600">{pos.stopLoss}</td>
-                        <td className="py-3 px-3 font-mono text-emerald-600">{pos.takeProfit || '—'}</td>
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            onClick={() => handleClosePosition(pos._id)}
-                            className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 font-bold text-xs"
-                          >
-                            {isEn ? 'Close' : 'Fermer'}
-                          </button>
-                        </td>
+              <div className="space-y-4">
+                {/* Live Performance & Unrealized PnL summary header */}
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-850/70 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const totalPnL = openPositions.reduce((acc, p) => acc + (Number(p.unrealizedPnL) || 0), 0);
+                      const isProfit = totalPnL >= 0;
+                      return (
+                        <>
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold ${
+                            isProfit
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            <Activity className="h-5 w-5 animate-pulse" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400 block tracking-wider">
+                              {isEn ? 'Total Unrealized P&L (Live)' : 'P&L Total Latent (En Direct)'}
+                            </span>
+                            <div className="flex items-baseline gap-2">
+                              <span className={`text-xl font-black font-mono ${isProfit ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
+                                {isProfit ? '+' : ''}{totalPnL.toFixed(2)} $
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                ({openPositions.length} {openPositions.length > 1 ? 'positions' : 'position'})
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDepositModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-500 dark:text-cyan-400 border border-cyan-500/30 transition shadow-sm"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>{isEn ? 'Add Demo Funds' : 'Ajouter Solde Démo'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadData(true)}
+                      disabled={refreshing}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-gray-700 transition"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin text-cyan-500' : ''}`} />
+                      <span>{isEn ? 'Refresh Quotes' : 'Actualiser'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Table of Open Positions with live Price, PnL & variation */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                      <tr>
+                        <th className="py-2.5 px-3">Ticket</th>
+                        <th className="py-2.5 px-3">Actif</th>
+                        <th className="py-2.5 px-3">Sens</th>
+                        <th className="py-2.5 px-3">Volume</th>
+                        <th className="py-2.5 px-3">Prix d'Entrée</th>
+                        <th className="py-2.5 px-3">Prix Actuel</th>
+                        <th className="py-2.5 px-3">Variation / P&amp;L</th>
+                        <th className="py-2.5 px-3">Stop Loss</th>
+                        <th className="py-2.5 px-3">Take Profit</th>
+                        <th className="py-2.5 px-3 text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {openPositions.map((pos) => {
+                        const pnl = Number(pos.unrealizedPnL) || 0;
+                        const pnlPct = Number(pos.pnlPercent) || 0;
+                        const isProfit = pnl >= 0;
+                        const curPrice = pos.currentPrice || pos.executionPrice || pos.requestedPrice;
+                        const entryPrice = pos.executionPrice || pos.requestedPrice || curPrice;
+
+                        return (
+                          <tr key={pos._id} className="hover:bg-gray-50/60 dark:hover:bg-gray-850/50 transition">
+                            <td className="py-3 px-3 font-mono text-gray-500 font-semibold">{pos.brokerOrderId || pos._id.slice(-6)}</td>
+                            <td className="py-3 px-3">
+                              <span className="font-bold text-gray-900 dark:text-white block">{pos.symbol}</span>
+                              <span className="text-[10px] text-gray-500 font-medium">
+                                {pos.brokerAccountId?.accountName || 'Compte Simulation'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span
+                                className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                                  pos.direction === 'BUY'
+                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60'
+                                    : 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border border-rose-300 dark:border-rose-800/60'
+                                }`}
+                              >
+                                {pos.direction}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 font-mono font-semibold">{pos.volume} lots</td>
+                            <td className="py-3 px-3 font-mono font-semibold text-gray-700 dark:text-gray-300">{entryPrice}</td>
+                            <td className="py-3 px-3 font-mono font-black text-gray-900 dark:text-white">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`h-2 w-2 rounded-full ${isProfit ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-pulse'}`} />
+                                <span>{curPrice}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 font-mono">
+                              <div className={`inline-flex flex-col px-2.5 py-1 rounded-lg ${
+                                isProfit
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                                  : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                              }`}>
+                                <span className="font-black text-xs">
+                                  {isProfit ? '+' : ''}{pnl.toFixed(2)} $
+                                </span>
+                                <span className="text-[10px] font-bold">
+                                  {isProfit ? '+' : ''}{pnlPct.toFixed(2)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 font-mono text-rose-600 dark:text-rose-400">{pos.stopLoss}</td>
+                            <td className="py-3 px-3 font-mono text-emerald-600 dark:text-emerald-400">{pos.takeProfit || '—'}</td>
+                            <td className="py-3 px-3 text-right">
+                              <button
+                                onClick={() => handleClosePosition(pos._id)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 font-bold text-xs border border-rose-200 dark:border-rose-800/50 transition"
+                              >
+                                {isEn ? 'Close' : 'Fermer'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -1912,6 +2061,20 @@ export default function ManagedTrading() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 mt-1 font-mono">ID: {acc.accountId}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
+                          Solde : {Number(acc.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} {acc.currency || 'USD'}
+                        </span>
+                        {(acc.accountType === 'paper' || acc.broker === 'paper') && (
+                          <button
+                            type="button"
+                            onClick={() => setDepositModalOpen(true)}
+                            className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-0.5"
+                          >
+                            <Plus className="h-3 w-3" /> Recharger
+                          </button>
+                        )}
+                      </div>
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -2517,6 +2680,108 @@ export default function ManagedTrading() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SIMULATION / DEMO BALANCE RECHARGE MODAL */}
+      {depositModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full border border-gray-200 dark:border-gray-800 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Plus className="h-4 w-4 text-cyan-500" />
+                {isEn ? 'Add / Recharge Virtual Simulation Balance' : 'Recharger le Solde Démo / Simulation'}
+              </h3>
+              <button onClick={() => setDepositModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="rounded-xl border border-cyan-500/30 bg-cyan-50 dark:bg-cyan-950/20 p-3.5">
+                <p className="text-xs text-cyan-800 dark:text-cyan-300">
+                  {isEn
+                    ? 'Top up or reset your virtual demo capital to test AI automated trading, institutional setups, and lot sizes without financial risk.'
+                    : 'Créditez votre capital virtuel de simulation pour tester les stratégies de trading haute probabilité et l’exécution des ordres IA sans risque réel.'}
+                </p>
+                <div className="mt-2.5 flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-slate-300">
+                  <span>Solde actuel du compte démo :</span>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                    {Number(activeAccount?.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} $
+                  </strong>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400 mb-2">
+                  Montant rapide à ajouter (+ $)
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[1000, 5000, 10000, 25000, 50000, 100000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => { setDepositAmount(amt); setCustomDeposit(''); }}
+                      className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1 ${
+                        depositAmount === amt && !customDeposit
+                          ? 'border-cyan-500 bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 ring-1 ring-cyan-500/40'
+                          : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/80 text-gray-700 dark:text-slate-300 hover:border-gray-300 dark:hover:border-gray-700'
+                      }`}
+                    >
+                      <Plus className="h-3 w-3 text-cyan-500" />
+                      <span>+{amt.toLocaleString()} $</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400 mb-1.5">
+                  Ou saisissez un montant personnalisé ($)
+                </label>
+                <input
+                  type="number"
+                  placeholder="Ex : 15000"
+                  value={customDeposit}
+                  onChange={(e) => setCustomDeposit(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                <button
+                  type="button"
+                  disabled={depositing}
+                  onClick={() => handleDepositPaper(10000, 'set')}
+                  className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-slate-300 transition"
+                >
+                  Réinitialiser à 10 000 $
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDepositModalOpen(false)}
+                    className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-white transition"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={depositing}
+                    onClick={() => {
+                      const amt = customDeposit ? Number(customDeposit) : depositAmount;
+                      if (!amt || amt <= 0) return toast.error('Veuillez entrer un montant valide');
+                      handleDepositPaper(amt, 'add');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>{depositing ? 'Crédit en cours...' : 'Créditer le Solde'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

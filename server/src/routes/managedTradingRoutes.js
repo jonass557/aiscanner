@@ -14,6 +14,7 @@ import {
   getOrders,
   getPositions,
   closePosition,
+  depositPaperBalance,
 } from '../controllers/managedTradingController.js';
 
 const router = Router();
@@ -28,11 +29,13 @@ router.post('/activate-automation', activateAutomation);
 router.post('/emergency-stop', emergencyStop);
 router.post('/emergency-stop/reset', resetEmergency);
 
-// Broker Accounts
+// Broker Accounts & Simulation Balance
 router.get('/broker-accounts', getBrokerAccounts);
 router.post('/broker-accounts', connectBrokerAccount);
 router.post('/broker-accounts/:id/select', selectBrokerAccount);
 router.delete('/broker-accounts/:id', deleteBrokerAccount);
+router.post('/broker-accounts/deposit-paper', depositPaperBalance);
+router.post('/broker-accounts/:id/deposit-paper', depositPaperBalance);
 
 // Orders & Execution
 router.post('/orders/execute-manual', executeManualOrder);
