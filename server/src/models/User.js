@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema(
   {
@@ -83,6 +84,26 @@ const userSchema = new mongoose.Schema(
       default: 'user',
     },
 
+    // Referral / Parrainage System
+    referralCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+      uppercase: true,
+    },
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    referral: {
+      enabled: { type: Boolean, default: false }, // Activated by Admin
+      commissionRate: { type: Number, default: 20 }, // 20%
+      balance: { type: Number, default: 0 }, // Solde disponible en FCFA
+      totalEarned: { type: Number, default: 0 },
+      totalWithdrawn: { type: Number, default: 0 },
+    },
+
     // Anti-Abuse device & IP tracking
     registrationIp: { type: String, default: '' },
     deviceFingerprint: { type: String, default: '' },
@@ -140,8 +161,11 @@ userSchema.virtual('subscription.scansRemaining').get(function () {
   return Infinity;
 });
 
-// Hash password before saving
+// Hash password and ensure referral code before saving
 userSchema.pre('save', async function (next) {
+  if (!this.referralCode) {
+    this.referralCode = (this.firstName ? this.firstName.slice(0, 3).toUpperCase() : 'TRD') + crypto.randomBytes(3).toString('hex').toUpperCase();
+  }
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();

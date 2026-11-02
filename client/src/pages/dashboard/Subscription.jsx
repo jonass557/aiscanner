@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   Check, Zap, Smartphone, Gift, CreditCard, X, ShieldCheck,
   History, Receipt, ExternalLink, RefreshCw, AlertCircle, CheckCircle2,
+  Calendar, ArrowUpRight,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -232,6 +233,11 @@ export default function Subscription() {
   const limit = user?.subscription?.scansPerMonth || 0;
   const pct = limit === -1 ? 0 : Math.min(100, (used / limit) * 100);
 
+  const expirationDate = user?.subscription?.endDate || user?.trial?.endsAt;
+  const nowMs = Date.now();
+  const expMs = expirationDate ? new Date(expirationDate).getTime() : 0;
+  const daysRemaining = expMs > nowMs ? Math.ceil((expMs - nowMs) / (1000 * 60 * 60 * 24)) : 0;
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -274,32 +280,52 @@ export default function Subscription() {
 
       {activeTab === 'plans' ? (
         <>
-          {/* Current usage banner */}
-          <div className="card p-6 border border-gray-100 dark:border-gray-800">
-            <div className="flex items-center justify-between">
+          {/* Current usage & Expiration countdown banner */}
+          <div className="card p-6 border border-slate-700/80 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/30 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase font-medium tracking-wider text-gray-500">Plan Actif</p>
-                <p className="mt-1 text-2xl font-extrabold capitalize text-gray-900 dark:text-white">
-                  {currentPlan || 'Free'}
-                </p>
+                <p className="text-xs uppercase font-semibold tracking-wider text-slate-400">Votre Forfait Actuel</p>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="text-2xl font-black capitalize text-white">
+                    {plans.find((p) => p.id === currentPlan)?.name || currentPlan || '1 Mois'}
+                  </span>
+                  <Badge tone={user?.subscription?.status === 'active' ? 'green' : 'yellow'} className="text-xs px-3 py-0.5 font-bold">
+                    {user?.subscription?.status === 'active' ? 'Actif' : user?.subscription?.status || 'Inactif'}
+                  </Badge>
+                </div>
               </div>
-              <Badge tone="purple" className="text-xs px-3 py-1 font-semibold">
-                {user?.subscription?.status === 'active' ? 'Actif' : user?.subscription?.status || 'Inactif'}
-              </Badge>
+
+              {/* Expiration countdown box */}
+              <div className="rounded-2xl border border-slate-700/80 bg-slate-950/80 p-3.5 flex items-center gap-4 shadow-inner">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Temps restant avant expiration</span>
+                  <div className="text-sm font-extrabold text-slate-100 flex items-center gap-1.5">
+                    {daysRemaining > 0 ? (
+                      <span className="text-emerald-400 font-extrabold">{daysRemaining} jour{daysRemaining > 1 ? 's' : ''} restant{daysRemaining > 1 ? 's' : ''}</span>
+                    ) : (
+                      <span className="text-rose-400 font-bold">Abonnement expiré</span>
+                    )}
+                  </div>
+                  {expirationDate && (
+                    <span className="text-[11px] text-slate-400 block">
+                      Expire le {new Date(expirationDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="mt-5">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500 dark:text-gray-400">Scans consommés ce mois-ci</span>
-                <span className="font-bold text-gray-900 dark:text-white">
-                  {used} / {limit === -1 ? 'Illimités (∞)' : limit}
-                </span>
-              </div>
-              <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-brand-500 via-indigo-500 to-accent-500 transition-all duration-500"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
+
+            <div className="mt-5 border-t border-slate-800 pt-3 flex items-center justify-between text-xs text-slate-300">
+              <span className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                Scans et détections IA : <strong>Illimités (∞)</strong>
+              </span>
+              <span className="text-slate-400">
+                Besoin de changer de formule ? Sélectionnez un forfait ci-dessous pour upgrader instantanément.
+              </span>
             </div>
           </div>
 
@@ -307,7 +333,7 @@ export default function Subscription() {
           <div className="grid gap-6 lg:grid-cols-3">
             {plans.map((plan) => {
               const isCurrent = plan.id === currentPlan;
-              const highlighted = plan.id === 'pro';
+              const highlighted = plan.id === '2mois' || plan.id === 'pro';
               const trialAvailable = plan.trial?.enabled && user?.trial?.appliedFor !== plan.id;
 
               return (
@@ -315,13 +341,13 @@ export default function Subscription() {
                   key={plan.id}
                   className={`card relative flex flex-col p-6 transition-all duration-300 ${
                     highlighted
-                      ? 'ring-2 ring-brand-500 shadow-xl shadow-brand-500/10 dark:bg-slate-900/90'
-                      : 'border border-gray-200 dark:border-gray-800'
+                      ? 'ring-2 ring-cyan-500 shadow-xl shadow-cyan-500/10 bg-slate-900/90'
+                      : 'border border-slate-800 bg-slate-900/60'
                   }`}
                 >
                   {highlighted && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-brand-600 to-accent-600 px-3.5 py-1 text-xs font-bold text-white shadow-md">
-                      RECOMMANDÉ
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-cyan-600 to-indigo-600 px-3.5 py-1 text-xs font-bold text-white shadow-md">
+                      POPULAIRE & ÉCONOMIQUE
                     </span>
                   )}
                   <div className="flex items-center justify-between">
@@ -344,24 +370,24 @@ export default function Subscription() {
                             {plan.promo.price}
                           </span>
                           <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                            {plan.currency || 'USD'}
+                            {plan.currency || 'XOF'}
                           </span>
                           <span className="text-sm text-gray-400 line-through">
                             {plan.price} {plan.currency}
                           </span>
                         </div>
                         <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 mt-0.5">
-                          Offre spéciale : tarif pour les {plan.promo.durationMonths} {plan.promo.durationMonths === 1 ? 'premier mois' : 'premiers mois'}, puis {plan.price} {plan.currency}/mois
+                          Tarif spécial : {plan.promo.durationMonths} {plan.promo.durationMonths === 1 ? 'mois' : 'mois'}, puis {plan.price} {plan.currency}
                         </p>
                       </div>
                     ) : (
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-extrabold text-gray-900 dark:text-white">
-                          {plan.price === 0 ? 'Gratuit' : `${plan.price}`}
+                          {plan.price === 0 ? 'Gratuit' : Number(plan.price).toLocaleString()}
                         </span>
                         {plan.price > 0 && (
                           <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                            {plan.currency || 'USD'} / mois
+                            {plan.currency || 'FCFA'}
                           </span>
                         )}
                       </div>
@@ -369,7 +395,7 @@ export default function Subscription() {
                   </div>
                   <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                    Scans et analyses illimités (∞)
+                    Scans et signaux IA illimités (∞)
                   </p>
 
                   <ul className="mt-6 flex-1 space-y-3">
@@ -383,17 +409,17 @@ export default function Subscription() {
 
                   <Button
                     variant={isCurrent ? 'secondary' : highlighted ? 'primary' : 'secondary'}
-                    disabled={isCurrent}
+                    disabled={changing === plan.id}
                     loading={changing === plan.id}
                     onClick={() => choosePlan(plan)}
                     className="mt-6 w-full justify-center font-semibold"
                   >
                     {isCurrent ? (
-                      'Forfait Actuel'
+                      <><RefreshCw className="h-4 w-4" /> Prolonger / Renouveler</>
                     ) : trialAvailable ? (
                       <><Gift className="h-4 w-4" /> Démarrer l'essai gratuit</>
                     ) : plan.price > 0 ? (
-                      <><CreditCard className="h-4 w-4" /> Souscrire avec iKeePay</>
+                      <><CreditCard className="h-4 w-4" /> Passer à ce forfait (Upgrade)</>
                     ) : (
                       <><Zap className="h-4 w-4" /> Choisir {plan.name}</>
                     )}

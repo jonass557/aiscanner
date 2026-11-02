@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ScanLine, History, CreditCard, User, Settings,
   Menu, X, LogOut, Moon, Sun, ShieldCheck, Layers, Radar, GraduationCap,
   CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe, Eye, Calculator, Cpu,
-  ArrowLeft,
+  ArrowLeft, Share2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -80,6 +80,25 @@ export default function DashboardLayout() {
             {t(item.key)}
           </NavLink>
         ))}
+        {user?.referral?.enabled && (
+          <NavLink
+            to="/dashboard/referral"
+            onClick={() => setOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                isActive
+                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 font-bold'
+                  : 'text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300'
+              }`
+            }
+          >
+            <Share2 className="h-4 w-4 text-cyan-400" />
+            <span>Parrainage</span>
+            <span className="ml-auto rounded-full bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-bold text-cyan-300">
+              20%
+            </span>
+          </NavLink>
+        )}
         {isAdmin && (
           <NavLink
             to="/admin"

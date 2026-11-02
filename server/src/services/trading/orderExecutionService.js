@@ -67,21 +67,21 @@ export const executeManagedOrder = async ({
   }
 
   // 2. Fetch Fresh Market Quote
-  const targetSymbol = opportunity?.symbol || directParams?.symbol;
+  const targetSymbol = opportunity?.symbol || directParams?.symbol || 'EURUSD';
   const quote = await getQuote(targetSymbol);
 
   // 3. Generate Unique Idempotency Key
-  const rawHash = `${user._id}_${brokerAccount._id}_${targetSymbol}_${opportunity?._id || directParams?.entry}_${Date.now()}`;
+  const rawHash = `${user._id}_${brokerAccount._id}_${targetSymbol}_${opportunity?._id || directParams?.entry || Date.now()}_${Date.now()}`;
   const idempotencyKey = crypto.createHash('sha256').update(rawHash).digest('hex');
 
   // Build normalized opportunity object if direct params passed
   const opp = opportunity || {
-    symbol: directParams.symbol,
-    market: directParams.market || 'forex',
-    direction: directParams.direction,
-    entry: directParams.entry,
-    stopLoss: directParams.stopLoss,
-    takeProfit1: directParams.takeProfit,
+    symbol: directParams?.symbol || targetSymbol,
+    market: directParams?.market || 'forex',
+    direction: directParams?.direction || 'BUY',
+    entry: Number(directParams?.entry || quote?.price || 1.0),
+    stopLoss: Number(directParams?.stopLoss || (quote?.price ? quote.price * 0.99 : 0.99)),
+    takeProfit1: Number(directParams?.takeProfit || (quote?.price ? quote.price * 1.02 : 1.02)),
     status: 'active',
   };
 

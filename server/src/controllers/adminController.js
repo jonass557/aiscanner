@@ -142,7 +142,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw ApiError.notFound('User not found.');
 
-  const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate } = req.body;
+  const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate, referralEnabled, commissionRate } = req.body;
 
   if (plan) {
     // Admin override: allow assigning any plan, active or not, free or paid.
@@ -189,6 +189,19 @@ export const updateUser = asyncHandler(async (req, res) => {
   }
   if (subscriptionEndDate) {
     user.subscription.endDate = new Date(subscriptionEndDate);
+  }
+
+  // Referral / Parrainage management
+  if (typeof referralEnabled === 'boolean') {
+    user.referral = user.referral || {};
+    user.referral.enabled = referralEnabled;
+  }
+  if (commissionRate !== undefined && !isNaN(commissionRate)) {
+    user.referral = user.referral || {};
+    user.referral.commissionRate = Math.max(1, Math.min(100, Number(commissionRate)));
+  }
+  if (user.referral?.enabled && !user.referralCode) {
+    user.referralCode = (user.firstName ? user.firstName.slice(0, 3).toUpperCase() : 'TRD') + Math.random().toString(36).substring(2, 6).toUpperCase();
   }
 
   await user.save();

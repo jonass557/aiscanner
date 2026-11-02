@@ -126,17 +126,17 @@ export default function AdminPlans() {
   };
 
   const inputCls =
-    'w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800';
-  const labelCls = 'mb-1 block text-xs font-medium text-gray-500';
+    'w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition';
+  const labelCls = 'mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300';
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <CreditCard className="h-6 w-6 text-brand-500" /> Plans
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100">
+            <CreditCard className="h-6 w-6 text-brand-500" /> Gestion des Plans & Abonnements
           </h1>
-          <p className="mt-1 text-sm text-gray-500">Créez, modifiez, activez/désactivez les plans et le free trial.</p>
+          <p className="mt-1 text-sm text-slate-400">Configurez les forfaits (1 mois, 2 mois, 1 an), tarifs promotions post-essai et free trials.</p>
         </div>
         <Button onClick={openNew}>
           <Plus className="h-4 w-4" /> Nouveau plan
@@ -146,9 +146,9 @@ export default function AdminPlans() {
       {loading ? (
         <div className="flex justify-center py-16"><Spinner /></div>
       ) : (
-        <div className="card overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-500 dark:border-gray-800">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-xl overflow-x-auto p-0">
+          <table className="w-full text-sm text-slate-300">
+            <thead className="border-b border-slate-800 text-left text-xs uppercase text-slate-400 bg-slate-950/60">
               <tr>
                 <th className="px-4 py-3">Plan</th>
                 <th className="px-4 py-3">Prix Standard</th>
@@ -159,7 +159,7 @@ export default function AdminPlans() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody className="divide-y divide-slate-800/60">
               {plans.map((plan) => (
                 <tr key={plan.id}>
                   <td className="px-4 py-3">

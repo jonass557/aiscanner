@@ -480,7 +480,7 @@ export default function AdminAIConfig() {
         {Object.entries(aiConfig.providers).map(([name, p]) => {
           const test = tests[name];
           return (
-            <div key={name} className="card p-5 border border-slate-800 bg-slate-900/70">
+            <div key={name} className="rounded-2xl p-5 border border-slate-800 bg-slate-900/90 shadow-lg">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold capitalize text-white">{name}</h3>
                 {p.configured ? (
@@ -501,7 +501,7 @@ export default function AdminAIConfig() {
               </dl>
               {TESTABLE.includes(name) && (
                 <div className="mt-3">
-                  <Button variant="secondary" className="w-full text-xs" loading={test?.loading} onClick={() => runTest(name)}>
+                  <Button variant="secondary" className="w-full text-xs border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200" loading={test?.loading} onClick={() => runTest(name)}>
                     <PlugZap className="h-3.5 w-3.5" /> Tester la connexion
                   </Button>
                   {test && !test.loading && (
@@ -516,18 +516,18 @@ export default function AdminAIConfig() {
 
       {/* Paramètres éditables groupés */}
       {Object.entries(groups).map(([category, fields]) => (
-        <div key={category} className="card p-6 border border-slate-800 bg-slate-900/60">
-          <h2 className="mb-4 text-lg font-semibold text-white">{CATEGORY_TITLES[category] || category}</h2>
-          <div className="grid gap-4 md:grid-cols-2">
+        <div key={category} className="rounded-2xl p-6 border border-slate-800 bg-slate-900/90 shadow-xl">
+          <h2 className="mb-4 text-lg font-bold text-white border-b border-slate-800/80 pb-3">{CATEGORY_TITLES[category] || category}</h2>
+          <div className="grid gap-5 md:grid-cols-2">
             {fields.map((f) => {
               const meta = FIELD_META[f.key] || { label: f.key };
               if (meta.toggle) {
                 const on = values[f.key] === true || values[f.key] === 'true';
                 return (
-                  <div key={f.key} className="md:col-span-2 flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                  <div key={f.key} className="md:col-span-2 flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
                     <div>
-                      <p className="font-medium text-white">{meta.label}</p>
-                      {meta.hint && <p className="mt-0.5 text-sm text-slate-400">{meta.hint}</p>}
+                      <p className="font-semibold text-white">{meta.label}</p>
+                      {meta.hint && <p className="mt-0.5 text-xs text-slate-400">{meta.hint}</p>}
                       <p className={`mt-1 text-xs font-semibold ${on ? 'text-emerald-400' : 'text-slate-500'}`}>
                         {on ? 'Activée' : 'Désactivée'}
                       </p>
@@ -545,20 +545,25 @@ export default function AdminAIConfig() {
                 );
               }
               return (
-                <Input
-                  key={f.key}
-                  label={meta.label}
-                  type={f.secret ? 'password' : 'text'}
-                  value={values[f.key] ?? ''}
-                  onChange={(e) => onChange(f.key, e.target.value)}
-                  placeholder={
-                    f.secret
-                      ? f.configured
-                        ? `${f.preview} — laisser vide pour conserver`
-                        : 'Non configurée'
-                      : meta.hint || ''
-                  }
-                />
+                <div key={f.key} className="space-y-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    {meta.label}
+                  </label>
+                  <input
+                    type={f.secret ? 'password' : 'text'}
+                    value={values[f.key] ?? ''}
+                    onChange={(e) => onChange(f.key, e.target.value)}
+                    placeholder={
+                      f.secret
+                        ? f.configured
+                          ? `${f.preview} — laisser vide pour conserver`
+                          : 'Non configurée'
+                        : meta.hint || ''
+                    }
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition"
+                  />
+                  {meta.hint && <p className="text-[11px] text-slate-400">{meta.hint}</p>}
+                </div>
               );
             })}
           </div>
@@ -572,7 +577,7 @@ export default function AdminAIConfig() {
         </Button>
       </div>
 
-      <div className="card flex items-start gap-3 p-5 border border-slate-800 bg-slate-900/50">
+      <div className="rounded-2xl flex items-start gap-3 p-5 border border-slate-800 bg-slate-900/70 shadow-lg">
         <Info className="mt-0.5 h-5 w-5 shrink-0 text-cyan-400" />
         <p className="text-sm text-slate-400">
           Les clés secrètes sont chiffrées au repos (AES-256-GCM). Dès que vous enregistrez une nouvelle clé ou un nouveau modèle, les changements prennent effet immédiatement pour tous les utilisateurs du site sans interruption ni redémarrage.
@@ -584,7 +589,7 @@ export default function AdminAIConfig() {
 
 function SummaryCard({ icon: Icon, label, value }) {
   return (
-    <div className="card flex items-center gap-4 p-5 border border-slate-800 bg-slate-900/60">
+    <div className="rounded-2xl flex items-center gap-4 p-5 border border-slate-800 bg-slate-900/90 shadow-lg">
       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 text-slate-950 font-bold shadow-md shadow-cyan-500/20">
         <Icon className="h-5 w-5" />
       </div>

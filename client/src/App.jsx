@@ -34,6 +34,7 @@ const VoiceAssistant = lazy(() => import('./pages/dashboard/VoiceAssistant.jsx')
 const History = lazy(() => import('./pages/dashboard/History.jsx'));
 const AnalysisDetail = lazy(() => import('./pages/dashboard/AnalysisDetail.jsx'));
 const Subscription = lazy(() => import('./pages/dashboard/Subscription.jsx'));
+const Referral = lazy(() => import('./pages/dashboard/Referral.jsx'));
 const Profile = lazy(() => import('./pages/dashboard/Profile.jsx'));
 const Settings = lazy(() => import('./pages/dashboard/Settings.jsx'));
 
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="history" element={<History />} />
           <Route path="history/:id" element={<AnalysisDetail />} />
           <Route path="subscription" element={<Subscription />} />
+          <Route path="referral" element={<Referral />} />
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
         </Route>

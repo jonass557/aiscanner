@@ -62,12 +62,14 @@ export default function AdminUsers() {
     const remainingDays = trialEndMs > now ? Math.ceil((trialEndMs - now) / (1000 * 60 * 60 * 24)) : (u.trial?.days || 0);
 
     setForm({
-      plan: u.subscription?.plan || 'pro',
+      plan: u.subscription?.plan || '1mois',
       status: u.subscription?.status || 'active',
       role: u.role || 'user',
       isVerified: Boolean(u.isVerified),
       trialDays: remainingDays,
       extendDays: 0,
+      referralEnabled: Boolean(u.referral?.enabled),
+      commissionRate: u.referral?.commissionRate || 20,
     });
   };
 
@@ -87,8 +89,10 @@ export default function AdminUsers() {
         role: form.role,
         isVerified: form.isVerified,
         trialDays: Number(form.trialDays),
+        referralEnabled: Boolean(form.referralEnabled),
+        commissionRate: Number(form.commissionRate),
       });
-      toast.success('Utilisateur et jours d\'essai mis à jour avec succès.');
+      toast.success('Utilisateur et statut parrainage mis à jour avec succès.');
       setEditing(null);
       load();
     } catch (err) {
@@ -196,8 +200,15 @@ export default function AdminUsers() {
                   return (
                     <tr key={u._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900 dark:text-white">
-                          {u.firstName ? `${u.firstName} ${u.lastName || ''}` : '—'}
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {u.firstName ? `${u.firstName} ${u.lastName || ''}` : '—'}
+                          </span>
+                          {u.referral?.enabled && (
+                            <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[9px] font-bold text-cyan-400 border border-cyan-500/20">
+                              Partenaire ({u.referral.commissionRate || 20}%)
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-500 font-mono">{u.email}</div>
                         {u.registrationIp && (
@@ -376,8 +387,11 @@ export default function AdminUsers() {
                   onChange={(e) => setForm({ ...form, plan: e.target.value })}
                 >
                   <option value="free">Free</option>
-                  <option value="pro">Pro</option>
-                  <option value="premium">Premium</option>
+                  <option value="1mois">1 Mois (7 000 FCFA)</option>
+                  <option value="2mois">2 Mois (13 000 FCFA)</option>
+                  <option value="1an">1 An VIP (65 000 FCFA)</option>
+                  <option value="pro">Pro (Legacy)</option>
+                  <option value="premium">Premium (Legacy)</option>
                 </select>
               </div>
 
@@ -419,6 +433,50 @@ export default function AdminUsers() {
                   <span>Email vérifié par OTP</span>
                 </label>
               </div>
+            </div>
+
+            {/* Referral Partner Toggle & Commission */}
+            <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400">Programme Partenaire & Parrainage</h4>
+                  <p className="text-[11px] text-slate-400">Active l'accès parrainage et le bouton dans le dashboard de l'utilisateur.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.referralEnabled}
+                    onChange={(e) => setForm({ ...form, referralEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                </label>
+              </div>
+
+              {form.referralEnabled && (
+                <div className="pt-2 border-t border-cyan-500/20 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Taux de Commission (%)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={form.commissionRate}
+                      onChange={(e) => setForm({ ...form, commissionRate: e.target.value })}
+                      className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Code Parrainage</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={editing.referralCode || 'Généré automatiquement'}
+                      className="w-full px-3 py-1.5 text-xs font-mono bg-slate-900/60 border border-slate-700 rounded-lg text-cyan-300"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Anti-Abuse Audit info */}

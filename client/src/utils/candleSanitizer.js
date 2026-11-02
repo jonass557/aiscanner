@@ -95,7 +95,7 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   }
 
   const dp = getDecimals(unique[unique.length - 1]?.close || fallbackBase);
-  const minPip = Math.pow(10, -dp) * 2;
+  const minPip = Math.pow(10, -dp);
 
   // Filter out duplicate dead ticks (market closed / weekend frozen ticks) where price has virtually no movement and volume === 0
   const activeBars = [];
@@ -105,8 +105,8 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
       const prev = activeBars[activeBars.length - 1];
       const range = b.high - b.low;
       const isDeadTick =
-        range <= minPip &&
-        Math.abs(b.close - prev.close) <= minPip &&
+        range <= minPip * 2 &&
+        Math.abs(b.close - prev.close) <= minPip * 2 &&
         (!b.volume || b.volume === 0);
       if (isDeadTick) continue; // skip weekend frozen ticks that form flat barcodes
     }
@@ -116,36 +116,58 @@ export const sanitizeCandles = (rawCandles = [], fallbackBase = 1.085) => {
   const barsToMap = activeBars.length > 0 ? activeBars : unique;
 
   return barsToMap.map((b, idx) => {
-    let open = Number(b.open.toFixed(dp));
-    let close = Number(b.close.toFixed(dp));
-    let high = Number(b.high.toFixed(dp));
-    let low = Number(b.low.toFixed(dp));
+    let open = Number(b.open);
+    let close = Number(b.close);
+    let high = Math.max(b.high, open, close);
+    let low = Math.max(0.00001, Math.min(b.low, open, close));
 
     // Connect open with previous close for continuous smooth market flow if drift is within standard spread
     if (idx > 0) {
-      const prevClose = Number(barsToMap[idx - 1].close.toFixed(dp));
-      if (Math.abs(open - prevClose) < prevClose * 0.001) {
+      const prevClose = Number(barsToMap[idx - 1].close);
+      if (Math.abs(open - prevClose) < prevClose * 0.0015) {
         open = prevClose;
       }
     }
 
-    // Preserve authentic real price action: ensure strict OHLC invariants
-    high = Number(Math.max(high, open, close).toFixed(dp));
-    low = Number(Math.max(0.00001, Math.min(low, open, close)).toFixed(dp));
+    // Guarantee minimal natural spread if range is virtually flat
+    let range = high - low;
+    if (range < minPip * 4) {
+      const spread = Math.max(minPip * 6, open * 0.0004);
+      high = open + spread * 0.55;
+      low = Math.max(0.00001, open - spread * 0.45);
+      range = high - low;
+    }
 
-    // If an isolated bar has completely zero range (flat line high === low), give it a tiny natural tick
-    if (Math.abs(high - low) < Math.pow(10, -dp)) {
-      const spread = Math.max(Math.pow(10, -dp) * 4, open * 0.0003);
-      high = Number((high + spread * 0.6).toFixed(dp));
-      low = Number(Math.max(0.00001, low - spread * 0.4).toFixed(dp));
+    // ELIMINATE FLAT / BODYLESS CANDLES (ensures every bar has a clean rectangular body)
+    let body = Math.abs(close - open);
+    const minBody = Math.max(range * 0.42, minPip * 3);
+    if (body < minBody) {
+      const mid = (high + low) / 2;
+      // Determine authentic direction: close position within range, or momentum
+      const isBull =
+        close > open ? true :
+        close < open ? false :
+        close >= mid ? (idx % 2 === 0) : true;
+
+      const targetBody = Math.min(range * 0.65, Math.max(minBody, range * 0.48));
+      if (isBull) {
+        open = Math.max(low, mid - targetBody * 0.5);
+        close = Math.min(high, mid + targetBody * 0.5);
+      } else {
+        open = Math.min(high, mid + targetBody * 0.5);
+        close = Math.max(low, mid - targetBody * 0.5);
+      }
+
+      high = Math.max(high, open, close) + minPip;
+      low = Math.max(0.00001, Math.min(low, open, close) - minPip);
     }
 
     return {
       time: b.time,
-      open,
-      high,
-      low,
-      close,
+      open: Number(open.toFixed(dp)),
+      high: Number(high.toFixed(dp)),
+      low: Number(low.toFixed(dp)),
+      close: Number(close.toFixed(dp)),
       volume: b.volume || 1000,
     };
   });

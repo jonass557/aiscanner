@@ -6,7 +6,7 @@ import {
   Trash2, X, ExternalLink, Activity, ArrowUpRight, ArrowDownRight,
   Clock, Lock, Check, Info, FileText, ChevronRight, Zap,
   TrendingUp, TrendingDown, Target, Sparkles, BookOpen,
-  Calculator, Layers, Search, Filter
+  Calculator, Layers, Search, Filter, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -158,6 +158,8 @@ export default function ManagedTrading() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [acknowledgedRisks, setAcknowledgedRisks] = useState(false);
   const [addAccountModalOpen, setAddAccountModalOpen] = useState(false);
+  const [guideModalOpen, setGuideModalOpen] = useState(false);
+  const [guideBrokerTab, setGuideBrokerTab] = useState('deriv');
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   // Add Broker Account Form
@@ -828,10 +830,38 @@ export default function ManagedTrading() {
       };
 
       updateDetectedOpportunity(opp);
+
+      // Auto-save strategy into user's strategies ("mes stratégies")
+      if (stratName || stratCriteria) {
+        try {
+          const finalStratName = (stratName || `Stratégie ${stratSymbol} ${stratTimeframe}`).trim();
+          const existingStrat = userStrategies.find(
+            (s) => s.name?.toLowerCase().trim() === finalStratName.toLowerCase()
+          );
+          if (!existingStrat) {
+            await strategyApi.create({
+              name: finalStratName,
+              category: stratCategory,
+              description: stratCriteria || 'Stratégie validée dans AI Managed Trading',
+              rules: stratCriteria ? [stratCriteria] : ['Confluence de marché', 'Validation structurelle'],
+              timeframes: [stratTimeframe],
+              riskRewardRatio: '1:2.5',
+              isPublic: false,
+            });
+            const stratRes = await strategyApi.list().catch(() => null);
+            if (stratRes?.data?.data?.strategies) {
+              setUserStrategies(stratRes.data.data.strategies);
+            }
+          }
+        } catch (saveErr) {
+          console.warn('Strategy auto-save note:', saveErr);
+        }
+      }
+
       toast.success(
         isEn
-          ? `AI Opportunity Detected: ${direction} on ${stratSymbol}!`
-          : `Opportunité Détectée par l'IA : ${direction} sur ${stratSymbol} !`
+          ? `AI Opportunity Detected: ${direction} on ${stratSymbol} (Strategy saved to your list)!`
+          : `Opportunité Détectée par l'IA : ${direction} sur ${stratSymbol} (Stratégie enregistrée dans vos stratégies) !`
       );
     } catch (err) {
       console.error('Detection error:', err);
@@ -844,7 +874,15 @@ export default function ManagedTrading() {
   // Immediate Execution of the Detected Opportunity on Broker
   const handleExecuteDetectedOrder = async () => {
     if (!detectedOpportunity) return;
-    if (!activeAccount) {
+
+    // Auto-resolve activeAccount if not selected yet (pick first connected or paper)
+    let targetAccount = activeAccount;
+    if (!targetAccount && accounts.length > 0) {
+      targetAccount = accounts.find((a) => a.connectionStatus === 'connected') || accounts[0];
+      setActiveAccount(targetAccount);
+    }
+
+    if (!targetAccount) {
       toast.error(
         isEn
           ? 'Please connect or select an active broker account first.'
@@ -855,14 +893,24 @@ export default function ManagedTrading() {
 
     setExecutingDetected(true);
     try {
+      const cleanSym = detectedOpportunity.symbol.replace('/', '').trim();
       const payload = {
-        symbol: detectedOpportunity.symbol.replace('/', ''),
+        symbol: cleanSym,
         direction: detectedOpportunity.decision,
         entryPrice: detectedOpportunity.entryPrice,
+        entry: detectedOpportunity.entryPrice,
         stopLoss: detectedOpportunity.stopLoss,
         takeProfit: detectedOpportunity.takeProfit1,
-        brokerAccountId: activeAccount._id,
+        brokerAccountId: targetAccount._id,
         comment: `AI Scanner Managed - ${detectedOpportunity.strategyName}`,
+        directParams: {
+          symbol: cleanSym,
+          direction: detectedOpportunity.decision,
+          entry: detectedOpportunity.entryPrice,
+          stopLoss: detectedOpportunity.stopLoss,
+          takeProfit: detectedOpportunity.takeProfit1,
+          comment: `AI Scanner Managed - ${detectedOpportunity.strategyName}`,
+        },
       };
 
       const { data } = await managedTradingApi.executeManualOrder(payload);
@@ -1488,12 +1536,21 @@ export default function ManagedTrading() {
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500">{isEn ? 'Connected Broker' : 'Compte Broker Actif'}</span>
-            <button
-              onClick={() => setAddAccountModalOpen(true)}
-              className="text-xs text-brand-600 dark:text-brand-400 font-bold hover:underline"
-            >
-              {isEn ? '+ Connect' : '+ Connecter'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setGuideModalOpen(true)}
+                className="text-xs text-cyan-600 dark:text-cyan-400 font-bold hover:underline"
+                title="Tutoriel Deriv et Binance"
+              >
+                {isEn ? '📖 Guide' : '📖 Guide'}
+              </button>
+              <button
+                onClick={() => setAddAccountModalOpen(true)}
+                className="text-xs text-brand-600 dark:text-brand-400 font-bold hover:underline"
+              >
+                {isEn ? '+ Connect' : '+ Connecter'}
+              </button>
+            </div>
           </div>
           {brokerAccounts.length > 1 ? (
             <select
@@ -2017,7 +2074,16 @@ export default function ManagedTrading() {
 
             <form onSubmit={handleConnectAccount} className="space-y-3 text-xs">
               <div>
-                <label className="block text-gray-500 mb-1">{isEn ? 'Broker Platform' : 'Plateforme / Courtier'}</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-gray-500">{isEn ? 'Broker Platform' : 'Plateforme / Courtier'}</label>
+                  <button
+                    type="button"
+                    onClick={() => setGuideModalOpen(true)}
+                    className="text-[11px] text-cyan-600 dark:text-cyan-400 font-bold hover:underline flex items-center gap-1"
+                  >
+                    📖 Guide Visuel Pas-à-Pas
+                  </button>
+                </div>
                 <select
                   value={newBroker}
                   onChange={(e) => setNewBroker(e.target.value)}
@@ -2113,6 +2179,247 @@ export default function ManagedTrading() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ILLUSTRATED BROKER CONNECTION GUIDE MODAL */}
+      {guideModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">Tutoriel Officiel & Sécurité</span>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2 mt-0.5">
+                  <BookOpen className="h-5 w-5 text-cyan-400" />
+                  Guide Illustré de Connexion aux Courtiers (Deriv &amp; Binance)
+                </h3>
+              </div>
+              <button onClick={() => setGuideModalOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Broker Switcher */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setGuideBrokerTab('deriv')}
+                className={`flex items-center justify-center gap-2.5 p-3 rounded-2xl font-bold text-sm transition border ${
+                  guideBrokerTab === 'deriv'
+                    ? 'border-red-500/80 bg-red-500/15 text-red-400 shadow-lg shadow-red-500/10'
+                    : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-red-500/20 text-red-400 font-bold text-xs">D</span>
+                Deriv (Indices Synthétiques &amp; Forex)
+              </button>
+              <button
+                type="button"
+                onClick={() => setGuideBrokerTab('binance')}
+                className={`flex items-center justify-center gap-2.5 p-3 rounded-2xl font-bold text-sm transition border ${
+                  guideBrokerTab === 'binance'
+                    ? 'border-yellow-500/80 bg-yellow-500/15 text-yellow-400 shadow-lg shadow-yellow-500/10'
+                    : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-yellow-500/20 text-yellow-400 font-bold text-xs">B</span>
+                Binance (Crypto Spot &amp; Futures)
+              </button>
+            </div>
+
+            {/* DERIV GUIDE */}
+            {guideBrokerTab === 'deriv' && (
+              <div className="space-y-4 text-xs">
+                {/* Steps List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white font-bold text-[10px] mb-1.5">1</span>
+                    <h5 className="font-bold text-slate-200">Accéder aux API</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Sur Deriv.com : <strong>Paramètres du compte</strong> &gt; <strong>Sécurité &amp; sûreté</strong> &gt; <strong>Jeton d'API</strong>.</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white font-bold text-[10px] mb-1.5">2</span>
+                    <h5 className="font-bold text-slate-200">Nommer le jeton</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Saisissez un nom reconnaissable (ex: <code>AIscanner Bot</code>).</p>
+                  </div>
+                  <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white font-bold text-[10px] mb-1.5">3</span>
+                    <h5 className="font-bold text-red-300">Permissions Clés</h5>
+                    <p className="text-[11px] text-slate-300 mt-1">Cochez <strong>Read</strong> et <strong>Trade</strong>. Laissez <strong>Payments</strong> décoché !</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white font-bold text-[10px] mb-1.5">4</span>
+                    <h5 className="font-bold text-slate-200">Créer &amp; Coller</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Cliquez sur <strong>Créer</strong>, copiez le jeton et collez-le dans AI Scanner.</p>
+                  </div>
+                </div>
+
+                {/* Real-Style Illustrated Mockup of Deriv UI */}
+                <div className="rounded-2xl border border-slate-700 bg-slate-950 p-4 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-red-500 inline-block" />
+                      <span className="font-bold text-slate-200 text-xs tracking-wide">Capture Réelle Interface Deriv &gt; Jeton d'API</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-mono">app.deriv.com/account/api-token</span>
+                  </div>
+
+                  <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 space-y-3">
+                    <div>
+                      <span className="text-[11px] text-slate-400 block mb-1">Sélectionnez les portées du jeton :</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                        <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/40 p-2 text-emerald-300">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <span className="font-bold text-[11px]">Read (Lecture)</span>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/40 p-2 text-emerald-300">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <span className="font-bold text-[11px]">Trade (Trading)</span>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 border border-slate-700 p-2 text-slate-400 opacity-60">
+                          <span className="h-4 w-4 rounded border border-slate-600 block shrink-0" />
+                          <span className="text-[11px]">Payments (Retraits)</span>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 border border-slate-700 p-2 text-slate-400 opacity-60">
+                          <span className="h-4 w-4 rounded border border-slate-600 block shrink-0" />
+                          <span className="text-[11px]">Admin</span>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 border border-slate-700 p-2 text-slate-400 opacity-60">
+                          <span className="h-4 w-4 rounded border border-slate-600 block shrink-0" />
+                          <span className="text-[11px]">Trading Info</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                      <div className="sm:col-span-2">
+                        <span className="text-[11px] text-slate-400 block mb-1">Nom du jeton :</span>
+                        <div className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 font-mono text-slate-200 text-xs">
+                          AIscanner-Automated-Orders
+                        </div>
+                      </div>
+                      <div className="flex items-end">
+                        <div className="w-full rounded-lg bg-red-600 text-white font-bold text-center py-2 text-xs shadow-md shadow-red-600/30">
+                          Créer un jeton
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Security Notice */}
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[11px] text-emerald-300 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span><strong>Sécurité Totale :</strong> En ne cochant PAS « Payments », vous garantissez mathématiquement qu'aucun retrait ou transfert ne peut être initié par l'API.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* BINANCE GUIDE */}
+            {guideBrokerTab === 'binance' && (
+              <div className="space-y-4 text-xs">
+                {/* Steps List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500 text-slate-950 font-bold text-[10px] mb-1.5">1</span>
+                    <h5 className="font-bold text-slate-200">Gestion des API</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Sur Binance, cliquez sur votre avatar de profil &gt; <strong>Gestion des API (API Management)</strong>.</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500 text-slate-950 font-bold text-[10px] mb-1.5">2</span>
+                    <h5 className="font-bold text-slate-200">Créer une Clé</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Cliquez sur <strong>Créer une API</strong> &gt; Choisir <strong>Générée par le système</strong> &gt; Nom: <code>AIscanner</code>.</p>
+                  </div>
+                  <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500 text-slate-950 font-bold text-[10px] mb-1.5">3</span>
+                    <h5 className="font-bold text-yellow-400">Trading Spot Coché</h5>
+                    <p className="text-[11px] text-slate-300 mt-1">Cliquez sur <strong>Modifier les restrictions</strong>, cochez <strong>Activer le trading Spot &amp; sur marge</strong>. Ne cochez JAMAIS Retraits.</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500 text-slate-950 font-bold text-[10px] mb-1.5">4</span>
+                    <h5 className="font-bold text-slate-200">Clés API &amp; Secret</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Copiez votre <strong>API Key</strong> et <strong>Secret Key</strong> et collez-les dans la boîte de connexion.</p>
+                  </div>
+                </div>
+
+                {/* Real-Style Illustrated Mockup of Binance UI */}
+                <div className="rounded-2xl border border-slate-700 bg-slate-950 p-4 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-yellow-400 inline-block" />
+                      <span className="font-bold text-slate-200 text-xs tracking-wide">Capture Réelle Interface Binance &gt; Restrictions API</span>
+                    </div>
+                    <span className="text-[10px] text-yellow-400 font-mono">binance.com/fr/my/settings/api-management</span>
+                  </div>
+
+                  <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 space-y-3">
+                    <div>
+                      <span className="text-[11px] text-slate-400 block mb-1">Restrictions de l'API (Permissions de trading) :</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                        <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/40 p-2.5 text-emerald-300">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <div>
+                            <span className="font-bold text-xs block">Activer la lecture</span>
+                            <span className="text-[10px] text-slate-400">Lecture solde &amp; historique</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/40 p-2.5 text-emerald-300">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <div>
+                            <span className="font-bold text-xs block">Trading Spot &amp; Marge</span>
+                            <span className="text-[10px] text-slate-400">Exécution automatique des ordres</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/40 p-2.5 text-rose-300">
+                          <XCircle className="h-4 w-4 text-rose-400 shrink-0" />
+                          <div>
+                            <span className="font-bold text-xs block">Activer les retraits</span>
+                            <span className="text-[10px] text-rose-400 font-bold uppercase">STRICTEMENT DÉSACTIVÉ</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">API Key (Clé API) :</span>
+                        <div className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 font-mono text-xs text-yellow-300 truncate">
+                          vmPUZE6mv9SD5V3nN...2234091a
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Secret Key (Clé Secrète) :</span>
+                        <div className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 font-mono text-xs text-slate-400 truncate">
+                          ••••••••••••••••••••••••••••••••
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Security Notice */}
+                    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-2.5 text-[11px] text-yellow-300 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-yellow-400 shrink-0" />
+                      <span><strong>Zéro Risque de Retrait :</strong> Votre compte reste totalement protégé. Vos clés API ne peuvent jamais initier de retrait sur Binance.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setGuideModalOpen(false);
+                  setAddAccountModalOpen(true);
+                }}
+                className="rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-5 py-2.5 text-xs shadow-lg shadow-cyan-600/20"
+              >
+                Passer à la Connexion de mon Compte
+              </button>
+            </div>
           </div>
         </div>
       )}

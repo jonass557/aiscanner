@@ -20,7 +20,13 @@ const activatePlan = async (user, plan) => {
   user.subscription.scansPerMonth = -1; // illimité pour tous les forfaits
   user.subscription.scansUsed = 0; // reset quota on subscription
   user.subscription.startDate = new Date();
-  const months = (plan.promo?.enabled && plan.promo?.durationMonths > 0) ? plan.promo.durationMonths : 1;
+
+  let months = 1;
+  if (plan.id === '2mois') months = 2;
+  else if (plan.id === '1an') months = 12;
+  else if (plan.id === '6mois') months = 6;
+  else if (plan.promo?.enabled && plan.promo?.durationMonths > 0) months = plan.promo.durationMonths;
+
   const end = new Date();
   end.setMonth(end.getMonth() + months);
   user.subscription.endDate = end;
@@ -35,6 +41,25 @@ const activatePlan = async (user, plan) => {
   }
 
   await user.save();
+
+  // Credit referrer commission if applicable
+  if (user.referredBy) {
+    try {
+      const referrer = await User.findById(user.referredBy);
+      if (referrer && referrer.referral?.enabled) {
+        const rate = (referrer.referral.commissionRate || 20) / 100;
+        const paidAmount = plan.effectivePrice ?? plan.price ?? 7000;
+        const commission = Math.round(paidAmount * rate);
+        if (commission > 0) {
+          referrer.referral.balance = (referrer.referral.balance || 0) + commission;
+          referrer.referral.totalEarned = (referrer.referral.totalEarned || 0) + commission;
+          await referrer.save();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to credit referral commission on activatePlan:', err);
+    }
+  }
 
   await logAuth('subscription_paid', {
     message: isRenewal

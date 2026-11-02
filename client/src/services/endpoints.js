@@ -222,3 +222,11 @@ export const reviewApi = {
   update: (id, payload) => api.put(`/reviews/${id}`, payload),
   delete: (id) => api.delete(`/reviews/${id}`),
 };
+
+export const referralApi = {
+  getMy: () => api.get('/referrals/my'),
+  requestWithdrawal: (payload) => api.post('/referrals/withdraw', payload),
+  getAdminWithdrawals: (status) => api.get(`/referrals/admin/withdrawals${status ? `?status=${status}` : ''}`),
+  processWithdrawal: (id, payload) => api.post(`/referrals/admin/withdrawals/${id}/process`, payload),
+  updateUserReferral: (userId, payload) => api.put(`/referrals/admin/users/${userId}`, payload),
+};

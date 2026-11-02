@@ -293,19 +293,43 @@ export const deleteBrokerAccount = asyncHandler(async (req, res) => {
  */
 export const executeManualOrder = asyncHandler(async (req, res) => {
   const user = req.user;
-  const { opportunityId, brokerAccountId, directParams } = req.body || {};
+  const {
+    opportunityId,
+    brokerAccountId,
+    directParams,
+    symbol,
+    direction,
+    entryPrice,
+    entry,
+    stopLoss,
+    takeProfit,
+    takeProfit1,
+    comment,
+  } = req.body || {};
 
   let opportunity = null;
   if (opportunityId) {
     opportunity = await Opportunity.findById(opportunityId);
-    if (!opportunity) {
-      throw ApiError.notFound('Opportunité de trading introuvable ou expirée.');
-    }
   }
+
+  // Support directParams passed either nested or flattened at top-level
+  const resolvedDirectParams = directParams || (symbol ? {
+    symbol,
+    direction: direction || 'BUY',
+    entry: Number(entryPrice || entry),
+    stopLoss: Number(stopLoss),
+    takeProfit: Number(takeProfit || takeProfit1),
+    comment: comment || 'Managed Trading Order',
+  } : null);
 
   let account = null;
   if (brokerAccountId) {
     account = await BrokerAccount.findOne({ _id: brokerAccountId, userId: user._id });
+  }
+
+  // If no specific broker was found, fall back to active paper account
+  if (!account) {
+    account = await BrokerAccount.findOne({ userId: user._id, broker: 'paper' });
   }
 
   const result = await executeManagedOrder({
@@ -313,7 +337,7 @@ export const executeManualOrder = asyncHandler(async (req, res) => {
     account,
     opportunity,
     executionMode: 'manual_confirmation',
-    directParams,
+    directParams: resolvedDirectParams,
   });
 
   if (!result.success) {

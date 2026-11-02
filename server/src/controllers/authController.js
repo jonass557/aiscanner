@@ -25,7 +25,7 @@ import { logAuth } from '../services/logService.js';
  * Creates an account, sends a verification email, returns tokens.
  */
 export const register = asyncHandler(async (req, res) => {
-  const { email, password, firstName, lastName, plan: requestedPlan, deviceFingerprint: rawFp, orderId } = req.body;
+  const { email, password, firstName, lastName, plan: requestedPlan, deviceFingerprint: rawFp, orderId, referralCode: reqRef, ref: queryRef } = req.body;
 
   const existing = await User.findOne({ email: email.toLowerCase().trim() });
   if (existing) throw ApiError.conflict('Un compte avec cet email existe déjà.');
@@ -33,6 +33,13 @@ export const register = asyncHandler(async (req, res) => {
   let paidOrder = null;
   if (orderId) {
     paidOrder = await Payment.findOne({ externalRef: orderId });
+  }
+
+  // Check referral code
+  let referredByUser = null;
+  const refCodeToFind = (reqRef || queryRef || '').trim().toUpperCase();
+  if (refCodeToFind) {
+    referredByUser = await User.findOne({ referralCode: refCodeToFind });
   }
 
   const isPaidSubscriber = Boolean(paidOrder && (paidOrder.status === 'approved' || paidOrder.amount > 0));
@@ -83,9 +90,10 @@ export const register = asyncHandler(async (req, res) => {
   const trialDays = targetPlan?.trial?.days || 7;
   const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
-  // Durée de l'abonnement selon le plan (1 mois, 2 mois, 6 mois)
+  // Durée de l'abonnement selon le plan (1 mois, 2 mois, 1 an / 6 mois)
   let subMonths = 1;
   if (targetPlan?.id === '2mois') subMonths = 2;
+  else if (targetPlan?.id === '1an') subMonths = 12;
   else if (targetPlan?.id === '6mois') subMonths = 6;
   else if (targetPlan?.promo?.enabled && targetPlan.promo.durationMonths > 0) subMonths = targetPlan.promo.durationMonths;
 
@@ -99,6 +107,7 @@ export const register = asyncHandler(async (req, res) => {
     password,
     firstName: firstName || paidOrder?.customerName || '',
     lastName: lastName || '',
+    referredBy: referredByUser ? referredByUser._id : null,
     verificationCode: hashed,
     verificationCodeExpires: Date.now() + 15 * 60 * 1000, // 15 minutes
     registrationIp: clientIp,
@@ -125,6 +134,22 @@ export const register = asyncHandler(async (req, res) => {
     paidOrder.user = user._id;
     if (paidOrder.status !== 'approved') paidOrder.status = 'approved';
     await paidOrder.save();
+
+    // Credit referrer commission if enabled
+    if (referredByUser && referredByUser.referral?.enabled) {
+      try {
+        const rate = (referredByUser.referral.commissionRate || 20) / 100;
+        const paidAmount = targetPlan?.effectivePrice ?? targetPlan?.price ?? paidOrder.amount ?? 7000;
+        const commission = Math.round(paidAmount * rate);
+        if (commission > 0) {
+          referredByUser.referral.balance = (referredByUser.referral.balance || 0) + commission;
+          referredByUser.referral.totalEarned = (referredByUser.referral.totalEarned || 0) + commission;
+          await referredByUser.save();
+        }
+      } catch (err) {
+        console.error('Failed to credit referral commission on register:', err);
+      }
+    }
   }
 
   // Envoi automatique de l'OTP de vérification par mail

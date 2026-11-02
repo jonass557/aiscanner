@@ -110,8 +110,8 @@ export default function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      {/* Desktop Sidebar */}
-      <aside className="hidden w-64 shrink-0 lg:block sticky top-0 h-screen overflow-y-auto z-40 border-r border-slate-800/80 bg-slate-950 shadow-xl">
+      {/* Desktop Sidebar (Fixed) */}
+      <aside className="hidden lg:block fixed left-0 top-0 bottom-0 w-64 z-40 border-r border-slate-800/80 bg-slate-950 shadow-xl overflow-y-auto">
         <SidebarInner />
       </aside>
 
@@ -126,7 +126,7 @@ export default function AdminLayout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 px-4 py-3 backdrop-blur-md lg:px-8">
           <div className="flex items-center gap-3">
             <button
