@@ -353,12 +353,18 @@ export default function ManagedTrading() {
     const posInterval = setInterval(async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
       try {
-        const { data } = await managedTradingApi.getPositions();
-        if (data?.data?.positions) {
-          setOpenPositions(data.data.positions);
+        const [posRes, accRes] = await Promise.allSettled([
+          managedTradingApi.getPositions(),
+          managedTradingApi.getBrokerAccounts(),
+        ]);
+        if (posRes.status === 'fulfilled' && posRes.value?.data?.data?.positions) {
+          setOpenPositions(posRes.value.data.data.positions);
+        }
+        if (accRes.status === 'fulfilled' && accRes.value?.data?.data?.accounts) {
+          setBrokerAccounts(accRes.value.data.data.accounts);
         }
       } catch (err) {}
-    }, 4000);
+    }, 3000);
     return () => clearInterval(posInterval);
   }, [openPositions.length]);
 
@@ -397,6 +403,16 @@ export default function ManagedTrading() {
     }
     return brokerAccounts[0];
   }, [brokerAccounts, config?.activeBrokerAccountId]);
+
+  // Real-time calculation of total portfolio unrealized P&L and live simulated equity
+  const totalOpenPnL = useMemo(() => {
+    return openPositions.reduce((acc, p) => acc + (Number(p.unrealizedPnL) || 0), 0);
+  }, [openPositions]);
+
+  const liveSimulatedEquity = useMemo(() => {
+    const baseBal = Number(activeAccount?.balance || 10000);
+    return baseBal + totalOpenPnL;
+  }, [activeAccount?.balance, totalOpenPnL]);
 
   // Explicit Account Selection Handler
   const handleSelectAccount = async (accId) => {
@@ -1060,6 +1076,141 @@ export default function ManagedTrading() {
         </div>
       )}
 
+      {/* HERO LIVE ACTIVE POSITIONS BANNER (Directly visible at the top without scrolling) */}
+      {openPositions.length > 0 && (
+        <div className="rounded-2xl border-2 border-cyan-500/80 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 p-5 shadow-2xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+              </span>
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <span>{isEn ? 'Live Active Position' : 'Position Ouverte en Direct'}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-black uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    {activeAccount?.accountType === 'paper' || openPositions[0].brokerAccountId?.accountType === 'paper' ? 'Mode Simulation Démo' : 'Compte Réel'}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {isEn
+                    ? 'Real-time market ticks, live profit/loss tracking and instant execution.'
+                    : 'Cotation en direct, calcul instantané de votre gain ou perte et contrôle d\'exécution.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => loadData(true)}
+                disabled={refreshing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{isEn ? 'Refresh' : 'Actualiser'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {openPositions.map((pos) => {
+              const pnl = Number(pos.unrealizedPnL) || 0;
+              const pnlPct = Number(pos.pnlPercent) || 0;
+              const isProfit = pnl >= 0;
+              const curPrice = pos.currentPrice || pos.executionPrice || pos.requestedPrice;
+              const entryPrice = pos.executionPrice || pos.requestedPrice || curPrice;
+
+              return (
+                <div
+                  key={pos._id}
+                  className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-slate-950/80 rounded-xl p-4 border border-slate-800"
+                >
+                  {/* Symbol & Direction */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Actif &amp; Sens</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-lg font-black text-white">{pos.symbol}</span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-extrabold uppercase ${
+                          pos.direction === 'BUY'
+                            ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-700/60'
+                            : 'bg-rose-950/90 text-rose-300 border border-rose-700/60'
+                        }`}
+                      >
+                        {pos.direction} ({pos.volume} lots)
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500 mt-0.5 block">
+                      Ticket : {pos.brokerOrderId || pos._id.slice(-6)}
+                    </span>
+                  </div>
+
+                  {/* Entry Price */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Prix d'Entrée</span>
+                    <span className="text-base font-extrabold font-mono text-slate-200 mt-1 block">
+                      {entryPrice} $
+                    </span>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 font-mono">
+                      <span>SL: <strong className="text-rose-400">{pos.stopLoss}</strong></span>
+                      <span>•</span>
+                      <span>TP: <strong className="text-emerald-400">{pos.takeProfit || '—'}</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Live Current Market Price */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Prix Actuel du Marché</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`h-2.5 w-2.5 rounded-full ${isProfit ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-pulse'}`} />
+                      <span className="text-lg font-black font-mono text-white">
+                        {curPrice} $
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-cyan-400 font-semibold block mt-0.5">
+                      Flux temps réel (Binance / Yahoo)
+                    </span>
+                  </div>
+
+                  {/* Real-time P&L Badge */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                      Gain / Perte en Cours (P&amp;L)
+                    </span>
+                    <div
+                      className={`mt-1 inline-flex items-baseline gap-2 px-3 py-1.5 rounded-xl ${
+                        isProfit
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 ring-1 ring-emerald-500/30'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/40 ring-1 ring-rose-500/30'
+                      }`}
+                    >
+                      <span className="text-xl font-black font-mono">
+                        {isProfit ? '+' : ''}{pnl.toFixed(2)} $
+                      </span>
+                      <span className="text-xs font-extrabold">
+                        ({isProfit ? '+' : ''}{pnlPct.toFixed(2)}%)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Close / Take Profit Action */}
+                  <div className="flex flex-col sm:flex-row items-center gap-2 justify-end">
+                    <button
+                      onClick={() => handleClosePosition(pos._id)}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-xs shadow-lg shadow-rose-600/30 transition transform active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      <span>{isEn ? 'Close & Take Profit' : 'Fermer & Encaisser'}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* STRATEGY CONFIGURATION & INSTANT AI DETECTION WITH INTERACTIVE CHART */}
       <div className="rounded-2xl border-2 border-brand-200 bg-white p-5 shadow-sm dark:border-brand-900/60 dark:bg-gray-900">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
@@ -1614,7 +1765,7 @@ export default function ManagedTrading() {
             </p>
           )}
           <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                   activeAccount?.isTradeAuthorized || activeAccount?.accountType === 'paper'
@@ -1628,20 +1779,35 @@ export default function ManagedTrading() {
                   ? 'Trading Autorisé'
                   : 'Lecture Seule'}
               </span>
-              <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
-                {Number(activeAccount?.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeAccount?.currency || 'USD'}
-              </span>
+
+              {/* Dynamic live simulated equity moving with active position gains/losses */}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-sm font-black font-mono text-gray-900 dark:text-white">
+                  {Number(liveSimulatedEquity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeAccount?.currency || 'USD'}
+                </span>
+                {totalOpenPnL !== 0 && (
+                  <span className={`text-[10px] font-extrabold font-mono px-1.5 py-0.5 rounded ${totalOpenPnL >= 0 ? 'bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-500 dark:text-rose-400 border border-rose-500/30'}`}>
+                    {totalOpenPnL >= 0 ? '+' : ''}{totalOpenPnL.toFixed(2)} $
+                  </span>
+                )}
+              </div>
             </div>
 
             <button
               type="button"
               onClick={() => setDepositModalOpen(true)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400 border border-cyan-500/30 transition shadow-sm"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-500 dark:text-cyan-400 border border-cyan-500/30 transition shadow-sm"
               title="Ajouter ou recharger le solde de simulation"
             >
               <Plus className="h-3 w-3" /> {isEn ? 'Deposit Demo' : 'Ajouter Solde Démo'}
             </button>
           </div>
+          {activeAccount?.accountType === 'paper' && (
+            <div className="mt-1.5 pt-1.5 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400 font-mono">
+              <span>Solde base: {Number(activeAccount?.balance || 10000).toLocaleString('en-US', { minimumFractionDigits: 2 })} $</span>
+              <span>Fonds propres: <strong className={totalOpenPnL >= 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}>{Number(liveSimulatedEquity).toLocaleString('en-US', { minimumFractionDigits: 2 })} $</strong></span>
+            </div>
+          )}
         </div>
 
         {/* Daily Loss Limit Tracking */}

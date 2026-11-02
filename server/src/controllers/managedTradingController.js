@@ -236,12 +236,56 @@ export const connectBrokerAccount = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/v1/managed-trading/broker-accounts
+ * Returns accounts with real-time equity & unrealized PnL computed from active positions.
  */
 export const getBrokerAccounts = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const accounts = await BrokerAccount.find({ userId }).sort({ createdAt: -1 });
+  const accounts = await BrokerAccount.find({ userId }).sort({ createdAt: -1 }).lean();
 
-  return sendSuccess(res, 200, { accounts });
+  const openPositions = await ManagedOrder.find({
+    userId,
+    status: { $in: ['FILLED', 'ACCEPTED', 'SUBMITTED'] },
+  }).lean();
+
+  const enhancedAccounts = await Promise.all(
+    accounts.map(async (acc) => {
+      const accPositions = openPositions.filter(
+        (p) => String(p.brokerAccountId) === String(acc._id)
+      );
+
+      let totalPnL = 0;
+      for (const pos of accPositions) {
+        let curPrice = pos.executionPrice || pos.requestedPrice || pos.signalPrice || 1.0;
+        try {
+          const q = await getQuote(pos.symbol);
+          if (q?.price && Number(q.price) > 0) curPrice = Number(q.price);
+        } catch (e) {}
+
+        const entryPrice = Number(pos.executionPrice || pos.requestedPrice || curPrice);
+        const volume = Number(pos.volume || 1);
+        const isForex = !pos.symbol.includes('BTC') && !pos.symbol.includes('ETH') && !pos.symbol.includes('VOLATILITY') && !pos.symbol.includes('BOOM') && !pos.symbol.includes('CRASH') && pos.market === 'forex';
+        const contractSize = isForex ? 100000 : 1;
+
+        if (entryPrice > 0) {
+          if (pos.direction === 'BUY') {
+            totalPnL += (curPrice - entryPrice) * volume * contractSize;
+          } else {
+            totalPnL += (entryPrice - curPrice) * volume * contractSize;
+          }
+        }
+      }
+
+      const balance = Number(acc.balance || 10000);
+      const equity = Number((balance + totalPnL).toFixed(2));
+      return {
+        ...acc,
+        equity,
+        unrealizedPnL: Number(totalPnL.toFixed(2)),
+      };
+    })
+  );
+
+  return sendSuccess(res, 200, { accounts: enhancedAccounts });
 });
 
 /**
