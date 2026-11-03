@@ -51,3 +51,6 @@ export const error = (res, statusCode = 500, message = 'Error', details = null, 
   if (stack) payload.stack = stack;
   return res.status(statusCode).json(payload);
 };
+
+export const sendError = error;
+

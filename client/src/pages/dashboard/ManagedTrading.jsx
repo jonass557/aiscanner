@@ -347,25 +347,99 @@ export default function ManagedTrading() {
     return () => clearInterval(interval);
   }, [loadData]);
 
+  // Live market price feeds cache for open positions
+  const [liveTickerPrices, setLiveTickerPrices] = useState({});
+
+  // Helper to compute live position metrics with client-side fallback
+  const getLivePositionMetrics = useCallback((pos) => {
+    if (!pos) return { curPrice: 0, entryPrice: 0, pnl: 0, pnlPercent: 0, isProfit: true };
+
+    const rawCur =
+      (liveTickerPrices[pos.symbol] != null ? Number(liveTickerPrices[pos.symbol]) : null) ??
+      (pos.currentPrice != null && Number(pos.currentPrice) > 0 ? Number(pos.currentPrice) : null) ??
+      Number(pos.executionPrice || pos.requestedPrice || pos.signalPrice || 1.0);
+
+    const entryPrice = Number(pos.executionPrice || pos.requestedPrice || pos.signalPrice || rawCur);
+    const curPrice = rawCur || entryPrice;
+    const volume = Number(pos.volume || 1);
+    const symUpper = String(pos.symbol || '').toUpperCase();
+    const isForex =
+      !symUpper.includes('BTC') &&
+      !symUpper.includes('ETH') &&
+      !symUpper.includes('VOLATILITY') &&
+      !symUpper.includes('BOOM') &&
+      !symUpper.includes('CRASH') &&
+      pos.market === 'forex';
+    const contractSize = isForex ? 100000 : 1;
+
+    let pnl = 0;
+    let pnlPercent = 0;
+
+    if (entryPrice > 0 && curPrice > 0) {
+      if (pos.direction === 'BUY') {
+        pnl = (curPrice - entryPrice) * volume * contractSize;
+        pnlPercent = ((curPrice - entryPrice) / entryPrice) * 100;
+      } else {
+        pnl = (entryPrice - curPrice) * volume * contractSize;
+        pnlPercent = ((entryPrice - curPrice) / entryPrice) * 100;
+      }
+    }
+
+    if (pnl === 0 && Number(pos.unrealizedPnL) !== 0) {
+      pnl = Number(pos.unrealizedPnL);
+      pnlPercent = Number(pos.pnlPercent) || 0;
+    }
+
+    return {
+      curPrice: Number(curPrice.toFixed(curPrice > 100 ? 2 : 5)),
+      entryPrice: Number(entryPrice.toFixed(entryPrice > 100 ? 2 : 5)),
+      pnl: Number(pnl.toFixed(2)),
+      pnlPercent: Number(pnlPercent.toFixed(2)),
+      isProfit: pnl >= 0,
+    };
+  }, [liveTickerPrices]);
+
   // Fast polling of open positions to display real-time live price variations & PnL
   useEffect(() => {
     if (openPositions.length === 0) return;
-    const posInterval = setInterval(async () => {
+
+    let isMounted = true;
+    const pollQuotes = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const [posRes, accRes] = await Promise.allSettled([
           managedTradingApi.getPositions(),
           managedTradingApi.getBrokerAccounts(),
         ]);
-        if (posRes.status === 'fulfilled' && posRes.value?.data?.data?.positions) {
-          setOpenPositions(posRes.value.data.data.positions);
+        if (isMounted) {
+          if (posRes.status === 'fulfilled' && posRes.value?.data?.data?.positions) {
+            setOpenPositions(posRes.value.data.data.positions);
+          }
+          if (accRes.status === 'fulfilled' && accRes.value?.data?.data?.accounts) {
+            setBrokerAccounts(accRes.value.data.data.accounts);
+          }
         }
-        if (accRes.status === 'fulfilled' && accRes.value?.data?.data?.accounts) {
-          setBrokerAccounts(accRes.value.data.data.accounts);
+
+        // Fetch live market snapshots for all active position symbols
+        const symbols = [...new Set(openPositions.map((p) => p.symbol).filter(Boolean))];
+        for (const sym of symbols) {
+          try {
+            const snap = await marketApi.snapshot(sym, 'H1', 5);
+            const liveP = Number(snap?.data?.data?.market?.quote?.price);
+            if (isMounted && liveP && Number.isFinite(liveP) && liveP > 0) {
+              setLiveTickerPrices((prev) => ({ ...prev, [sym]: liveP }));
+            }
+          } catch (err) {}
         }
       } catch (err) {}
-    }, 3000);
-    return () => clearInterval(posInterval);
+    };
+
+    pollQuotes();
+    const posInterval = setInterval(pollQuotes, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(posInterval);
+    };
   }, [openPositions.length]);
 
   // Paper / Simulation Balance Deposit & Recharge Handler
@@ -406,8 +480,11 @@ export default function ManagedTrading() {
 
   // Real-time calculation of total portfolio unrealized P&L and live simulated equity
   const totalOpenPnL = useMemo(() => {
-    return openPositions.reduce((acc, p) => acc + (Number(p.unrealizedPnL) || 0), 0);
-  }, [openPositions]);
+    return openPositions.reduce((acc, p) => {
+      const m = getLivePositionMetrics(p);
+      return acc + m.pnl;
+    }, 0);
+  }, [openPositions, getLivePositionMetrics]);
 
   const liveSimulatedEquity = useMemo(() => {
     const baseBal = Number(activeAccount?.balance || 10000);
@@ -1115,11 +1192,8 @@ export default function ManagedTrading() {
 
           <div className="space-y-3">
             {openPositions.map((pos) => {
-              const pnl = Number(pos.unrealizedPnL) || 0;
-              const pnlPct = Number(pos.pnlPercent) || 0;
-              const isProfit = pnl >= 0;
-              const curPrice = pos.currentPrice || pos.executionPrice || pos.requestedPrice;
-              const entryPrice = pos.executionPrice || pos.requestedPrice || curPrice;
+              const m = getLivePositionMetrics(pos);
+              const { curPrice, entryPrice, pnl, pnlPercent: pnlPct, isProfit } = m;
 
               return (
                 <div
@@ -1911,7 +1985,7 @@ export default function ManagedTrading() {
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-850/70 shadow-sm">
                   <div className="flex items-center gap-3">
                     {(() => {
-                      const totalPnL = openPositions.reduce((acc, p) => acc + (Number(p.unrealizedPnL) || 0), 0);
+                      const totalPnL = totalOpenPnL;
                       const isProfit = totalPnL >= 0;
                       return (
                         <>
@@ -1961,9 +2035,90 @@ export default function ManagedTrading() {
                   </div>
                 </div>
 
-                {/* Table of Open Positions with live Price, PnL & variation */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                {/* MOBILE POSITION CARDS (Shown on small screens to prevent cut-off values) */}
+                <div className="md:hidden space-y-3">
+                  {openPositions.map((pos) => {
+                    const m = getLivePositionMetrics(pos);
+                    const { curPrice, entryPrice, pnl, pnlPercent: pnlPct, isProfit } = m;
+
+                    return (
+                      <div
+                        key={`m-${pos._id}`}
+                        className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-850 p-4 shadow-sm space-y-3"
+                      >
+                        {/* Header: Symbol, Direction, Ticket */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-base text-gray-900 dark:text-white">{pos.symbol}</span>
+                            <span
+                              className={`px-2 py-0.5 rounded font-black uppercase text-[11px] ${
+                                pos.direction === 'BUY'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border border-rose-300 dark:border-rose-800/60'
+                              }`}
+                            >
+                              {pos.direction} ({pos.volume} lots)
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-gray-400">
+                            #{pos.brokerOrderId || pos._id.slice(-6)}
+                          </span>
+                        </div>
+
+                        {/* Price metrics grid */}
+                        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800/60 text-xs font-mono">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Prix Entrée</span>
+                            <span className="font-bold text-gray-700 dark:text-gray-200">{entryPrice.toLocaleString('en-US')} $</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Prix Actuel (Live)</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`h-2 w-2 rounded-full ${isProfit ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-pulse'}`} />
+                              <span className="font-extrabold text-gray-900 dark:text-white">{curPrice.toLocaleString('en-US')} $</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Stop Loss</span>
+                            <span className="text-rose-600 dark:text-rose-400 font-bold">{pos.stopLoss || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Take Profit</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">{pos.takeProfit || '—'}</span>
+                          </div>
+                        </div>
+
+                        {/* PnL and Close button */}
+                        <div className="flex items-center justify-between pt-1">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Résultat en Direct</span>
+                            <div className="flex items-baseline gap-1.5 font-mono">
+                              <span className={`text-lg font-black ${isProfit ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
+                                {isProfit ? '+' : ''}{pnl.toFixed(2)} $
+                              </span>
+                              <span className={`text-xs font-extrabold ${isProfit ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'}`}>
+                                ({isProfit ? '+' : ''}{pnlPct.toFixed(2)}%)
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleClosePosition(pos._id)}
+                            className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition flex items-center gap-1.5"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            <span>{isEn ? 'Close Trade' : 'Fermer & Encaisser'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Table of Open Positions for Desktop */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
                     <thead className="text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
                       <tr>
                         <th className="py-2.5 px-3">Ticket</th>
@@ -1980,11 +2135,8 @@ export default function ManagedTrading() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {openPositions.map((pos) => {
-                        const pnl = Number(pos.unrealizedPnL) || 0;
-                        const pnlPct = Number(pos.pnlPercent) || 0;
-                        const isProfit = pnl >= 0;
-                        const curPrice = pos.currentPrice || pos.executionPrice || pos.requestedPrice;
-                        const entryPrice = pos.executionPrice || pos.requestedPrice || curPrice;
+                        const m = getLivePositionMetrics(pos);
+                        const { curPrice, entryPrice, pnl, pnlPercent: pnlPct, isProfit } = m;
 
                         return (
                           <tr key={pos._id} className="hover:bg-gray-50/60 dark:hover:bg-gray-850/50 transition">
@@ -2007,11 +2159,11 @@ export default function ManagedTrading() {
                               </span>
                             </td>
                             <td className="py-3 px-3 font-mono font-semibold">{pos.volume} lots</td>
-                            <td className="py-3 px-3 font-mono font-semibold text-gray-700 dark:text-gray-300">{entryPrice}</td>
+                            <td className="py-3 px-3 font-mono font-semibold text-gray-700 dark:text-gray-300">{entryPrice.toLocaleString('en-US')} $</td>
                             <td className="py-3 px-3 font-mono font-black text-gray-900 dark:text-white">
                               <div className="flex items-center gap-1.5">
                                 <span className={`h-2 w-2 rounded-full ${isProfit ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-pulse'}`} />
-                                <span>{curPrice}</span>
+                                <span>{curPrice.toLocaleString('en-US')} $</span>
                               </div>
                             </td>
                             <td className="py-3 px-3 font-mono">
@@ -2028,7 +2180,7 @@ export default function ManagedTrading() {
                                 </span>
                               </div>
                             </td>
-                            <td className="py-3 px-3 font-mono text-rose-600 dark:text-rose-400">{pos.stopLoss}</td>
+                            <td className="py-3 px-3 font-mono text-rose-600 dark:text-rose-400">{pos.stopLoss || '—'}</td>
                             <td className="py-3 px-3 font-mono text-emerald-600 dark:text-emerald-400">{pos.takeProfit || '—'}</td>
                             <td className="py-3 px-3 text-right">
                               <button
