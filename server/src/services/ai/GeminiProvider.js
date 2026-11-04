@@ -162,6 +162,18 @@ export class GeminiProvider extends BaseProvider {
     });
   }
 
+  async analyzeData({ systemPrompt, userPrompt }) {
+    return this.executeGenerate({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+      },
+    });
+  }
+
   async chat({ systemPrompt, messages }) {
     const contents = messages.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',

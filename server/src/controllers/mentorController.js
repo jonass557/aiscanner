@@ -318,22 +318,6 @@ export const submitExercise = asyncHandler(async (req, res) => {
     },
   });
 
-  conversation.messages.push({
-    role: 'assistant',
-    content: verdictMsg,
-    createdAt: new Date(),
-  });
-
-  await conversation.save();
-
-  return sendSuccess(res, {
-    message: evaluation.passed ? 'Exercice validé avec succès !' : 'Exercice corrigé.',
-    data: {
-      evaluation,
-      lesson: currentLesson,
-      conversation,
-    },
-  });
 });
 
 /**
@@ -359,9 +343,24 @@ export const selectLesson = asyncHandler(async (req, res) => {
   }
 
   conversation.activeLessonIndex = idx;
-  if (targetLesson.status === 'available') {
+  if (targetLesson.status === 'available' || targetLesson.status === 'locked') {
     targetLesson.status = 'in_progress';
   }
+
+  // Ensure introductory lecture exists in transcript for this lesson
+  const hasIntro = conversation.messages.some((m) => m.content && m.content.includes(targetLesson.title));
+  if (!hasIntro) {
+    const objectivesList = (targetLesson.objectives || []).map((o) => '- ' + o).join('\n');
+    const introMsg = '🎓 **Bienvenue dans : ' + targetLesson.title + '**\n\n' +
+      targetLesson.description + '\n\n**Objectifs institutionnels du module :**\n' +
+      objectivesList + '\n\n*Vous pouvez me poser toutes vos questions sur ces concepts ou cliquer sur **"Devoir / Exercice"** pour soumettre votre travail.*';
+    conversation.messages.push({
+      role: 'assistant',
+      content: introMsg,
+      createdAt: new Date(),
+    });
+  }
+
   await conversation.save();
 
   return sendSuccess(res, {

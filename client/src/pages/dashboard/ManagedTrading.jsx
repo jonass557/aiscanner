@@ -253,6 +253,21 @@ export default function ManagedTrading() {
     }
   }, []);
 
+  const detectedTradePlan = useMemo(() => {
+    if (!detectedOpportunity) return null;
+    return {
+      entry: detectedOpportunity.entryPrice,
+      stopLoss: detectedOpportunity.stopLoss,
+      takeProfit1: detectedOpportunity.takeProfit1,
+      takeProfit2: detectedOpportunity.takeProfit2,
+    };
+  }, [
+    detectedOpportunity?.entryPrice,
+    detectedOpportunity?.stopLoss,
+    detectedOpportunity?.takeProfit1,
+    detectedOpportunity?.takeProfit2,
+  ]);
+
   // Sync strategy preferences to localStorage
   useEffect(() => {
     localStorage.setItem('managed_strat_category', stratCategory);
@@ -1629,12 +1644,7 @@ export default function ManagedTrading() {
                   market={MANAGED_ALL_PAIRS.find(p => p.symbol === detectedOpportunity.symbol)?.category || 'forex'}
                   symbol={detectedOpportunity.symbol}
                   timeframe={detectedOpportunity.timeframe}
-                  tradePlan={{
-                    entry: detectedOpportunity.entryPrice,
-                    stopLoss: detectedOpportunity.stopLoss,
-                    takeProfit1: detectedOpportunity.takeProfit1,
-                    takeProfit2: detectedOpportunity.takeProfit2,
-                  }}
+                  tradePlan={detectedTradePlan}
                   decision={detectedOpportunity.decision}
                   strategy={detectedOpportunity.strategyDescription || detectedOpportunity.strategyName}
                 />
@@ -1807,7 +1817,10 @@ export default function ManagedTrading() {
             <span className="text-xs text-gray-500">{isEn ? 'Connected Broker' : 'Compte Broker Actif'}</span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setGuideModalOpen(true)}
+                onClick={() => {
+                  setGuideBrokerTab(activeAccount?.broker === 'binance' ? 'binance' : 'deriv');
+                  setGuideModalOpen(true);
+                }}
                 className="text-xs text-cyan-600 dark:text-cyan-400 font-bold hover:underline"
                 title="Tutoriel Deriv et Binance"
               >
@@ -2559,7 +2572,10 @@ export default function ManagedTrading() {
                   <label className="block text-gray-500">{isEn ? 'Broker Platform' : 'Plateforme / Courtier'}</label>
                   <button
                     type="button"
-                    onClick={() => setGuideModalOpen(true)}
+                    onClick={() => {
+                      setGuideBrokerTab(newBroker === 'binance' ? 'binance' : 'deriv');
+                      setGuideModalOpen(true);
+                    }}
                     className="text-[11px] text-cyan-600 dark:text-cyan-400 font-bold hover:underline flex items-center gap-1"
                   >
                     📖 Guide Visuel Pas-à-Pas
@@ -2666,8 +2682,8 @@ export default function ManagedTrading() {
 
       {/* ILLUSTRATED BROKER CONNECTION GUIDE MODAL */}
       {guideModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl space-y-5 my-2 sm:my-6 flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">Tutoriel Officiel & Sécurité</span>
@@ -2889,14 +2905,21 @@ export default function ManagedTrading() {
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setGuideModalOpen(false)}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-bold text-xs transition"
+              >
+                Fermer le guide
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setGuideModalOpen(false);
                   setAddAccountModalOpen(true);
                 }}
-                className="rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-5 py-2.5 text-xs shadow-lg shadow-cyan-600/20"
+                className="w-full sm:w-auto rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-5 py-2.5 text-xs shadow-lg shadow-cyan-600/20"
               >
                 Passer à la Connexion de mon Compte
               </button>

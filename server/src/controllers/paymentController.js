@@ -141,9 +141,23 @@ export const initiateIkeepay = asyncHandler(async (req, res) => {
     ? Number(plan.promo.price)
     : plan.price;
 
+  // Conversion intelligente XAF -> USDT si paiement par cryptomonnaie
+  const isXafOrXof1 = ['XAF', 'XOF', 'FCFA'].includes((plan.currency || '').toUpperCase());
+  const wantsCrypto1 = req.body.paymentCurrency === 'USDT' || req.body.paymentMethod === 'crypto';
+
+  let checkoutAmount1 = effectivePrice;
+  let checkoutCurrency1 = plan.currency || 'USD';
+
+  if (wantsCrypto1 && isXafOrXof1) {
+    checkoutAmount1 = Math.max(1, Number((effectivePrice / 655).toFixed(2)));
+    checkoutCurrency1 = 'USD';
+  } else if (!wantsCrypto1 && isXafOrXof1) {
+    checkoutCurrency1 = 'XOF';
+  }
+
   const session = provider.createCheckoutSession({
-    amount: effectivePrice,
-    currency: plan.currency || 'USD',
+    amount: checkoutAmount1,
+    currency: checkoutCurrency1,
     orderId,
     redirectUrl: redirectUrl || `${config.frontendUrl}/dashboard/subscription?status=success&ref=${orderId}`,
   });
@@ -151,8 +165,8 @@ export const initiateIkeepay = asyncHandler(async (req, res) => {
   const payment = await Payment.create({
     user: req.user._id,
     planId: plan.id,
-    amount: effectivePrice,
-    currency: plan.currency || 'USD',
+    amount: checkoutAmount1,
+    currency: checkoutCurrency1,
     provider: 'ikeepay',
     externalRef: orderId,
     checkoutUrl: session.checkoutUrl,
@@ -279,9 +293,23 @@ export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
       throw ApiError.badRequest("Le moyen de paiement iKeePay n'a pas encore été configuré par l'administrateur (Clé publique manquante dans l'admin).");
     }
 
+    // Conversion intelligente XAF -> USDT si paiement par cryptomonnaie
+    const isXafOrXof2 = ['XAF', 'XOF', 'FCFA'].includes((plan.currency || '').toUpperCase());
+    const wantsCrypto2 = req.body.paymentCurrency === 'USDT' || req.body.paymentMethod === 'crypto';
+
+    let checkoutAmount2 = effectivePrice;
+    let checkoutCurrency2 = plan.currency || 'USD';
+
+    if (wantsCrypto2 && isXafOrXof2) {
+      checkoutAmount2 = Math.max(1, Number((effectivePrice / 655).toFixed(2)));
+      checkoutCurrency2 = 'USD';
+    } else if (!wantsCrypto2 && isXafOrXof2) {
+      checkoutCurrency2 = 'XOF';
+    }
+
     session = provider.createCheckoutSession({
-      amount: effectivePrice,
-      currency: plan.currency || 'USD',
+      amount: checkoutAmount2,
+      currency: checkoutCurrency2,
       orderId,
       redirectUrl: redirectUrl || `${config.frontendUrl}/register?orderId=${orderId}&email=${encodeURIComponent(email)}&plan=${plan.id}&name=${encodeURIComponent(fullName || '')}`,
     });
@@ -292,8 +320,8 @@ export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
     customerName: fullName || '',
     customerPhone: phone || '',
     planId: plan.id,
-    amount: effectivePrice,
-    currency: plan.currency || 'USD',
+    amount: session?.amount ?? effectivePrice,
+    currency: session?.currency ?? (plan.currency || 'USD'),
     provider: 'ikeepay',
     externalRef: orderId,
     checkoutUrl: session?.checkoutUrl || '',

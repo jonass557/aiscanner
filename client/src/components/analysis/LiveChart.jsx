@@ -163,17 +163,26 @@ export default function LiveChart({
     } finally {
       setRefreshing(false);
     }
-  }, [activeSymbol, activeTf, tradePlan]);
+  }, [activeSymbol, activeTf, tradePlan?.entry]);
 
   // Initial load when symbol or timeframe changes
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
-    fetchMarketCandles().finally(() => setLoading(false));
-  }, [fetchMarketCandles]);
+    fetchMarketCandles().finally(() => {
+      if (isMounted) setLoading(false);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [activeSymbol, activeTf]);
 
-  // Polling every 15 seconds
+  // Polling every 15 seconds in background
   useEffect(() => {
-    const id = setInterval(fetchMarketCandles, 15000);
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchMarketCandles();
+    }, 15000);
     return () => clearInterval(id);
   }, [fetchMarketCandles]);
 
@@ -260,6 +269,9 @@ export default function LiveChart({
           chartRef.current.applyOptions({
             width: chartContainerRef.current.clientWidth,
           });
+          try {
+            chartRef.current.timeScale().fitContent();
+          } catch {}
         }
       };
 
@@ -278,6 +290,11 @@ export default function LiveChart({
     if (!seriesRef.current || candles.length === 0) return;
 
     seriesRef.current.setData(candles);
+    if (chartRef.current) {
+      try {
+        chartRef.current.timeScale().fitContent();
+      } catch {}
+    }
     clearChartLines();
 
     if (autoTrace && strategicOverlay) {

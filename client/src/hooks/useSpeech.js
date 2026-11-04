@@ -266,15 +266,21 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
 
         const sentence = queueRef.current.shift();
         const utter = new SpeechSynthesisUtterance(sentence);
+        // CRITICAL FIX: Retain active utterance on window to prevent Chrome V8 garbage-collecting it mid-speech
+        if (typeof window !== 'undefined') {
+          window.__activeSpeechUtterance = utter;
+        }
         utter.lang = targetLang;
         utter.rate = 1.05; // clear, comfortable educational cadence
         utter.pitch = 1.0;
 
         utter.onend = () => {
+          if (typeof window !== 'undefined') window.__activeSpeechUtterance = null;
           playNextSentence();
         };
 
         utter.onerror = (e) => {
+          if (typeof window !== 'undefined') window.__activeSpeechUtterance = null;
           if (e.error !== 'canceled' && e.error !== 'interrupted') {
             playNextSentence();
           }
@@ -283,6 +289,7 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
         try {
           window.speechSynthesis.speak(utter);
         } catch {
+          if (typeof window !== 'undefined') window.__activeSpeechUtterance = null;
           playNextSentence();
         }
       };

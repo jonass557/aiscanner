@@ -96,6 +96,16 @@ export class ClaudeProvider extends BaseProvider {
     });
   }
 
+  async analyzeData({ systemPrompt, userPrompt }) {
+    return this._post({
+      model: this.model,
+      max_tokens: 4096,
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+  }
+
   async chat({ systemPrompt, messages }) {
     return this._post({
       model: this.model,

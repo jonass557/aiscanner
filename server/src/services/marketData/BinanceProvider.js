@@ -32,7 +32,14 @@ export class BinanceProvider extends BaseMarketProvider {
   constructor(config = {}) {
     super(config);
     this.name = 'binance';
-    this.baseUrl = config.baseUrl || 'https://api.binance.com';
+    // Use data-api.binance.vision as primary (unrestricted public market data cluster)
+    this.endpoints = [
+      'https://data-api.binance.vision',
+      'https://api.binance.com',
+      'https://api1.binance.com',
+      'https://api3.binance.com',
+    ];
+    if (config.baseUrl) this.endpoints.unshift(config.baseUrl);
   }
 
   isConfigured() {
@@ -45,14 +52,19 @@ export class BinanceProvider extends BaseMarketProvider {
   }
 
   async _fetch(path) {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) {
-      throw new Error(`Binance API error (${res.status}): ${await res.text()}`);
+    let lastErr = null;
+    for (const base of this.endpoints) {
+      try {
+        const res = await fetch(`${base}${path}`, {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) return await res.json();
+      } catch (err) {
+        lastErr = err;
+      }
     }
-    return res.json();
+    throw lastErr || new Error('Binance endpoints failed.');
   }
 
   async getQuote(entry) {

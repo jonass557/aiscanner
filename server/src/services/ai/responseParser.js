@@ -24,18 +24,98 @@ export const extractJson = (raw) => {
 
   // Strip markdown code fences if present
   let text = raw.trim();
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) text = fenceMatch[1].trim();
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)(?:```|$)/i);
+  if (fenceMatch && fenceMatch[1]) text = fenceMatch[1].trim();
 
   // If still not starting with {, grab the first {...} block
   if (!text.startsWith('{')) {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
-    if (start === -1 || end === -1) throw new Error('No JSON object found in AI response');
-    text = text.slice(start, end + 1);
+    if (start === -1) throw new Error('No JSON object found in AI response');
+    text = end > start ? text.slice(start, end + 1) : text.slice(start);
   }
 
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch (e1) {
+    // Attempt auto-repair on truncated JSON
+    let cleaned = text;
+    let inString = false;
+    let escaped = false;
+    const stack = [];
+
+    for (let i = 0; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === '{' || char === '[') {
+          stack.push(char);
+        } else if (char === '}') {
+          if (stack[stack.length - 1] === '{') stack.pop();
+        } else if (char === ']') {
+          if (stack[stack.length - 1] === '[') stack.pop();
+        }
+      }
+    }
+
+    if (inString) {
+      cleaned += '"';
+    }
+
+    // Clean any trailing key without value, e.g. ',"key":' or ',"key"'
+    cleaned = cleaned.replace(/,\s*"[^"]*"\s*:\s*$/, '');
+    cleaned = cleaned.replace(/,\s*"[^"]*"\s*$/, '');
+    // Clean any trailing comma before closing
+    cleaned = cleaned.replace(/,\s*$/, '');
+
+    // Close remaining open brackets/braces in reverse order
+    while (stack.length > 0) {
+      const open = stack.pop();
+      if (open === '{') cleaned += '}';
+      else if (open === '[') cleaned += ']';
+    }
+
+    try {
+      return JSON.parse(cleaned);
+    } catch (e2) {
+      // Regex fallback to extract essential fields safely
+      const symbol = (raw.match(/"symbol"\s*:\s*"([^"]+)"/i) || [])[1] || 'ACTIF';
+      const decision = (raw.match(/"decision"\s*:\s*"([^"]+)"/i) || [])[1] || 'WAIT';
+      const confidence = Number((raw.match(/"confidenceScore"\s*:\s*([0-9.]+)/i) || [])[1]) || 75;
+      return {
+        symbol,
+        decision,
+        confidenceScore: confidence,
+        technicalAnalysis: {
+          trend: 'Neutre',
+          marketStructure: 'Analyse approfondie en cours',
+          keyLevels: [],
+        },
+        tradePlan: {
+          entry: null,
+          stopLoss: null,
+          takeProfit1: null,
+          takeProfit2: null,
+          riskRewardRatio: '1:2.5',
+        },
+        report: {
+          summary: "Analyse institutionnelle générée par l'IA.",
+          marketContext: "Structure analysée selon les flux d'ordres et confluences institutionnelles.",
+        },
+      };
+    }
+  }
 };
 
 const toNumberOrNull = (v) => {

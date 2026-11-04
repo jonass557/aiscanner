@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, Radio, FlaskConical, ListChecks, ShieldAlert, ChevronDown } from 'lucide-react';
 import DecisionCard from '../analysis/DecisionCard.jsx';
+import LiveChart from '../analysis/LiveChart.jsx';
 import TradePlanCard from '../analysis/TradePlanCard.jsx';
 import Badge from '../ui/Badge.jsx';
 import Spinner from '../ui/Spinner.jsx';
@@ -80,6 +81,37 @@ export default function AssistantMessage({ message }) {
             )}
             {analysis && (
               <>
+                {/* Live Interactive Chart for the analyzed asset */}
+                <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-850 overflow-hidden shadow-lg mb-3">
+                  <div className="p-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/80 dark:bg-gray-900/50">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                        <i className="fa-solid fa-chart-line text-brand-500"></i>
+                        {analysis.symbol} ({analysis.timeframe || 'H1'})
+                      </span>
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+                        Graphique &amp; Flux d'Ordres
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <LiveChart
+                      symbol={analysis.symbol}
+                      timeframe={analysis.timeframe || 'H1'}
+                      tradePlan={analysis.tradePlan}
+                      decision={analysis.decision}
+                      analysis={analysis}
+                    />
+                  </div>
+                </div>
+
+                {/* If chart image is available */}
+                {analysis.imageUrl && (
+                  <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-md mb-3">
+                    <img src={analysis.imageUrl} alt={analysis.symbol} className="w-full h-auto object-cover" />
+                  </div>
+                )}
+
                 <DecisionCard decision={analysis.decision} confidenceScore={analysis.confidenceScore} />
                 <TradePlanCard tradePlan={analysis.tradePlan} decision={analysis.decision} />
 

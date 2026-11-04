@@ -87,6 +87,19 @@ export class OpenAIProvider extends BaseProvider {
     });
   }
 
+  async analyzeData({ systemPrompt, userPrompt }) {
+    return this._post({
+      model: this.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 4096,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+    });
+  }
+
   async chat({ systemPrompt, messages }) {
     return this._post({
       model: this.model,

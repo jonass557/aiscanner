@@ -100,6 +100,7 @@ export default function Subscription() {
 
   // iKeePay Inline Checkout state
   const [ikeepayOverlayVisible, setIkeepayOverlayVisible] = useState(false);
+  const [methodModalPlan, setMethodModalPlan] = useState(null);
   const [ikeepayIframeSrc, setIkeepayIframeSrc] = useState('');
   const [ikeepayLoading, setIkeepayLoading] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState(null);
@@ -225,8 +226,13 @@ export default function Subscription() {
     const isIkeepay = paymentConfig?.activeProvider === 'ikeepay' || paymentConfig?.ikeepay?.configured;
 
     if (isIkeepay) {
-      // Launch iKeePay Inline Checkout
-      await startIkeepayCheckout(plan);
+      // Prompt user to pick Mobile Money (XAF) or Crypto (USDT)
+      const isXaf = ['XAF', 'XOF', 'FCFA'].includes((plan.currency || '').toUpperCase());
+      if (isXaf) {
+        setMethodModalPlan(plan);
+      } else {
+        await startIkeepayCheckout(plan, 'USD');
+      }
     } else {
       // Fallback to Mobile Money (SebPay/Demo)
       setPayForSebpay(plan);
@@ -237,12 +243,15 @@ export default function Subscription() {
   /**
    * Initiate iKeePay checkout session and load inline iframe
    */
-  const startIkeepayCheckout = async (plan) => {
+  const startIkeepayCheckout = async (plan, paymentCurrency = 'XAF') => {
     setChanging(plan.id);
     setSelectedPlanForIkeepay(plan);
+    setMethodModalPlan(null);
     try {
       const { data } = await paymentApi.initiateIkeepay({
         planId: plan.id,
+        paymentCurrency,
+        paymentMethod: paymentCurrency === 'USDT' ? 'crypto' : 'mobile_money',
         redirectUrl: `${window.location.origin}/dashboard/subscription?status=success`,
       });
 
@@ -701,6 +710,87 @@ export default function Subscription() {
           </div>
         )}
       </Modal>
+      {/* PAYMENT METHOD SELECTION MODAL (Mobile Money vs Crypto USDT) */}
+      {methodModalPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-cyan-400">Paiement Sécurisé iKeePay</span>
+                <h3 className="text-lg font-bold text-white mt-0.5">
+                  Choisir le Mode de Paiement
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMethodModalPlan(null)}
+                className="rounded-lg p-1 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Sélectionnez votre moyen de paiement pour souscrire au <strong>{methodModalPlan.name}</strong> :
+            </p>
+
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                onClick={() => startIkeepayCheckout(methodModalPlan, 'XAF')}
+                className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 text-white transition group shadow-md"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500 text-slate-950 font-black">
+                    <i className="fa-solid fa-mobile-screen text-base"></i>
+                  </div>
+                  <div className="text-left">
+                    <span className="font-bold text-sm block text-white group-hover:text-cyan-300">
+                      Mobile Money / Carte Bancaire
+                    </span>
+                    <span className="text-xs text-slate-400">Orange Money, MTN, Moov, Wave, Visa</span>
+                  </div>
+                </div>
+                <span className="font-mono font-extrabold text-sm text-cyan-400">
+                  {Number(methodModalPlan.promo?.enabled ? methodModalPlan.promo.price : methodModalPlan.price).toLocaleString()} XAF
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => startIkeepayCheckout(methodModalPlan, 'USDT')}
+                className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-white transition group shadow-md"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-black">
+                    <i className="fa-brands fa-bitcoin text-base"></i>
+                  </div>
+                  <div className="text-left">
+                    <span className="font-bold text-sm block text-white group-hover:text-emerald-300">
+                      Cryptomonnaie USDT
+                    </span>
+                    <span className="text-xs text-slate-400">TRC20 / BEP20 (Taux : 1$ = 655 XAF)</span>
+                  </div>
+                </div>
+                <span className="font-mono font-extrabold text-sm text-emerald-400">
+                  ≈ {Math.max(1, Number(((methodModalPlan.promo?.enabled ? methodModalPlan.promo.price : methodModalPlan.price) / 655).toFixed(2)))} USDT
+                </span>
+              </button>
+            </div>
+
+            <div className="pt-2 text-center border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setMethodModalPlan(null)}
+                className="text-xs text-slate-400 hover:text-slate-300 font-semibold"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

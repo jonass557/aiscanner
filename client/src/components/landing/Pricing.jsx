@@ -167,6 +167,7 @@ export default function Pricing() {
       phone: '',
       orderId: '',
       checkoutUrl: '',
+      paymentCurrency: 'XAF',
       loading: false,
       verifying: false,
     });
@@ -193,6 +194,8 @@ export default function Pricing() {
         email: modalState.email,
         fullName: modalState.fullName,
         phone: modalState.phone,
+        paymentCurrency: modalState.paymentCurrency || 'XAF',
+        paymentMethod: modalState.paymentCurrency === 'USDT' ? 'crypto' : 'mobile_money',
       });
 
       const resData = data.data;
@@ -548,6 +551,47 @@ export default function Pricing() {
                       </p>
                     </div>
 
+                    {/* Mode de Paiement : Mobile Money ou Crypto USDT */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                        {isEn ? 'Payment Method:' : 'Mode de paiement :'}
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setModalState((prev) => ({ ...prev, paymentCurrency: 'XAF' }))}
+                          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition ${
+                            modalState.paymentCurrency !== 'USDT'
+                              ? 'border-cyan-500 bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500'
+                              : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-slate-600'
+                          }`}
+                        >
+                          <i className="fa-solid fa-mobile-screen text-xs"></i>
+                          <span>Mobile Money (XAF)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalState((prev) => ({ ...prev, paymentCurrency: 'USDT' }))}
+                          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition ${
+                            modalState.paymentCurrency === 'USDT'
+                              ? 'border-emerald-500 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500'
+                              : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-slate-600'
+                          }`}
+                        >
+                          <i className="fa-brands fa-bitcoin text-xs"></i>
+                          <span>Crypto (USDT)</span>
+                        </button>
+                      </div>
+                      {modalState.paymentCurrency === 'USDT' && (
+                        <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/50 text-[11px] text-emerald-300 font-mono mb-3 flex items-center justify-between">
+                          <span>{isEn ? 'Converted Amount:' : 'Montant Converti :'}</span>
+                          <span className="font-extrabold text-white">
+                            ≈ {Math.max(1, Number(((modalState.plan.promo?.enabled ? modalState.plan.promo.price : modalState.plan.price) / 655).toFixed(2)))} USDT
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                         {isEn ? 'WhatsApp / Phone (for Mobile Money)' : 'Numéro WhatsApp / Téléphone (pour Mobile Money)'}
@@ -579,15 +623,19 @@ export default function Pricing() {
                         <>
                           <Lock className="h-4 w-4" />
                           <span>
-                            {isEn
-                              ? `Pay ${formatPrice(
-                                  modalState.plan.promo?.enabled ? modalState.plan.promo.price : modalState.plan.price,
-                                  modalState.plan.currency
-                                )} with iKeePay`
-                              : `Payer ${formatPrice(
-                                  modalState.plan.promo?.enabled ? modalState.plan.promo.price : modalState.plan.price,
-                                  modalState.plan.currency
-                                )} via iKeePay`}
+                            {modalState.paymentCurrency === 'USDT'
+                              ? (isEn
+                                  ? `Pay ${Math.max(1, Number(((modalState.plan.promo?.enabled ? modalState.plan.promo.price : modalState.plan.price) / 655).toFixed(2)))} USDT with iKeePay`
+                                  : `Payer ${Math.max(1, Number(((modalState.plan.promo?.enabled ? modalState.plan.promo.price : modalState.plan.price) / 655).toFixed(2)))} USDT via iKeePay Crypto`)
+                              : (isEn
+                                  ? `Pay ${formatPrice(
+                                      modalState.plan.promo?.enabled ? modalState.plan.promo.price : modalState.plan.price,
+                                      modalState.plan.currency
+                                    )} with iKeePay`
+                                  : `Payer ${formatPrice(
+                                      modalState.plan.promo?.enabled ? modalState.plan.promo.price : modalState.plan.price,
+                                      modalState.plan.currency
+                                    )} via iKeePay`)}
                           </span>
                         </>
                       )}

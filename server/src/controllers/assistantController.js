@@ -187,8 +187,11 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
     const { analysis } = await analyzeMarketData({
       snapshot,
-      preferences: user.preferences || {},
-      strategy: ctx.strategy,
+      preferences: {
+        ...(user.preferences || {}),
+        customStrategy: text,
+      },
+      strategy: ctx.strategy || 'custom',
       intentParams: intent.params,
     });
 
