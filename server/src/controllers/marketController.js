@@ -24,10 +24,10 @@ export const getSnapshot = asyncHandler(async (req, res) => {
 
   const tf = normalizeTimeframe(timeframe);
   const requestedLimit = Number(req.query.limit);
-  // Support high-depth / multi-year history requests up to 15000 bars for backtesting
+  // Support high-depth / multi-year history requests up to 25000 bars for backtesting (from year 2000 to present)
   const candleLimit = requestedLimit === 0 || req.query.limit === 'max'
-    ? 15000
-    : Math.min(Math.max(requestedLimit || 200, 30), 15000);
+    ? 25000
+    : Math.min(Math.max(requestedLimit || 200, 30), 25000);
 
   const cacheKey = `${String(symbol).toUpperCase()}|${tf}|${candleLimit}`;
   const now = Date.now();

@@ -97,6 +97,15 @@ export default function AssistantChat() {
       const clean = String(text || '').trim();
       if (!clean || sending) return;
 
+      // Unlock speech synthesis immediately on user gesture to prevent browser autoplay blocking
+      if (ttsOn && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          const primer = new SpeechSynthesisUtterance('');
+          primer.volume = 0.01;
+          window.speechSynthesis.speak(primer);
+        } catch {}
+      }
+
       setMessages((m) => [...(Array.isArray(m) ? m : []), { role: 'user', content: clean }]);
       setInput('');
       setSending(true);
@@ -123,7 +132,7 @@ export default function AssistantChat() {
           },
         ]);
         if (ttsOn && res.reply) {
-          speak(res.reply);
+          speak(res.reply, lang === 'en' ? 'en-US' : 'fr-FR');
         }
         loadList();
       } catch (err) {
@@ -296,7 +305,7 @@ export default function AssistantChat() {
           )}
 
           {(messages || []).map((m, i) => (
-            <AssistantMessage key={i} message={m} />
+            <AssistantMessage key={i} message={m} onSpeak={speak} />
           ))}
 
           {interim && (

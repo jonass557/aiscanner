@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Hook vocal avancé avec support mains-libres continu (Hands-Free Continuous Voice).
- * Permet à l'utilisateur de parler à l'IA en continu sans avoir à appuyer sur le micro :
- * - Détection automatique de fin de parole (VAD silence 1.2s)
- * - Boucle de réécoute automatique en mode mains libres
- * - Mise en pause automatique du micro pendant que l'IA parle (évite l'écho)
- * - Reprise instantanée de l'écoute dès que l'IA a fini de parler
+ * Hook vocal avancé avec support mains-libres continu (Hands-Free Continuous Voice)
+ * et synthèse vocale ininterrompue de haute qualité (anti-coupure Chrome / Android / iOS).
+ *
+ * Résout définitivement :
+ * - Le problème des arrêts intempestifs en cours de route (anti-timeout & anti-freeze)
+ * - La suppression des coupures sur les nombres à virgule (ex: 1.1234, 78.9, 2.5)
+ * - La compatibilité avec les politiques d'autoplay des navigateurs mobiles
+ * - Le basculement automatique sur la meilleure voix naturelle disponible
  */
 export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [interim, setInterim] = useState('');
   const [handsFree, setHandsFree] = useState(false);
 
@@ -28,11 +31,30 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
   const accumulatedTranscriptRef = useRef('');
   const shouldListenRef = useRef(false);
 
+  const queueRef = useRef([]);
+  const manualCancelRef = useRef(false);
+  const watchdogTimerRef = useRef(null);
+  const voicesRef = useRef([]);
+
   const SpeechRecognition =
     typeof window !== 'undefined' &&
     (window.SpeechRecognition || window.webkitSpeechRecognition);
   const synthSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
   const supported = Boolean(SpeechRecognition);
+
+  // Charger et mettre en cache les voix système
+  useEffect(() => {
+    if (!synthSupported) return;
+    const updateVoices = () => {
+      try {
+        voicesRef.current = window.speechSynthesis.getVoices() || [];
+      } catch {}
+    };
+    updateVoices();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, [synthSupported]);
 
   const initRecognition = useCallback(() => {
     if (!SpeechRecognition) return null;
@@ -55,13 +77,10 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
         if (speakingRef.current) return; // ignorer si l'IA parle
 
         let interimText = '';
-        let hasFinal = false;
-
         for (let i = event.resultIndex; i < event.results.length; i += 1) {
           const chunk = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             accumulatedTranscriptRef.current += ' ' + chunk;
-            hasFinal = true;
           } else {
             interimText += chunk;
           }
@@ -69,10 +88,8 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
 
         setInterim(interimText || accumulatedTranscriptRef.current.trim());
 
-        // Réinitialiser le timer de silence
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
-        // Si silence de 1.3s ou segment final, valider et envoyer à l'IA
         silenceTimerRef.current = setTimeout(() => {
           const fullText = (accumulatedTranscriptRef.current + ' ' + interimText).trim();
           if (fullText.length > 2) {
@@ -131,9 +148,7 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
     accumulatedTranscriptRef.current = '';
     try {
       recognitionRef.current.start();
-    } catch {
-      // Ignorer si déjà démarré
-    }
+    } catch {}
   }, [initRecognition]);
 
   const stopListening = useCallback(() => {
@@ -159,34 +174,21 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
     });
   }, [startListening, stopListening]);
 
-  const [isPaused, setIsPaused] = useState(false);
-  const queueRef = useRef([]);
-  const keepAliveTimerRef = useRef(null);
-
-  const startKeepAlive = () => {
-    if (keepAliveTimerRef.current) clearInterval(keepAliveTimerRef.current);
-    keepAliveTimerRef.current = setInterval(() => {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-          window.speechSynthesis.pause();
-          window.speechSynthesis.resume();
-        }
-      }
-    }, 10000);
-  };
-
-  const stopKeepAlive = () => {
-    if (keepAliveTimerRef.current) {
-      clearInterval(keepAliveTimerRef.current);
-      keepAliveTimerRef.current = null;
+  const stopWatchdog = () => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
     }
   };
 
   const cancelSpeech = useCallback(() => {
-    stopKeepAlive();
+    manualCancelRef.current = true;
+    stopWatchdog();
     queueRef.current = [];
     if (synthSupported) {
-      window.speechSynthesis.cancel();
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
     }
     setSpeaking(false);
     setIsPaused(false);
@@ -207,28 +209,93 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
     }
   }, [synthSupported]);
 
+  /**
+   * Synthèse vocale continue, naturelle et ininterrompue
+   */
   const speak = useCallback(
     (text, customLang) => {
       if (!synthSupported || !text) return;
 
-      cancelSpeech();
+      manualCancelRef.current = false;
+      stopWatchdog();
+      queueRef.current = [];
 
-      // Clean markdown, brackets, and code blocks for fluid spoken output
-      const clean = String(text)
-        .replace(/```[\s\S]*?```/g, '') // strip full code blocks
+      // Annuler toute lecture précédente
+      try {
+        if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+          window.speechSynthesis.cancel();
+        }
+      } catch {}
+
+      // Nettoyer et transcrire le texte pour une prononciation fluide et humaine
+      let clean = String(text)
+        .replace(/```[\s\S]*?```/g, '') // supprimer les blocs de code
         .replace(/[#*_~`]/g, '')
+        .replace(/https?:\/\/\S+/g, '') // supprimer les URLs
         .replace(/\[.*?\]\(.*?\)/g, '')
         .replace(/\[.*?\]/g, '')
         .replace(/(\r\n|\n|\r)/gm, ' ')
-        .replace(/\s+/g, ' ')
         .trim();
 
       if (!clean) return;
 
-      // Break into natural sentences for continuous, non-stopping speech
-      const sentenceRegex = /[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g;
-      const rawSentences = clean.match(sentenceRegex) || [clean];
-      const sentences = rawSentences.map((s) => s.trim()).filter((s) => s.length > 0);
+      // Détecter la langue
+      const isEnglish =
+        customLang === 'en' ||
+        customLang === 'en-US' ||
+        (/^[a-zA-Z0-9\s,.'!?-]+$/.test(clean) &&
+          (clean.includes('the ') || clean.includes('is ') || clean.includes('trading ') || clean.includes('market ')));
+      const targetLang = customLang || (isEnglish ? 'en-US' : lang || 'fr-FR');
+
+      // Prononciation optimisée pour le trading et la finance
+      if (!isEnglish) {
+        clean = clean
+          .replace(/(\d+)\.(\d+)/g, '$1 virgule $2') // ex: 1.1234 -> 1 virgule 1234
+          .replace(/TP1\s*\/\s*TP2\s*\/\s*TP3/gi, 'Take Profit 1, 2 et 3')
+          .replace(/TP1\s*\/\s*2\s*\/\s*3/gi, 'Take Profit 1, 2 et 3')
+          .replace(/TP\s*1\s*\/\s*2/gi, 'Take Profit 1 et 2')
+          .replace(/R:R\s*:\s*([0-9.,]+)/gi, 'Ratio Risque Rendement de $1')
+          .replace(/\bR:R\b/gi, 'Ratio Risque Rendement')
+          .replace(/\bSL\b/g, 'Stop Loss')
+          .replace(/\bTP\b/g, 'Take Profit')
+          .replace(/%/g, ' pour cent')
+          .replace(/\$/g, ' dollars')
+          .replace(/•/g, ' ')
+          .replace(/-/g, ' ');
+      } else {
+        clean = clean
+          .replace(/(\d+)\.(\d+)/g, '$1 point $2')
+          .replace(/TP1\s*\/\s*TP2\s*\/\s*TP3/gi, 'Take Profit 1, 2 and 3')
+          .replace(/TP1\s*\/\s*2\s*\/\s*3/gi, 'Take Profit 1, 2 and 3')
+          .replace(/R:R\s*:\s*([0-9.,]+)/gi, 'Risk to Reward of $1')
+          .replace(/\bR:R\b/gi, 'Risk to Reward ratio')
+          .replace(/\bSL\b/g, 'Stop Loss')
+          .replace(/\bTP\b/g, 'Take Profit')
+          .replace(/%/g, ' percent')
+          .replace(/\$/g, ' dollars');
+      }
+
+      // Nettoyer les espaces multiples
+      clean = clean.replace(/\s+/g, ' ').trim();
+
+      // Découper en segments courts (30 à 110 caractères) sur les séparateurs naturels
+      const rawChunks = clean.split(/(?<=[.!?;\n])\s+/);
+      const sentences = [];
+
+      for (const piece of rawChunks) {
+        const trimmed = piece.trim();
+        if (!trimmed) continue;
+        if (trimmed.length > 130) {
+          // Si le segment est trop long, découper sur les virgules ou deux-points
+          const sub = trimmed.split(/(?<=[,:])\s+/);
+          for (const s of sub) {
+            const str = s.trim();
+            if (str) sentences.push(str);
+          }
+        } else {
+          sentences.push(trimmed);
+        }
+      }
 
       if (sentences.length === 0) return;
 
@@ -236,67 +303,102 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
       setSpeaking(true);
       setIsPaused(false);
       speakingRef.current = true;
-      startKeepAlive();
 
-      // Detect English vs French if not explicitly passed
-      const targetLang =
-        customLang ||
-        (/^[a-zA-Z0-9\s,.'!?-]+$/.test(clean) &&
-        (clean.includes('the ') || clean.includes('is ') || clean.includes('trading ') || clean.includes('market '))
-          ? 'en-US'
-          : lang || 'fr-FR');
+      // Recherche de la meilleure voix naturelle disponible
+      const allVoices = voicesRef.current.length > 0
+        ? voicesRef.current
+        : (typeof window !== 'undefined' && window.speechSynthesis.getVoices()) || [];
+      const langPrefix = targetLang.split('-')[0].toLowerCase();
+
+      const matchedVoice =
+        allVoices.find((v) => v.lang && v.lang.toLowerCase() === targetLang.toLowerCase() && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Premium'))) ||
+        allVoices.find((v) => v.lang && v.lang.toLowerCase().startsWith(langPrefix) && (v.name.includes('Google') || v.name.includes('Natural'))) ||
+        allVoices.find((v) => v.lang && v.lang.toLowerCase().startsWith(langPrefix)) ||
+        null;
 
       const playNextSentence = () => {
+        if (manualCancelRef.current) return;
+
         if (!queueRef.current || queueRef.current.length === 0) {
-          stopKeepAlive();
+          stopWatchdog();
           setSpeaking(false);
           setIsPaused(false);
           speakingRef.current = false;
 
-          // If hands-free mode is on, resume listening automatically
+          // Si le mode mains-libres est actif, reprendre l'écoute micro
           if (shouldListenRef.current && handsFreeRef.current) {
             setTimeout(() => {
-              if (shouldListenRef.current && handsFreeRef.current) {
+              if (shouldListenRef.current && handsFreeRef.current && !speakingRef.current) {
                 startListening();
               }
-            }, 400);
+            }, 350);
           }
           return;
         }
 
         const sentence = queueRef.current.shift();
+        if (!sentence || sentence.trim().length === 0) {
+          playNextSentence();
+          return;
+        }
+
         const utter = new SpeechSynthesisUtterance(sentence);
-        // CRITICAL FIX: Retain active utterance on window to prevent Chrome V8 garbage-collecting it mid-speech
+        if (matchedVoice) utter.voice = matchedVoice;
+        utter.lang = targetLang;
+        utter.rate = 1.02; // Cadence fluide et claire
+        utter.pitch = 1.0;
+
+        // Prévenir le garbage-collector Chrome V8
         if (typeof window !== 'undefined') {
           window.__activeSpeechUtterance = utter;
         }
-        utter.lang = targetLang;
-        utter.rate = 1.05; // clear, comfortable educational cadence
-        utter.pitch = 1.0;
+
+        // Watchdog de sécurité (si un segment freeze plus de 12s, passer au suivant)
+        stopWatchdog();
+        watchdogTimerRef.current = setTimeout(() => {
+          if (speakingRef.current && !manualCancelRef.current) {
+            playNextSentence();
+          }
+        }, 12000);
 
         utter.onend = () => {
+          stopWatchdog();
           if (typeof window !== 'undefined') window.__activeSpeechUtterance = null;
-          playNextSentence();
+          if (!manualCancelRef.current) {
+            setTimeout(() => playNextSentence(), 30);
+          }
         };
 
         utter.onerror = (e) => {
+          stopWatchdog();
           if (typeof window !== 'undefined') window.__activeSpeechUtterance = null;
-          if (e.error !== 'canceled' && e.error !== 'interrupted') {
-            playNextSentence();
+          // Continuer systématiquement la lecture du texte même si une erreur survient
+          if (!manualCancelRef.current && e.error !== 'canceled') {
+            setTimeout(() => playNextSentence(), 35);
           }
         };
 
         try {
           window.speechSynthesis.speak(utter);
+          // Si le navigateur est en pause inattendue, le débloquer
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
         } catch {
-          if (typeof window !== 'undefined') window.__activeSpeechUtterance = null;
-          playNextSentence();
+          if (!manualCancelRef.current) {
+            setTimeout(() => playNextSentence(), 35);
+          }
         }
       };
 
-      playNextSentence();
+      // Délai de 60ms pour laisser le pipeline audio du navigateur se réinitialiser proprement
+      setTimeout(() => {
+        if (!manualCancelRef.current) {
+          playNextSentence();
+        }
+      }, 60);
     },
-    [synthSupported, lang, startListening, cancelSpeech]
+    [synthSupported, lang, startListening]
   );
 
   return {

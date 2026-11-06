@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Radio, FlaskConical, ListChecks, ShieldAlert, ChevronDown } from 'lucide-react';
+import { Sparkles, Radio, FlaskConical, ListChecks, ShieldAlert, ChevronDown, Volume2 } from 'lucide-react';
 import DecisionCard from '../analysis/DecisionCard.jsx';
 import LiveChart from '../analysis/LiveChart.jsx';
 import TradePlanCard from '../analysis/TradePlanCard.jsx';
@@ -16,7 +16,7 @@ import { renderMarkdown } from '../../utils/markdown.jsx';
  *   market analysis (analysisId) — a rich, lazily-fetched analysis card
  *   (decision + trade plan + step-by-step reasoning + risks).
  */
-export default function AssistantMessage({ message }) {
+export default function AssistantMessage({ message, onSpeak }) {
   const isUser = message.role === 'user';
   const analysisId = message.analysisId || message.analysisIds?.[0] || null;
 
@@ -57,18 +57,31 @@ export default function AssistantMessage({ message }) {
             {renderMarkdown(message.content)}
           </div>
 
-          {/* Data-source badge */}
-          {message.dataSource && (
-            <div className="mt-2">
-              <Badge tone={message.isRealData ? 'green' : 'yellow'}>
-                {message.isRealData ? (
-                  <><Radio className="h-3 w-3" /> Temps réel · {message.dataSource}</>
-                ) : (
-                  <><FlaskConical className="h-3 w-3" /> Simulé · {message.dataSource}</>
-                )}
-              </Badge>
+          {/* Data-source badge & audio replay button */}
+          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-gray-200/50 dark:border-gray-700/50 pt-2">
+            <div>
+              {message.dataSource && (
+                <Badge tone={message.isRealData ? 'green' : 'yellow'}>
+                  {message.isRealData ? (
+                    <><Radio className="h-3 w-3" /> Temps réel · {message.dataSource}</>
+                  ) : (
+                    <><FlaskConical className="h-3 w-3" /> Simulé · {message.dataSource}</>
+                  )}
+                </Badge>
+              )}
             </div>
-          )}
+            {onSpeak && message.content && (
+              <button
+                type="button"
+                onClick={() => onSpeak(message.content)}
+                className="flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400 hover:underline font-semibold"
+                title="Écouter l'analyse à voix haute"
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+                <span>Écouter</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Rich analysis card */}

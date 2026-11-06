@@ -251,11 +251,11 @@ export const generateRealisticCandles = (
   let totalBars = count;
 
   if (startSec && endSec && endSec > startSec) {
-    totalBars = Math.max(30, Math.min(Math.floor((endSec - startSec) / tfSec), 15000));
+    totalBars = Math.max(30, Math.min(Math.floor((endSec - startSec) / tfSec), 25000));
   } else if (startSec) {
-    totalBars = Math.max(30, Math.min(count, 15000));
+    totalBars = Math.max(30, Math.min(count, 25000));
   } else {
-    totalBars = Math.max(50, Math.min(count, 15000));
+    totalBars = Math.max(50, Math.min(count, 25000));
     startSec = endSec - totalBars * tfSec;
   }
 

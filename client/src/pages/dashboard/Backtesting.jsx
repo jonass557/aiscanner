@@ -316,7 +316,7 @@ export default function Backtesting() {
   const [timeframe, setTimeframe] = useState(() => {
     return localStorage.getItem('backtest_timeframe') || 'H1';
   });
-  const [candleLimit, setCandleLimit] = useState(5000); // 5000 deep historical bars spanning years of price action
+  const [candleLimit, setCandleLimit] = useState(15000); // 15000 deep multi-year historical bars spanning from 2000 to present
 
   useEffect(() => {
     localStorage.setItem('backtest_category', selectedCategory);
@@ -674,20 +674,20 @@ export default function Backtesting() {
     if (applyRangeData(allCandles)) return;
 
     marketApi
-      .snapshot(selectedPair.symbol, timeframe, 15000)
+      .snapshot(selectedPair.symbol, timeframe, 25000)
       .then(({ data }) => {
         const raw = data?.data?.market?.candles || data?.data?.candles || [];
         const sorted =
           raw.length > 0
             ? sanitizeCandles(raw, selectedPair.base)
-            : generateRealisticCandles(selectedPair.base, timeframe, 5000, startSec, endSec);
+            : generateRealisticCandles(selectedPair.base, timeframe, 15000, startSec, endSec);
         if (!applyRangeData(sorted)) {
-          const continuous = generateRealisticCandles(selectedPair.base, timeframe, 3500, startSec, endSec);
+          const continuous = generateRealisticCandles(selectedPair.base, timeframe, 15000, startSec, endSec);
           applyRangeData(continuous);
         }
       })
       .catch(() => {
-        const continuous = generateRealisticCandles(selectedPair.base, timeframe, 3500, startSec, endSec);
+        const continuous = generateRealisticCandles(selectedPair.base, timeframe, 15000, startSec, endSec);
         applyRangeData(continuous);
       });
   };
@@ -4259,10 +4259,12 @@ export default function Backtesting() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
-                  Date de Début
+                  Date de Début (depuis l'an 2000)
                 </label>
                 <input
                   type="date"
+                  min="2000-01-01"
+                  max={new Date().toISOString().slice(0, 10)}
                   value={modalStartDate}
                   onChange={(e) => setModalStartDate(e.target.value)}
                   className="w-full rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -4274,6 +4276,8 @@ export default function Backtesting() {
                 </label>
                 <input
                   type="date"
+                  min="2000-01-01"
+                  max={new Date().toISOString().slice(0, 10)}
                   value={modalEndDate}
                   onChange={(e) => setModalEndDate(e.target.value)}
                   className="w-full rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -4284,27 +4288,32 @@ export default function Backtesting() {
             {/* Quick Presets */}
             <div className="space-y-1.5">
               <span className="text-[10px] uppercase font-bold text-gray-500">Périodes prédéfinies :</span>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                 {[
-                  { label: '30 Jours', days: 30 },
-                  { label: '3 Mois', days: 90 },
-                  { label: '6 Mois', days: 180 },
-                  { label: '1 An', days: 365 },
-                  { label: '2 Ans', days: 730 },
+                  { label: 'Depuis 2000 (26+ Ans)', from2000: true },
+                  { label: 'Ère 2000 - 2008', customRange: ['2000-01-01', '2008-12-31'] },
+                  { label: 'Ère 2008 - 2016', customRange: ['2008-01-01', '2016-12-31'] },
+                  { label: 'Ère 2016 - 2020', customRange: ['2016-01-01', '2020-12-31'] },
                   { label: '5 Ans (2021-2026)', days: 1825 },
+                  { label: '2 Ans (2024-2026)', days: 730 },
+                  { label: '1 An Récents', days: 365 },
+                  { label: '6 Mois Récents', days: 180 },
+                  { label: '3 Mois Récents', days: 90 },
                   { label: 'Année 2024', year: 2024 },
                   { label: 'Année 2025', year: 2025 },
-                  { label: 'Année 2026', year: 2026 },
-                  { label: 'Historique Complet', all: true },
+                  { label: 'Historique Complet (2000-Présent)', all: true },
                 ].map((p, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => {
                       const now = new Date();
-                      if (p.all) {
-                        setModalStartDate('2020-01-01');
+                      if (p.all || p.from2000) {
+                        setModalStartDate('2000-01-01');
                         setModalEndDate(now.toISOString().slice(0, 10));
+                      } else if (p.customRange) {
+                        setModalStartDate(p.customRange[0]);
+                        setModalEndDate(p.customRange[1]);
                       } else if (p.year) {
                         setModalStartDate(`${p.year}-01-01`);
                         setModalEndDate(`${p.year}-12-31`);

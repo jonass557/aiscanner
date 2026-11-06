@@ -360,8 +360,8 @@ export class LiveMarketProvider extends BaseMarketProvider {
     if (interval === '1m') range = fetchLimit > 200 ? '7d' : '2d';
     else if (interval === '2m' || interval === '5m') range = fetchLimit > 300 ? '30d' : '5d';
     else if (interval === '15m' || interval === '30m') range = fetchLimit > 1000 ? '60d' : fetchLimit > 300 ? '30d' : '10d';
-    else if (interval === '1h') range = fetchLimit > 3000 ? '1y' : fetchLimit > 1500 ? '6mo' : fetchLimit > 500 ? '3mo' : '1mo';
-    else if (interval === '1d') range = fetchLimit > 500 ? '5y' : '2y';
+    else if (interval === '1h') range = fetchLimit > 3000 ? '2y' : fetchLimit > 1500 ? '1y' : fetchLimit > 500 ? '3mo' : '1mo';
+    else if (interval === '1d') range = fetchLimit >= 1000 ? 'max' : fetchLimit > 500 ? '5y' : '2y';
     else if (interval === '1wk' || interval === '1mo') range = 'max';
 
     const result = await this._fetchChart(ticker, interval, range);
