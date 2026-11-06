@@ -426,9 +426,11 @@ export default function ManagedTrading() {
           managedTradingApi.getPositions(),
           managedTradingApi.getBrokerAccounts(),
         ]);
+        let freshPositions = openPositions;
         if (isMounted) {
           if (posRes.status === 'fulfilled' && posRes.value?.data?.data?.positions) {
-            setOpenPositions(posRes.value.data.data.positions);
+            freshPositions = posRes.value.data.data.positions;
+            setOpenPositions(freshPositions);
           }
           if (accRes.status === 'fulfilled' && accRes.value?.data?.data?.accounts) {
             setBrokerAccounts(accRes.value.data.data.accounts);
@@ -436,7 +438,7 @@ export default function ManagedTrading() {
         }
 
         // Fetch live market snapshots for all active position symbols
-        const symbols = [...new Set(openPositions.map((p) => p.symbol).filter(Boolean))];
+        const symbols = [...new Set(freshPositions.map((p) => p.symbol).filter(Boolean))];
         for (const sym of symbols) {
           try {
             const snap = await marketApi.snapshot(sym, 'H1', 5);
@@ -2048,8 +2050,8 @@ export default function ManagedTrading() {
                   </div>
                 </div>
 
-                {/* MOBILE POSITION CARDS (Shown on small screens to prevent cut-off values) */}
-                <div className="md:hidden space-y-3">
+                {/* MOBILE & TABLET POSITION CARDS (Always visible on mobile/tablets to prevent cut-off values) */}
+                <div className="lg:hidden space-y-3">
                   {openPositions.map((pos) => {
                     const m = getLivePositionMetrics(pos);
                     const { curPrice, entryPrice, pnl, pnlPercent: pnlPct, isProfit } = m;
@@ -2130,8 +2132,8 @@ export default function ManagedTrading() {
                 </div>
 
                 {/* Table of Open Positions for Desktop */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left text-xs whitespace-nowrap">
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="w-full min-w-[850px] text-left text-xs whitespace-nowrap">
                     <thead className="text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
                       <tr>
                         <th className="py-2.5 px-3">Ticket</th>

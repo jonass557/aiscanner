@@ -350,6 +350,17 @@ export default function ChartVision() {
           timeVisible: true,
           secondsVisible: false,
         },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: false, // Permet le défilement vertical fluide sur mobile
+        },
+        handleScale: {
+          axisPressedMouseMove: { time: true, price: true },
+          mouseWheel: true,
+          pinch: true,
+        },
       });
 
       const series = chart.addSeries(CandlestickSeries, {
@@ -1109,7 +1120,7 @@ export default function ChartVision() {
             )}
 
             {/* The Lightweight Charts DOM element */}
-            <div ref={chartContainerRef} className="h-full min-h-[580px] lg:min-h-[700px] w-full" />
+            <div ref={chartContainerRef} className="h-full min-h-[420px] sm:min-h-[520px] lg:min-h-[680px] w-full" />
           </div>
 
           {/* Bottom Chart Footer with Price Stats */}

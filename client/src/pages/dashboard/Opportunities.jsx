@@ -903,11 +903,12 @@ export default function Opportunities() {
               <LiveChart
                 symbol={selected.symbol}
                 timeframe={selected.timeframe}
+                decision={selected.direction}
+                singleSignalMode={true}
                 tradePlan={{
                   entry: selected.entry,
                   stopLoss: selected.stopLoss,
                   takeProfit1: selected.takeProfit1,
-                  takeProfit2: selected.takeProfit2,
                 }}
               />
             </div>

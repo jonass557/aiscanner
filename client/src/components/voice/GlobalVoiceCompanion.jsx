@@ -79,31 +79,33 @@ export default function GlobalVoiceCompanion() {
 
   return (
     <>
-      {/* Floating Trigger Pill */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Floating Trigger Button: compact circular on mobile to avoid blocking screen / colliding with WhatsApp */}
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setOpen(!open)}
-          className={`flex items-center gap-2.5 rounded-full px-4 py-3 font-semibold shadow-2xl backdrop-blur-xl transition ${
+          aria-label="Copilote Vocal IA"
+          title="Copilote Vocal IA"
+          className={`flex items-center justify-center gap-2 rounded-full p-2.5 sm:px-3.5 sm:py-2.5 font-semibold shadow-xl backdrop-blur-xl transition ${
             handsFree && listening
               ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300 shadow-cyan-500/40 animate-pulse'
               : 'border border-slate-700 bg-slate-900/90 text-white hover:border-cyan-500/50 hover:bg-slate-800'
           }`}
         >
-          <div className="relative flex h-3 w-3">
+          <div className="relative flex h-2.5 w-2.5">
             {(listening || handsFree) && (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
             )}
             <span
-              className={`relative inline-flex h-3 w-3 rounded-full ${
+              className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
                 listening ? 'bg-cyan-400' : handsFree ? 'bg-emerald-400' : 'bg-slate-500'
               }`}
             />
           </div>
-          <Sparkles className="h-4 w-4 text-cyan-400" />
-          <span className="text-xs uppercase tracking-wider">
-            {handsFree ? 'IA Mains Libres Active' : 'Copilote Vocal IA'}
+          <Sparkles className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+          <span className="hidden sm:inline text-xs uppercase tracking-wider">
+            {handsFree ? 'IA Mains Libres' : 'Copilote Vocal'}
           </span>
         </motion.button>
       </div>
@@ -115,7 +117,7 @@ export default function GlobalVoiceCompanion() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-3rem)] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-2xl"
+            className="fixed bottom-32 right-4 sm:bottom-20 sm:right-6 z-50 w-80 sm:w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">

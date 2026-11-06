@@ -47,6 +47,21 @@ const POPULAR_SYMBOLS = [
   'CRASH1000',
 ];
 
+export const normalizeTimeframe = (tf) => {
+  if (!tf || tf === 'Unknown') return '1h';
+  const raw = String(tf).trim().toLowerCase();
+  if (raw === 'm1' || raw === '1m') return '1m';
+  if (raw === 'm5' || raw === '5m') return '5m';
+  if (raw === 'm15' || raw === '15m') return '15m';
+  if (raw === 'm30' || raw === '30m') return '30m';
+  if (raw === 'h1' || raw === '1h') return '1h';
+  if (raw === 'h2' || raw === '2h') return '2h';
+  if (raw === 'h4' || raw === '4h') return '4h';
+  if (raw === 'd1' || raw === '1d' || raw === 'daily') return '1d';
+  if (raw === 'w1' || raw === '1w' || raw === 'weekly') return '1w';
+  return raw;
+};
+
 const TIMEFRAMES = [
   { id: '5m', label: 'M5' },
   { id: '15m', label: 'M15' },
@@ -63,6 +78,7 @@ export default function LiveChart({
   decision,
   strategy,
   analysis,
+  singleSignalMode = false,
 }) {
   // Normalize symbol: clean slashes, default to EUR/USD if Unknown
   const normalizedInitialSymbol = useMemo(() => {
@@ -75,7 +91,7 @@ export default function LiveChart({
   }, [initialSymbol]);
 
   const [activeSymbol, setActiveSymbol] = useState(normalizedInitialSymbol);
-  const [activeTf, setActiveTf] = useState(initialTf && initialTf !== 'Unknown' ? initialTf.toLowerCase() : '1h');
+  const [activeTf, setActiveTf] = useState(normalizeTimeframe(initialTf));
 
   // Synchronize when parent passes new symbol or timeframe
   useEffect(() => {
@@ -86,7 +102,7 @@ export default function LiveChart({
 
   useEffect(() => {
     if (initialTf && initialTf !== 'Unknown') {
-      setActiveTf(initialTf.toLowerCase());
+      setActiveTf(normalizeTimeframe(initialTf));
     }
   }, [initialTf]);
   const [candles, setCandles] = useState([]);
@@ -251,6 +267,17 @@ export default function LiveChart({
           timeVisible: true,
           secondsVisible: false,
         },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: false, // Allows natural vertical page scrolling on mobile
+        },
+        handleScale: {
+          axisPressedMouseMove: { time: true, price: true },
+          mouseWheel: true,
+          pinch: true,
+        },
       });
 
       const series = chart.addSeries(CandlestickSeries, {
@@ -297,7 +324,61 @@ export default function LiveChart({
     }
     clearChartLines();
 
+    const hasExplicitSignal = Boolean(
+      singleSignalMode ||
+      (tradePlan?.entry && (tradePlan?.stopLoss || tradePlan?.sl))
+    );
+
     if (autoTrace && strategicOverlay) {
+      if (hasExplicitSignal) {
+        // Mode Signal Robot : afficher UNIQUEMENT le point d'entrée, le SL et le TP du signal correspondant
+        const entryVal = Number(tradePlan?.entry || strategicOverlay.entry);
+        const slVal = Number(tradePlan?.stopLoss || tradePlan?.sl || strategicOverlay.sl);
+        const tpVal = Number(tradePlan?.takeProfit || tradePlan?.takeProfit1 || tradePlan?.tp || strategicOverlay.tp1);
+        const signalDir = tradePlan?.direction || decision || strategicOverlay.direction || 'BUY';
+
+        if (entryVal && !isNaN(entryVal)) {
+          const lineEntry = seriesRef.current.createPriceLine({
+            price: entryVal,
+            color: '#2563eb',
+            lineWidth: 2,
+            lineStyle: LineStyle.Solid,
+            axisLabelVisible: true,
+            title: getLineTitle(
+              signalDir === 'BUY' ? '▲ ENTRÉE' : '▼ ENTRÉE',
+              `ENTRÉE ${signalDir} (${entryVal})`
+            ),
+          });
+          linesRef.current.push(lineEntry);
+        }
+
+        if (slVal && !isNaN(slVal)) {
+          const lineSl = seriesRef.current.createPriceLine({
+            price: slVal,
+            color: '#dc2626',
+            lineWidth: 2,
+            lineStyle: LineStyle.Solid,
+            axisLabelVisible: true,
+            title: getLineTitle('STOP LOSS', `STOP LOSS (${slVal})`),
+          });
+          linesRef.current.push(lineSl);
+        }
+
+        if (tpVal && !isNaN(tpVal)) {
+          const lineTp = seriesRef.current.createPriceLine({
+            price: tpVal,
+            color: '#16a34a',
+            lineWidth: 2,
+            lineStyle: LineStyle.Solid,
+            axisLabelVisible: true,
+            title: getLineTitle('TAKE PROFIT', `TAKE PROFIT (${tpVal})`),
+          });
+          linesRef.current.push(lineTp);
+        }
+
+        // Nettoyer les zones de supply/demand pour ne pas encombrer le signal
+        setZoneBoxes({ supply: null, demand: null });
+      } else {
       // 1. Supply Zone (clean top tag, leave inner zone clear)
       if (strategicOverlay.supplyZone) {
         const top = seriesRef.current.createPriceLine({
@@ -428,8 +509,9 @@ export default function LiveChart({
       } catch {
         // ignore
       }
+      } // end else hasExplicitSignal
     }
-  }, [candles, strategicOverlay, autoTrace, labelMode, getLineTitle]);
+  }, [candles, strategicOverlay, autoTrace, labelMode, getLineTitle, singleSignalMode]);
 
   const lastBar = candles[candles.length - 1];
 

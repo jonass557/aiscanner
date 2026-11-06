@@ -198,6 +198,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     // Persist to the unified analysis history (source=assistant).
     const saved = await Analysis.create({
       userId: user._id,
+      imageUrl: analysis.imageUrl || '',
       symbol: analysis.symbol,
       market: analysis.market,
       timeframe: analysis.timeframe,
@@ -254,6 +255,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
       });
       const saved = await Analysis.create({
         userId: user._id,
+        imageUrl: analysis.imageUrl || '',
         symbol: analysis.symbol,
         market: analysis.market,
         timeframe: analysis.timeframe,

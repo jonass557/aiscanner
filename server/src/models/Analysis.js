@@ -50,7 +50,7 @@ const analysisSchema = new mongoose.Schema(
     },
 
     // Image
-    imageUrl: { type: String, required: true },
+    imageUrl: { type: String, default: '' },
     imagePublicId: String,
 
     // Auto-recognition
