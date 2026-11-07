@@ -406,7 +406,13 @@ export default function Pricing() {
                 <div className="mt-8 pt-4">
                   <button
                     type="button"
-                    onClick={() => openCheckout(plan)}
+                    onClick={() => {
+                      if (hasTrial) {
+                        navigate(`/register?plan=${plan.id}&trial=true`);
+                      } else {
+                        openCheckout(plan);
+                      }
+                    }}
                     className={`flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-black transition-all ${
                       highlighted
                         ? 'bg-gradient-to-r from-cyan-500 via-teal-400 to-indigo-600 text-slate-950 shadow-xl shadow-cyan-500/25 hover:brightness-110 active:scale-95'

@@ -25,9 +25,24 @@ import { logAuth } from '../services/logService.js';
  * Creates an account, sends a verification email, returns tokens.
  */
 export const register = asyncHandler(async (req, res) => {
-  const { email, password, firstName, lastName, plan: requestedPlan, deviceFingerprint: rawFp, orderId, referralCode: reqRef, ref: queryRef } = req.body;
+  const {
+    email,
+    password,
+    firstName,
+    lastName,
+    phone,
+    plan: requestedPlan,
+    deviceFingerprint: rawFp,
+    orderId,
+    referralCode: reqRef,
+    ref: queryRef,
+  } = req.body;
 
-  const existing = await User.findOne({ email: email.toLowerCase().trim() });
+  const normalizedEmail = String(email || '').toLowerCase().trim();
+  const rawPhone = String(phone || '').trim();
+  const normalizedPhone = rawPhone.replace(/[^\d+]/g, '');
+
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) throw ApiError.conflict('Un compte avec cet email existe déjà.');
 
   let paidOrder = null;
@@ -49,6 +64,24 @@ export const register = asyncHandler(async (req, res) => {
 
   // --- Système Anti-Abus Free Trial (uniquement si l'utilisateur ne souscrit pas à un ordre payé) ---
   if (!isPaidSubscriber) {
+    // 1. Contrôle Anti-Abus Téléphone
+    if (normalizedPhone && normalizedPhone.length >= 8) {
+      const existingPhoneTrial = await User.findOne({
+        phone: normalizedPhone,
+        $or: [
+          { 'trial.isUsed': true },
+          { 'trial.isActive': true },
+          { 'trial.startedAt': { $ne: null } },
+        ],
+      });
+      if (existingPhoneTrial) {
+        throw ApiError.forbidden(
+          "Ce numéro de téléphone a déjà bénéficié d'un essai gratuit. Veuillez vous connecter ou souscrire directement à un abonnement."
+        );
+      }
+    }
+
+    // 2. Contrôle Anti-Abus Empreinte Appareil et Réseau
     const antiAbuseConditions = [];
     if (deviceFingerprint && deviceFingerprint.length > 6) {
       antiAbuseConditions.push({ deviceFingerprint });
@@ -73,7 +106,7 @@ export const register = asyncHandler(async (req, res) => {
 
       if (existingTrialUser) {
         throw ApiError.forbidden(
-          "Cet appareil ou adresse réseau est déjà associé à un compte d'essai gratuit. Un seul compte d'essai est autorisé par appareil."
+          "Cet appareil ou adresse réseau est déjà associé à un compte d'essai gratuit. Un seul compte d'essai est autorisé par appareil/réseau."
         );
       }
     }
@@ -107,6 +140,7 @@ export const register = asyncHandler(async (req, res) => {
     password,
     firstName: firstName || paidOrder?.customerName || '',
     lastName: lastName || '',
+    phone: normalizedPhone,
     referredBy: referredByUser ? referredByUser._id : null,
     verificationCode: hashed,
     verificationCodeExpires: Date.now() + 15 * 60 * 1000, // 15 minutes

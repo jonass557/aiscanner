@@ -4,6 +4,12 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoSanitize from 'express-mongo-sanitize';
 import mongoose from 'mongoose';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import config from './config/index.js';
 import logger from './config/logger.js';
@@ -76,6 +82,20 @@ const createApp = () => {
 
   // API routes
   app.use('/api/v1', routes);
+
+  // Serve frontend static build if present (e.g. on cPanel or single-dyno production)
+  const clientDistPath = path.resolve(__dirname, '../../client/dist');
+  const localDistPath = path.resolve(__dirname, '../public');
+  const targetDist = fs.existsSync(clientDistPath) ? clientDistPath : fs.existsSync(localDistPath) ? localDistPath : null;
+  if (targetDist) {
+    app.use(express.static(targetDist));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+        return next();
+      }
+      res.sendFile(path.join(targetDist, 'index.html'));
+    });
+  }
 
   // 404 + error handling (must be last)
   app.use(notFoundHandler);

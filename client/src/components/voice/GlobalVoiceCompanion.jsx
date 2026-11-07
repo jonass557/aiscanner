@@ -79,8 +79,8 @@ export default function GlobalVoiceCompanion() {
 
   return (
     <>
-      {/* Floating Trigger Button: compact circular on mobile to avoid blocking screen / colliding with WhatsApp */}
-      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+      {/* Floating Trigger Button: compact circular on mobile on bottom-left to avoid colliding with WhatsApp on bottom-right */}
+      <div className="fixed bottom-24 left-4 sm:bottom-6 sm:left-auto sm:right-6 z-40">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -117,7 +117,7 @@ export default function GlobalVoiceCompanion() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-32 right-4 sm:bottom-20 sm:right-6 z-50 w-80 sm:w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-2xl"
+            className="fixed bottom-36 left-4 sm:bottom-20 sm:left-auto sm:right-6 z-50 w-80 sm:w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">

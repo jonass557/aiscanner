@@ -71,16 +71,42 @@ export default function AssistantChat() {
     setConversationId(null);
     setMessages([]);
     setInput('');
+    localStorage.removeItem('assistant_last_active_conv');
+  }, []);
+
+  const openConversation = useCallback(async (id) => {
+    setSidebarOpen(false);
+    try {
+      const { data } = await assistantApi.getConversation(id);
+      const conv = data?.data?.conversation;
+      if (conv) {
+        setConversationId(conv._id);
+        setMessages(conv.messages || []);
+        localStorage.setItem('assistant_last_active_conv', conv._id);
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   }, []);
 
   const loadList = useCallback(async () => {
     try {
       const { data } = await assistantApi.conversations();
-      setConversations(data?.data?.conversations || []);
+      const list = data?.data?.conversations || [];
+      setConversations(list);
+
+      // Auto-restore last active session so user resumes where they left off
+      if (!conversationId && list.length > 0) {
+        const lastSavedId = localStorage.getItem('assistant_last_active_conv');
+        const target = list.find((c) => c._id === lastSavedId) || list[0];
+        if (target) {
+          openConversation(target._id);
+        }
+      }
     } catch {
       setConversations([]);
     }
-  }, []);
+  }, [conversationId, openConversation]);
 
   useEffect(() => {
     loadList();
@@ -116,6 +142,7 @@ export default function AssistantChat() {
           const { data } = await assistantApi.createConversation({});
           id = data?.data?.conversation?._id;
           setConversationId(id);
+          if (id) localStorage.setItem('assistant_last_active_conv', id);
         }
         const { data } = await assistantApi.sendMessage(id, { content: clean, language: lang });
         const res = data?.data || {};
@@ -150,26 +177,15 @@ export default function AssistantChat() {
 
   sendRef.current = send;
 
-  const openConversation = async (id) => {
-    setSidebarOpen(false);
-    try {
-      const { data } = await assistantApi.getConversation(id);
-      const conv = data?.data?.conversation;
-      if (conv) {
-        setConversationId(conv._id);
-        setMessages(conv.messages || []);
-      }
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
-  };
-
   const removeConversation = async (id, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
+    if (!id) return;
+    if (!window.confirm(isEn ? 'Delete this conversation history permanently?' : 'Supprimer définitivement l\'historique de cette conversation ?')) return;
     try {
       await assistantApi.deleteConversation(id);
       setConversations((c) => (Array.isArray(c) ? c.filter((x) => x._id !== id) : []));
       if (id === conversationId) newConversation();
+      toast.success(isEn ? 'Conversation deleted' : 'Conversation supprimée');
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
@@ -235,12 +251,31 @@ export default function AssistantChat() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={newConversation}
+              className="btn-ghost !px-2 flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300"
+              title={isEn ? 'New Chat' : 'Nouvelle conversation'}
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">{isEn ? 'New' : 'Nouveau'}</span>
+            </button>
+            {conversationId && (
+              <button
+                type="button"
+                onClick={() => removeConversation(conversationId)}
+                className="btn-ghost !px-2 text-rose-500 hover:text-rose-600 transition"
+                title={isEn ? 'Delete this conversation' : 'Supprimer cette conversation'}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
             {micSupported && (
               <button
                 type="button"
                 onClick={toggleHandsFree}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                className={`flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition ${
                   handsFree
                     ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300 animate-pulse'
                     : 'border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-white'
@@ -252,7 +287,9 @@ export default function AssistantChat() {
                 }
               >
                 <span className={`h-2 w-2 rounded-full ${handsFree ? 'bg-cyan-400' : 'bg-slate-500'}`} />
-                {handsFree ? (isEn ? 'Hands-Free Active' : 'Mains Libres Activé') : (isEn ? 'Hands-Free Mode' : 'Mode Mains Libres')}
+                <span className="hidden md:inline">
+                  {handsFree ? (isEn ? 'Hands-Free' : 'Mains Libres') : (isEn ? 'Hands-Free' : 'Mains Libres')}
+                </span>
               </button>
             )}
             {synthSupported && (

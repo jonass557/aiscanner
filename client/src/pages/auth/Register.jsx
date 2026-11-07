@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User } from 'lucide-react';
+import { Mail, Lock, User, Phone, Sparkles } from 'lucide-react';
 import AuthShell from '../../layouts/AuthShell.jsx';
 import Input from '../../components/ui/Input.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -50,6 +50,7 @@ export default function Register() {
     firstName: paramName ? paramName.split(' ')[0] : '',
     lastName: paramName ? paramName.split(' ').slice(1).join(' ') : '',
     email: paramEmail,
+    phone: searchParams.get('phone') || '',
     password: '',
   });
   const [loading, setLoading] = useState(false);
@@ -64,6 +65,10 @@ export default function Register() {
     const next = {};
     if (!passwordValid(form.password)) {
       next.password = 'Au moins 8 caractères avec majuscule, minuscule et chiffre.';
+    }
+    const cleanPhone = String(form.phone || '').replace(/[^\d+]/g, '');
+    if (!orderId && (!cleanPhone || cleanPhone.length < 8)) {
+      next.phone = 'Veuillez saisir un numéro de téléphone valide (WhatsApp / Mobile).';
     }
     setErrors(next);
     if (Object.keys(next).length) return;
@@ -104,10 +109,17 @@ export default function Register() {
         </>
       }
     >
-      {orderId && (
+      {orderId ? (
         <div className="mb-5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-emerald-300 flex items-center justify-between">
           <span>✅ Souscription validée ({selectedPlan.toUpperCase()})</span>
           <span className="font-mono text-[10px] text-emerald-400">{orderId}</span>
+        </div>
+      ) : (
+        <div className="mb-5 rounded-xl border border-cyan-500/40 bg-cyan-500/10 p-3 text-xs text-cyan-200 flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-cyan-400 shrink-0" />
+          <span>
+            <strong>Essai Gratuit 7 Jours Détecté :</strong> Accès 100% complet et illimité. Votre code de validation OTP vous sera envoyé par email.
+          </span>
         </div>
       )}
 
@@ -136,6 +148,18 @@ export default function Register() {
           required
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+
+        <Input
+          label="Numéro de Téléphone (WhatsApp / Mobile)"
+          type="tel"
+          icon={Phone}
+          placeholder="+237 6XXXXXXXX ou +33 6XXXXXXXX"
+          required={!orderId}
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          error={errors.phone}
+          hint="Requis pour la vérification anti-abus du Free Trial"
         />
 
         <Input

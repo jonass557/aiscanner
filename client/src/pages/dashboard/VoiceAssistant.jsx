@@ -52,6 +52,7 @@ export default function VoiceAssistant() {
         });
         const res = data.data;
         setConversationId(res.conversationId);
+        if (res.conversationId) localStorage.setItem('voice_last_active_conv', res.conversationId);
         setTurns((t) => [...t, { role: 'assistant', text: res.reply }]);
         if (ttsOn) speak(res.reply);
         // App-control directive (navigate). Slight delay so TTS can start.
@@ -83,14 +84,37 @@ export default function VoiceAssistant() {
     cancelSpeech,
   } = useSpeech({ lang: 'fr-FR', onResult: send });
 
+  const openConversation = useCallback(async (id) => {
+    setSidebarOpen(false);
+    try {
+      const { data } = await voiceApi.getConversation(id);
+      const conv = data.data.conversation;
+      setConversationId(conv._id);
+      setTurns((conv.turns || []).map((t) => ({ role: t.role, text: t.text })));
+      localStorage.setItem('voice_last_active_conv', conv._id);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  }, []);
+
   const loadList = useCallback(async () => {
     try {
       const { data } = await voiceApi.conversations();
-      setConversations(data.data.conversations || []);
+      const list = data?.data?.conversations || [];
+      setConversations(list);
+
+      // Auto-restore last active conversation on login / refresh
+      if (!conversationId && list.length > 0) {
+        const lastSavedId = localStorage.getItem('voice_last_active_conv');
+        const target = list.find((c) => c._id === lastSavedId) || list[0];
+        if (target) {
+          openConversation(target._id);
+        }
+      }
     } catch {
       /* non-blocking */
     }
-  }, []);
+  }, [conversationId, openConversation]);
 
   useEffect(() => {
     loadList();
@@ -106,26 +130,18 @@ export default function VoiceAssistant() {
     setConversationId(null);
     setTurns([]);
     setSidebarOpen(false);
-  };
-
-  const openConversation = async (id) => {
-    setSidebarOpen(false);
-    try {
-      const { data } = await voiceApi.getConversation(id);
-      const conv = data.data.conversation;
-      setConversationId(conv._id);
-      setTurns((conv.turns || []).map((t) => ({ role: t.role, text: t.text })));
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
+    localStorage.removeItem('voice_last_active_conv');
   };
 
   const removeConversation = async (id, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
+    if (!id) return;
+    if (!window.confirm('Supprimer définitivement cette conversation vocale et son historique ?')) return;
     try {
       await voiceApi.deleteConversation(id);
       setConversations((c) => c.filter((x) => x._id !== id));
       if (id === conversationId) newConversation();
+      toast.success('Conversation vocale supprimée');
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
@@ -201,11 +217,30 @@ export default function VoiceAssistant() {
             <Mic className="h-5 w-5 text-brand-500" />
             <span className="font-semibold">Voice Assistant</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={newConversation}
+              className="btn-ghost !px-2 flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300"
+              title="Nouvelle conversation vocale"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nouveau</span>
+            </button>
+            {conversationId && (
+              <button
+                type="button"
+                onClick={() => removeConversation(conversationId)}
+                className="btn-ghost !px-2 text-rose-500 hover:text-rose-600 transition"
+                title="Supprimer cette conversation"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
             {supported && (
               <button
                 onClick={toggleHandsFree}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                className={`flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition ${
                   handsFree
                     ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300 animate-pulse'
                     : 'border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-white'
@@ -213,7 +248,9 @@ export default function VoiceAssistant() {
                 title="Activer le mode mains-libres pour parler en continu sans appuyer"
               >
                 <span className={`h-2 w-2 rounded-full ${handsFree ? 'bg-cyan-400' : 'bg-slate-500'}`} />
-                {handsFree ? 'Mains Libres Activé' : 'Mode Mains Libres'}
+                <span className="hidden md:inline">
+                  {handsFree ? 'Mains Libres' : 'Mains Libres'}
+                </span>
               </button>
             )}
             {synthSupported && (
