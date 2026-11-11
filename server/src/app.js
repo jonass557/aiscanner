@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 
 import config from './config/index.js';
 import logger from './config/logger.js';
+import { getDbDiagnostics } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import routes from './routes/index.js';
@@ -75,6 +76,7 @@ const createApp = () => {
       success: true,
       status: 'ok',
       database: isDbConnected ? 'connected' : 'connecting',
+      ...(isDbConnected ? {} : { dbDiagnostic: getDbDiagnostics() }),
       env: config.env,
       timestamp: new Date().toISOString(),
     });

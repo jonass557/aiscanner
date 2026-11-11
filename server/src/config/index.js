@@ -1,6 +1,44 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Under cPanel Phusion Passenger / CloudLinux, process.cwd() may not match server/.
+// Probe server/.env, repo-root .env, cwd/.env, and ~/.env in priority order without
+// overwriting already-defined process.env variables.
+const candidateEnvPaths = [
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(process.cwd(), '.env'),
+  path.join(os.homedir(), '.env'),
+];
+const seenEnvPaths = new Set();
+if (process.env.MONGODB_URI !== undefined && !process.env.MONGODB_URI.trim()) {
+  delete process.env.MONGODB_URI;
+}
+let mongoSource = (process.env.MONGODB_URI || '').trim() ? 'process.env' : 'default-localhost';
+
+for (const candidatePath of candidateEnvPaths) {
+  const normalized = path.normalize(candidatePath);
+  if (seenEnvPaths.has(normalized)) continue;
+  seenEnvPaths.add(normalized);
+  if (fs.existsSync(normalized)) {
+    const hadMongoBefore = Boolean((process.env.MONGODB_URI || '').trim());
+    const result = dotenv.config({ path: normalized });
+    if (process.env.MONGODB_URI !== undefined && !process.env.MONGODB_URI.trim()) {
+      delete process.env.MONGODB_URI;
+    }
+    if (!result.error && !hadMongoBefore && (process.env.MONGODB_URI || '').trim()) {
+      mongoSource = `${path.basename(path.dirname(normalized))}/.env`;
+    }
+  }
+}
+
+const resolvedMongoUri = (process.env.MONGODB_URI || '').trim();
 
 /**
  * Centralized configuration.
@@ -14,7 +52,8 @@ const config = {
   port: parseInt(process.env.PORT, 10) || 5000,
 
   mongo: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-chart-scanner',
+    uri: resolvedMongoUri || 'mongodb://localhost:27017/ai-chart-scanner',
+    source: mongoSource,
   },
 
   jwt: {
