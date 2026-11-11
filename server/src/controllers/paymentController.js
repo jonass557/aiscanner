@@ -1,40 +1,51 @@
 import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import Payment from '../models/Payment.js';
+import PayoutTransaction from '../models/PayoutTransaction.js';
+import PartnershipConfig from '../models/PartnershipConfig.js';
 import User from '../models/User.js';
 import { getPlanById } from '../services/planService.js';
-import { getProvider, IkeepayProvider, SEBPAY_SIGNATURE_HEADER } from '../services/payments/index.js';
+import {
+  getProvider,
+  IkeepayProvider,
+  SEBPAY_SIGNATURE_HEADER,
+  IKEEPAY_SIGNATURE_HEADER,
+  IKEEPAY_H2H_COUNTRIES,
+} from '../services/payments/index.js';
 import { logAuth } from '../services/logService.js';
 import * as settingsService from '../services/settings/settingsService.js';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
+import {
+  getConfiguredIkeepayProvider,
+  processPartnerCommissionSplit,
+  resolvePlanDurationMonths,
+} from '../services/partnershipService.js';
 
-const OPERATORS = ['mtn', 'moov', 'orange', 'wave', 'standard', 'card'];
+const OPERATORS = ['mtn', 'moov', 'orange', 'wave', 'mobicash', 'airtel', 'vodacom', 'standard', 'card'];
 
 /**
- * Apply a paid plan to a user (shared by checkout, webhook & verify).
+ * Apply a paid plan to a user (shared by checkout, webhook & verify)
+ * and trigger either VIP Partner 30%/70% revenue split or legacy referral credit.
  */
-const activatePlan = async (user, plan) => {
+const activatePlan = async (user, plan, payment = null) => {
+  const wasActive = Boolean(user.subscription?.startDate && (user.subscription?.status === 'active' || user.subscription?.renewalCount > 0));
+
   user.subscription.plan = plan.id;
   user.subscription.status = 'active';
   user.subscription.scansPerMonth = -1; // illimité pour tous les forfaits
   user.subscription.scansUsed = 0; // reset quota on subscription
   user.subscription.startDate = new Date();
 
-  let months = 1;
-  if (plan.id === '2mois') months = 2;
-  else if (plan.id === '1an') months = 12;
-  else if (plan.id === '6mois') months = 6;
-  else if (plan.promo?.enabled && plan.promo?.durationMonths > 0) months = plan.promo.durationMonths;
-
+  const months = resolvePlanDurationMonths(plan);
   const end = new Date();
   end.setMonth(end.getMonth() + months);
   user.subscription.endDate = end;
+
   if (user.trial) {
     user.trial.isActive = false; // Fin de l'essai gratuit, abonnement actif
   }
-  const isRenewal = Boolean(user.subscription.startDate && (user.subscription.status === 'active' || user.subscription.renewalCount > 0));
-  if (isRenewal) {
+  if (wasActive) {
     user.subscription.renewalCount = (user.subscription.renewalCount || 0) + 1;
     user.subscription.lastRenewedAt = new Date();
     user.subscription.isRenewed = true;
@@ -42,27 +53,36 @@ const activatePlan = async (user, plan) => {
 
   await user.save();
 
-  // Credit referrer commission if applicable
+  // Credit VIP Partner (configurable 30% partner / 70% admin split) or legacy referral (20%)
   if (user.referredBy) {
     try {
-      const referrer = await User.findById(user.referredBy);
-      if (referrer && referrer.referral?.enabled) {
-        const rate = (referrer.referral.commissionRate || 20) / 100;
-        const paidAmount = plan.effectivePrice ?? plan.price ?? 7000;
-        const commission = Math.round(paidAmount * rate);
-        if (commission > 0) {
-          referrer.referral.balance = (referrer.referral.balance || 0) + commission;
-          referrer.referral.totalEarned = (referrer.referral.totalEarned || 0) + commission;
-          await referrer.save();
+      const paidAmount = payment?.amount ?? plan.effectivePrice ?? plan.price ?? 7000;
+      const handledByPartner = await processPartnerCommissionSplit({
+        subscriber: user,
+        payment,
+        plan,
+        paidAmount,
+      });
+
+      if (!handledByPartner) {
+        const referrer = await User.findById(user.referredBy);
+        if (referrer && referrer.referral?.enabled) {
+          const rate = (referrer.referral.commissionRate || 20) / 100;
+          const commission = Math.round(paidAmount * rate);
+          if (commission > 0) {
+            referrer.referral.balance = (referrer.referral.balance || 0) + commission;
+            referrer.referral.totalEarned = (referrer.referral.totalEarned || 0) + commission;
+            await referrer.save();
+          }
         }
       }
     } catch (err) {
-      console.error('Failed to credit referral commission on activatePlan:', err);
+      logger.error(`Failed to credit referral/partner commission on activatePlan: ${err.message}`);
     }
   }
 
   await logAuth('subscription_paid', {
-    message: isRenewal
+    message: wasActive
       ? `🔄 Renouvellement d'abonnement : ${user.email} (${plan.name}) — Renouvellement #${user.subscription.renewalCount}`
       : `Souscription abonnement : ${plan.name}`,
     userId: user._id,
@@ -75,25 +95,46 @@ const activatePlan = async (user, plan) => {
 };
 
 /**
+ * Resolve currency for iKeePay H2H payin based on country & plan price.
+ */
+const resolveH2HAmountAndCurrency = (planPrice, planCurrency, country = 'CI') => {
+  const ctry = IKEEPAY_H2H_COUNTRIES.find((c) => c.code === String(country || 'CI').toUpperCase());
+  const targetCurrency = ctry?.currency || 'XOF';
+  const upperPlanCurr = String(planCurrency || 'XOF').toUpperCase();
+
+  if (['XAF', 'XOF', 'FCFA'].includes(upperPlanCurr) && ['XOF', 'XAF'].includes(targetCurrency)) {
+    return { amount: Math.round(Number(planPrice)), currency: targetCurrency };
+  }
+  if (upperPlanCurr === 'USD' && ['XOF', 'XAF'].includes(targetCurrency)) {
+    return { amount: Math.round(Number(planPrice) * 655), currency: targetCurrency };
+  }
+  if (['XOF', 'XAF', 'FCFA'].includes(upperPlanCurr) && targetCurrency === 'USD') {
+    return { amount: Math.max(1, Number((Number(planPrice) / 655).toFixed(2))), currency: 'USD' };
+  }
+  return { amount: Math.round(Number(planPrice)), currency: targetCurrency || 'XOF' };
+};
+
+/**
  * GET /payments/config (public/auth)
- * Returns public payment configuration (active provider, iKeePay public key & options).
+ * Returns public payment configuration (active provider, H2H countries/operators).
  */
 export const getPaymentConfig = asyncHandler(async (req, res) => {
   const activeProvider = settingsService.getValue('payments.provider') || config.payments.provider || 'ikeepay';
+  const ikeepaySecretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey || '';
   const ikeepayPublicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey || '';
   const ikeepayMobile = settingsService.getValue('payments.ikeepay.mobileMoneyEnabled');
   const mobileMoneyEnabled = ikeepayMobile !== undefined ? Boolean(ikeepayMobile) : (config.payments.ikeepay?.mobileMoneyEnabled ?? true);
-  const checkoutUrl = settingsService.getValue('payments.ikeepay.checkoutUrl') || config.payments.ikeepay?.checkoutUrl || 'https://ikeepay.com/checkout/v1/inline';
 
   return sendSuccess(res, {
     data: {
       activeProvider,
       ikeepay: {
-        configured: Boolean(ikeepayPublicKey && ikeepayPublicKey.trim()),
-        publicKey: ikeepayPublicKey.trim(),
-        checkoutUrl,
+        mode: 'h2h',
+        configured: Boolean(ikeepaySecretKey && ikeepaySecretKey.trim()),
+        hasPublicKey: Boolean(ikeepayPublicKey && ikeepayPublicKey.trim()),
         mobileMoneyEnabled,
-        currency: config.payments.currency || 'USD',
+        currency: config.payments.currency || 'XOF',
+        countries: IKEEPAY_H2H_COUNTRIES,
       },
       sebpay: {
         configured: Boolean(settingsService.getValue('payments.sebpay.secretKey') || config.payments.sebpay?.secretKey),
@@ -105,110 +146,136 @@ export const getPaymentConfig = asyncHandler(async (req, res) => {
 
 /**
  * POST /payments/ikeepay/initiate  (auth)
- * Create an iKeePay payment order and generate the inline checkout session parameters.
+ * Initiates an authenticated iKeePay H2H payin (POST /h2h-payin).
  */
 export const initiateIkeepay = asyncHandler(async (req, res) => {
-  const { planId, redirectUrl } = req.body;
+  const { planId, country = 'CI', operator = 'ORANGE', otp, phoneNumber, phone, customerEmail } = req.body;
   if (!planId) throw ApiError.badRequest('Plan ID is required.');
 
   const plan = await getPlanById(planId, { activeOnly: true });
   if (!plan) throw ApiError.badRequest('Invalid or inactive plan.');
-  if (plan.price <= 0) throw ApiError.badRequest('This plan is free — no payment required.');
 
-  const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey || '';
-  const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey || '';
-  const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl;
-  const checkoutUrl = settingsService.getValue('payments.ikeepay.checkoutUrl') || config.payments.ikeepay?.checkoutUrl;
-  const mobileMoneyEnabled = settingsService.getValue('payments.ikeepay.mobileMoneyEnabled') ?? config.payments.ikeepay?.mobileMoneyEnabled;
-
-  const provider = new IkeepayProvider({
-    publicKey,
-    secretKey,
-    baseUrl,
-    checkoutUrl,
-    mobileMoneyEnabled,
-  });
-
-  if (!provider.isConfigured()) {
-    throw ApiError.badRequest("Le moyen de paiement iKeePay n'a pas encore été configuré par l'administrateur (Clé publique manquante dans l'admin).");
-  }
-
-  // Generate unique order reference (e.g. REF_1730000000000_1234)
-  const orderId = `REF_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-
-  // Prise en compte du tarif promotionnel configuré par l'admin après le free trial
   const effectivePrice = (plan.promo?.enabled && Number(plan.promo?.price) > 0)
     ? Number(plan.promo.price)
-    : plan.price;
+    : Number(plan.price || 0);
 
-  // Conversion intelligente XAF -> USDT si paiement par cryptomonnaie
-  const isXafOrXof1 = ['XAF', 'XOF', 'FCFA'].includes((plan.currency || '').toUpperCase());
-  const wantsCrypto1 = req.body.paymentCurrency === 'USDT' || req.body.paymentMethod === 'crypto';
-
-  let checkoutAmount1 = effectivePrice;
-  let checkoutCurrency1 = plan.currency || 'USD';
-
-  if (wantsCrypto1 && isXafOrXof1) {
-    checkoutAmount1 = Math.max(1, Number((effectivePrice / 655).toFixed(2)));
-    checkoutCurrency1 = 'USD';
-  } else if (!wantsCrypto1 && isXafOrXof1) {
-    checkoutCurrency1 = 'XOF';
+  if (effectivePrice <= 0) {
+    throw ApiError.badRequest('This plan is free — no payment required.');
   }
 
-  const session = provider.createCheckoutSession({
-    amount: checkoutAmount1,
-    currency: checkoutCurrency1,
-    orderId,
-    redirectUrl: redirectUrl || `${config.frontendUrl}/dashboard/subscription?status=success&ref=${orderId}`,
+  const rawPhone = phoneNumber || phone || req.user.phone || '';
+  if (!rawPhone || String(rawPhone).replace(/[^\d]/g, '').length < 8) {
+    throw ApiError.badRequest('Votre numéro Mobile Money est requis.');
+  }
+
+  const provider = getConfiguredIkeepayProvider();
+  const activeProvider = settingsService.getValue('payments.provider') || config.payments.provider;
+  const orderId = `REF_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+  const { amount: h2hAmount, currency: h2hCurrency } = resolveH2HAmountAndCurrency(effectivePrice, plan.currency, country);
+
+  if (!provider.isConfigured()) {
+    if (activeProvider === 'demo') {
+      const payment = await Payment.create({
+        user: req.user._id,
+        customerEmail: req.user.email,
+        customerPhone: String(rawPhone).trim(),
+        planId: plan.id,
+        amount: h2hAmount,
+        currency: h2hCurrency,
+        type: 'payin',
+        purpose: 'subscription',
+        country: String(country).toUpperCase(),
+        operator: String(operator).toUpperCase(),
+        provider: 'demo',
+        externalRef: orderId,
+        providerRef: `DEMO_${orderId}`,
+        method: 'demo',
+        status: 'approved',
+      });
+      await activatePlan(req.user, plan, payment);
+      return sendSuccess(res, {
+        statusCode: 201,
+        message: 'Paiement approuvé (mode démo). Votre plan est actif.',
+        data: { paymentId: payment._id, orderId, status: 'approved', amount: h2hAmount, currency: h2hCurrency },
+      });
+    }
+    throw ApiError.badRequest("La clé secrète iKeePay H2H (x-api-key) n'a pas encore été configurée par l'administrateur.");
+  }
+
+  const h2hRes = await provider.initiatePayin({
+    amount: h2hAmount,
+    currency: h2hCurrency,
+    country,
+    phoneNumber: rawPhone,
+    operator,
+    external_reference: orderId,
+    customer_email: customerEmail || req.user.email,
+    otp,
   });
 
   const payment = await Payment.create({
     user: req.user._id,
+    customerEmail: req.user.email,
+    customerName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim(),
+    customerPhone: String(rawPhone).trim(),
     planId: plan.id,
-    amount: checkoutAmount1,
-    currency: checkoutCurrency1,
+    amount: h2hAmount,
+    currency: h2hCurrency,
+    type: 'payin',
+    purpose: 'subscription',
+    country: String(country).toUpperCase(),
+    operator: String(operator).toUpperCase(),
     provider: 'ikeepay',
+    providerRef: h2hRes.providerRef || undefined,
     externalRef: orderId,
-    checkoutUrl: session.checkoutUrl,
-    method: 'inline_checkout',
-    status: 'pending',
+    paymentLink: h2hRes.paymentLink || '',
+    checkoutUrl: h2hRes.paymentLink || '',
+    method: 'h2h_payin',
+    status: h2hRes.status === 'approved' ? 'approved' : h2hRes.status === 'rejected' ? 'rejected' : 'pending',
+    rawResponse: h2hRes.raw,
   });
+
+  if (payment.status === 'approved') {
+    await activatePlan(req.user, plan, payment);
+  }
 
   return sendSuccess(res, {
     statusCode: 201,
-    message: 'Session de paiement iKeePay initialisée avec succès.',
+    message:
+      payment.status === 'approved'
+        ? 'Paiement confirmé ! Votre abonnement est actif.'
+        : h2hRes.paymentLink
+        ? 'Lien de redirection généré pour finaliser votre paiement iKeePay.'
+        : 'Paiement H2H initié. Confirmez la demande sur votre téléphone.',
     data: {
       paymentId: payment._id,
       orderId,
-      publicKey: session.publicKey,
-      amount: session.amount,
-      currency: session.currency,
-      checkoutUrl: session.checkoutUrl,
-      mobileMoneyEnabled: session.mobileMoneyEnabled,
-      plan: {
-        id: plan.id,
-        name: plan.name,
-        price: plan.price,
-        currency: plan.currency || 'USD',
-      },
+      providerRef: h2hRes.providerRef || null,
+      status: payment.status,
+      paymentLink: h2hRes.paymentLink || '',
+      amount: h2hAmount,
+      currency: h2hCurrency,
+      country: payment.country,
+      operator: payment.operator,
+      plan: { id: plan.id, name: plan.name, price: effectivePrice, currency: h2hCurrency },
     },
   });
 });
 
 /**
  * POST /payments/ikeepay/verify  (auth)
- * Frontend calls this when 'ikeepay-success' window message is received.
- * Verifies with iKeePay and activates plan immediately.
+ * Checks transaction status via GET /h2h-verify/:reference and activates plan when completed.
  */
 export const verifyIkeepay = asyncHandler(async (req, res) => {
-  const { orderId, ikeepayRef } = req.body;
-  if (!orderId && !ikeepayRef) {
-    throw ApiError.badRequest('Reference (orderId or ikeepayRef) required.');
+  const { orderId, providerRef, ikeepayRef } = req.body;
+  const ref = orderId || providerRef || ikeepayRef;
+  if (!ref) {
+    throw ApiError.badRequest('Référence (orderId ou providerRef) requise.');
   }
 
   const payment = orderId
     ? await Payment.findOne({ externalRef: orderId, user: req.user._id })
-    : await Payment.findOne({ providerRef: ikeepayRef, user: req.user._id });
+    : await Payment.findOne({ providerRef: providerRef || ikeepayRef, user: req.user._id });
 
   if (!payment) {
     throw ApiError.notFound('Paiement introuvable.');
@@ -221,45 +288,57 @@ export const verifyIkeepay = asyncHandler(async (req, res) => {
     });
   }
 
-  const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey || '';
-  const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey || '';
-  const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl;
-
-  const provider = new IkeepayProvider({ publicKey, secretKey, baseUrl });
-  const checkRef = ikeepayRef || orderId;
-
-  // Verify against iKeePay API
+  const provider = getConfiguredIkeepayProvider();
+  const checkRef = payment.externalRef || payment.providerRef;
   const verification = await provider.verifyTransaction(checkRef);
 
-  // If verified or if client confirmed with valid reference in test/live
-  if (verification.valid || (ikeepayRef && ikeepayRef.startsWith('IKP_'))) {
+  if (verification.providerRef && !payment.providerRef) {
+    payment.providerRef = verification.providerRef;
+  }
+
+  if (verification.valid || verification.status === 'approved') {
     payment.status = 'approved';
-    if (ikeepayRef) payment.providerRef = ikeepayRef;
     await payment.save();
 
     const plan = await getPlanById(payment.planId);
     if (plan) {
-      await activatePlan(req.user, plan);
+      await activatePlan(req.user, plan, payment);
     }
 
     return sendSuccess(res, {
-      message: 'Paiement iKeePay validé ! Votre abonnement est maintenant actif.',
-      data: { status: 'approved', paymentId: payment._id },
+      message: 'Paiement iKeePay H2H validé ! Votre abonnement est maintenant actif.',
+      data: { status: 'approved', paymentId: payment._id, providerRef: payment.providerRef },
     });
   }
 
+  if (verification.status === 'rejected') {
+    payment.status = 'rejected';
+    await payment.save();
+  }
+
   return sendSuccess(res, {
-    message: 'Paiement en cours de traitement par iKeePay.',
-    data: { status: payment.status, paymentId: payment._id },
+    message: payment.status === 'rejected' ? 'Paiement refusé ou annulé.' : 'Paiement en attente de confirmation...',
+    data: { status: payment.status, paymentId: payment._id, providerRef: payment.providerRef },
   });
 });
 
 /**
  * POST /payments/ikeepay/initiate-public  (PUBLIC)
- * Allows unauthenticated visitors to start iKeePay checkout for any plan before registering.
+ * Allows unauthenticated visitors to pay via iKeePay H2H before registering.
  */
 export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
-  const { planId, email, fullName, phone, redirectUrl } = req.body;
+  const {
+    planId,
+    email,
+    fullName,
+    phoneNumber,
+    phone,
+    country = 'CI',
+    operator = 'ORANGE',
+    otp,
+    referralCode,
+  } = req.body;
+
   if (!planId) throw ApiError.badRequest('Le plan d’abonnement est requis.');
   if (!email) throw ApiError.badRequest('Votre adresse email est requise.');
 
@@ -268,86 +347,153 @@ export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
 
   const effectivePrice = (plan.promo?.enabled && Number(plan.promo?.price) > 0)
     ? Number(plan.promo.price)
-    : plan.price;
-
-  const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey || '';
-  const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey || '';
-  const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl;
-  const checkoutUrl = settingsService.getValue('payments.ikeepay.checkoutUrl') || config.payments.ikeepay?.checkoutUrl;
-  const mobileMoneyEnabled = settingsService.getValue('payments.ikeepay.mobileMoneyEnabled') ?? config.payments.ikeepay?.mobileMoneyEnabled;
-
-  const provider = new IkeepayProvider({
-    publicKey,
-    secretKey,
-    baseUrl,
-    checkoutUrl,
-    mobileMoneyEnabled,
-  });
+    : Number(plan.price || 0);
 
   const orderId = `REF_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
   const isFree = effectivePrice <= 0;
-  let session = null;
+  const rawPhone = phoneNumber || phone || '';
 
-  if (!isFree) {
-    if (!provider.isConfigured()) {
-      throw ApiError.badRequest("Le moyen de paiement iKeePay n'a pas encore été configuré par l'administrateur (Clé publique manquante dans l'admin).");
-    }
+  if (isFree) {
+    const payment = await Payment.create({
+      customerEmail: email.toLowerCase().trim(),
+      customerName: fullName || '',
+      customerPhone: String(rawPhone).trim(),
+      planId: plan.id,
+      amount: 0,
+      currency: plan.currency || 'XOF',
+      type: 'payin',
+      purpose: 'subscription',
+      country: String(country).toUpperCase(),
+      operator: String(operator).toUpperCase(),
+      provider: 'ikeepay',
+      externalRef: orderId,
+      referralCodeUsed: String(referralCode || '').trim().toUpperCase(),
+      method: 'free_trial',
+      status: 'approved',
+    });
 
-    // Conversion intelligente XAF -> USDT si paiement par cryptomonnaie
-    const isXafOrXof2 = ['XAF', 'XOF', 'FCFA'].includes((plan.currency || '').toUpperCase());
-    const wantsCrypto2 = req.body.paymentCurrency === 'USDT' || req.body.paymentMethod === 'crypto';
-
-    let checkoutAmount2 = effectivePrice;
-    let checkoutCurrency2 = plan.currency || 'USD';
-
-    if (wantsCrypto2 && isXafOrXof2) {
-      checkoutAmount2 = Math.max(1, Number((effectivePrice / 655).toFixed(2)));
-      checkoutCurrency2 = 'USD';
-    } else if (!wantsCrypto2 && isXafOrXof2) {
-      checkoutCurrency2 = 'XOF';
-    }
-
-    session = provider.createCheckoutSession({
-      amount: checkoutAmount2,
-      currency: checkoutCurrency2,
-      orderId,
-      redirectUrl: redirectUrl || `${config.frontendUrl}/register?orderId=${orderId}&email=${encodeURIComponent(email)}&plan=${plan.id}&name=${encodeURIComponent(fullName || '')}`,
+    return sendSuccess(res, {
+      statusCode: 201,
+      message: 'Plan sélectionné avec succès.',
+      data: {
+        paymentId: payment._id,
+        orderId,
+        isFree: true,
+        status: 'approved',
+        amount: 0,
+        currency: plan.currency || 'XOF',
+        email: email.toLowerCase().trim(),
+        fullName: fullName || '',
+        plan: { id: plan.id, name: plan.name, price: plan.price, currency: plan.currency || 'XOF' },
+      },
     });
   }
+
+  if (!rawPhone || String(rawPhone).replace(/[^\d]/g, '').length < 8) {
+    throw ApiError.badRequest('Veuillez saisir un numéro Mobile Money valide.');
+  }
+
+  const provider = getConfiguredIkeepayProvider();
+  const activeProvider = settingsService.getValue('payments.provider') || config.payments.provider;
+  const { amount: h2hAmount, currency: h2hCurrency } = resolveH2HAmountAndCurrency(effectivePrice, plan.currency, country);
+
+  if (!provider.isConfigured()) {
+    if (activeProvider === 'demo') {
+      const payment = await Payment.create({
+        customerEmail: email.toLowerCase().trim(),
+        customerName: fullName || '',
+        customerPhone: String(rawPhone).trim(),
+        planId: plan.id,
+        amount: h2hAmount,
+        currency: h2hCurrency,
+        type: 'payin',
+        purpose: 'subscription',
+        country: String(country).toUpperCase(),
+        operator: String(operator).toUpperCase(),
+        provider: 'demo',
+        externalRef: orderId,
+        providerRef: `DEMO_${orderId}`,
+        referralCodeUsed: String(referralCode || '').trim().toUpperCase(),
+        method: 'demo',
+        status: 'approved',
+      });
+      return sendSuccess(res, {
+        statusCode: 201,
+        message: 'Paiement approuvé (mode démo).',
+        data: {
+          paymentId: payment._id,
+          orderId,
+          status: 'approved',
+          isFree: false,
+          amount: h2hAmount,
+          currency: h2hCurrency,
+          email: payment.customerEmail,
+          fullName: payment.customerName,
+          plan: { id: plan.id, name: plan.name, price: effectivePrice, currency: h2hCurrency },
+        },
+      });
+    }
+    throw ApiError.badRequest("Le moyen de paiement iKeePay H2H n'est pas encore configuré par l'administrateur (Clé secrète x-api-key manquante).");
+  }
+
+  const h2hRes = await provider.initiatePayin({
+    amount: h2hAmount,
+    currency: h2hCurrency,
+    country,
+    phoneNumber: rawPhone,
+    operator,
+    external_reference: orderId,
+    customer_email: email,
+    otp,
+  });
 
   const payment = await Payment.create({
     customerEmail: email.toLowerCase().trim(),
     customerName: fullName || '',
-    customerPhone: phone || '',
+    customerPhone: String(rawPhone).trim(),
     planId: plan.id,
-    amount: session?.amount ?? effectivePrice,
-    currency: session?.currency ?? (plan.currency || 'USD'),
+    amount: h2hAmount,
+    currency: h2hCurrency,
+    type: 'payin',
+    purpose: 'subscription',
+    country: String(country).toUpperCase(),
+    operator: String(operator).toUpperCase(),
     provider: 'ikeepay',
+    providerRef: h2hRes.providerRef || undefined,
     externalRef: orderId,
-    checkoutUrl: session?.checkoutUrl || '',
-    method: 'inline_checkout',
-    status: isFree ? 'approved' : 'pending',
+    paymentLink: h2hRes.paymentLink || '',
+    checkoutUrl: h2hRes.paymentLink || '',
+    referralCodeUsed: String(referralCode || '').trim().toUpperCase(),
+    method: 'h2h_payin',
+    status: h2hRes.status === 'approved' ? 'approved' : h2hRes.status === 'rejected' ? 'rejected' : 'pending',
+    rawResponse: h2hRes.raw,
   });
 
   return sendSuccess(res, {
     statusCode: 201,
-    message: isFree ? 'Plan sélectionné avec succès.' : 'Session de paiement iKeePay initialisée.',
+    message: payment.status === 'approved'
+      ? 'Paiement validé avec succès !'
+      : h2hRes.paymentLink
+      ? 'Lien de paiement généré. Complétez votre paiement pour activer votre accès.'
+      : 'Paiement initié. Confirmez la transaction sur votre téléphone.',
     data: {
       paymentId: payment._id,
       orderId,
-      isFree,
-      publicKey: session?.publicKey || '',
-      amount: effectivePrice,
-      currency: plan.currency || 'USD',
-      checkoutUrl: session?.checkoutUrl || '',
-      mobileMoneyEnabled: session?.mobileMoneyEnabled ?? true,
-      email: email.toLowerCase().trim(),
-      fullName: fullName || '',
+      providerRef: h2hRes.providerRef || null,
+      status: payment.status,
+      isFree: false,
+      amount: h2hAmount,
+      currency: h2hCurrency,
+      country: payment.country,
+      operator: payment.operator,
+      paymentLink: h2hRes.paymentLink || '',
+      email: payment.customerEmail,
+      fullName: payment.customerName,
       plan: {
         id: plan.id,
         name: plan.name,
-        price: plan.price,
-        currency: plan.currency || 'USD',
+        price: effectivePrice,
+        currency: h2hCurrency,
       },
     },
   });
@@ -355,137 +501,223 @@ export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
 
 /**
  * POST /payments/ikeepay/verify-public  (PUBLIC)
- * Verifies transaction with iKeePay before the user registers.
+ * Verifies transaction via GET /h2h-verify/:reference before visitor registers.
  */
 export const verifyPublicIkeepay = asyncHandler(async (req, res) => {
-  const { orderId } = req.body;
-  if (!orderId) throw ApiError.badRequest('Order ID is required.');
+  const { orderId, providerRef } = req.body;
+  if (!orderId && !providerRef) throw ApiError.badRequest('Référence de commande requise.');
 
-  const payment = await Payment.findOne({ externalRef: orderId });
+  const payment = orderId
+    ? await Payment.findOne({ externalRef: orderId })
+    : await Payment.findOne({ providerRef });
+
   if (!payment) throw ApiError.notFound('Paiement introuvable.');
 
   if (payment.status === 'approved') {
     return sendSuccess(res, {
       message: 'Paiement déjà validé.',
-      data: { status: 'approved', orderId, planId: payment.planId, email: payment.customerEmail },
+      data: {
+        status: 'approved',
+        orderId: payment.externalRef,
+        providerRef: payment.providerRef,
+        planId: payment.planId,
+        email: payment.customerEmail,
+      },
     });
   }
 
-  const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey || '';
-  const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey || '';
-  const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl;
+  const provider = getConfiguredIkeepayProvider();
+  const verification = await provider.verifyTransaction(payment.externalRef || payment.providerRef);
 
-  const provider = new IkeepayProvider({ publicKey, secretKey, baseUrl });
-  const verification = await provider.verifyTransaction(orderId);
+  if (verification.providerRef && !payment.providerRef) {
+    payment.providerRef = verification.providerRef;
+  }
 
-  if (verification.valid || verification.status === 'approved' || verification.status === 'success') {
+  if (verification.valid || verification.status === 'approved') {
     payment.status = 'approved';
     await payment.save();
     return sendSuccess(res, {
       message: 'Paiement validé avec succès !',
-      data: { status: 'approved', orderId, planId: payment.planId, email: payment.customerEmail },
+      data: {
+        status: 'approved',
+        orderId: payment.externalRef,
+        providerRef: payment.providerRef,
+        planId: payment.planId,
+        email: payment.customerEmail,
+      },
     });
   }
 
+  if (verification.status === 'rejected') {
+    payment.status = 'rejected';
+    await payment.save();
+  }
+
   return sendSuccess(res, {
-    message: 'Vérification terminée.',
-    data: { status: payment.status, orderId, planId: payment.planId, email: payment.customerEmail },
+    message: payment.status === 'rejected' ? 'Paiement refusé ou annulé.' : 'Vérification en attente de confirmation...',
+    data: {
+      status: payment.status,
+      orderId: payment.externalRef,
+      providerRef: payment.providerRef,
+      planId: payment.planId,
+      email: payment.customerEmail,
+    },
   });
 });
 
 /**
  * POST /payments/webhook/ikeepay  (PUBLIC)
- * iKeePay Webhook handler.
- * Payload example:
+ * Official iKeePay H2H Async Webhook with HMAC SHA-256 verification (X-Ikeepay-Signature).
+ *
+ * Payload format:
  * {
- *   "event": "payment.success",
- *   "ikeepay_ref": "IKP_c4f82877a5ab4373bd4adca113b2e59e",
- *   "order_id": "REF_1730000000000",
- *   "amount": 5000,
- *   "currency": "XOF",
- *   "status": "completed"
+ *   "event": "transaction.updated",
+ *   "data": {
+ *     "type": "payin" | "payout",
+ *     "external_reference": "REF_1700000000",
+ *     "provider_reference": "IKP-H2H-B5C9EC0E",
+ *     "amount": 500,
+ *     "currency": "XOF",
+ *     "country": "CI",
+ *     "phone_number": "2250700000000",
+ *     "operator": "ORANGE",
+ *     "status": "completed" | "pending" | "failed"
+ *   }
  * }
  */
 export const ikeepayWebhook = asyncHandler(async (req, res) => {
-  const { event, ikeepay_ref: ikeepayRef, order_id: orderId, status } = req.body || {};
+  const signature = req.headers[IKEEPAY_SIGNATURE_HEADER];
+  const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
 
-  logger.info(`iKeePay webhook received: event=${event}, order_id=${orderId}, ikeepay_ref=${ikeepayRef}, status=${status}`);
-
-  if (!orderId && !ikeepayRef) {
-    return sendSuccess(res, { message: 'Missing order_id or ikeepay_ref, ignored.' });
+  const provider = getConfiguredIkeepayProvider();
+  if (!provider.verifyWebhookSignature(rawBody, signature)) {
+    logger.warn('iKeePay H2H webhook rejected: invalid X-Ikeepay-Signature.');
+    return res.status(401).send('Signature invalide');
   }
 
-  // Idempotency: find payment by externalRef or providerRef
-  const payment = orderId
-    ? await Payment.findOne({ externalRef: orderId })
-    : await Payment.findOne({ providerRef: ikeepayRef });
+  const event = req.body?.event || '';
+  const txData = req.body?.data && typeof req.body.data === 'object' ? req.body.data : req.body;
+  const txType = String(txData?.type || 'payin').toLowerCase();
+  const externalRef = txData?.external_reference || req.body?.order_id || '';
+  const providerRef = txData?.provider_reference || req.body?.ikeepay_ref || '';
+  const rawStatus = txData?.status || req.body?.status || '';
+
+  logger.info(
+    `iKeePay H2H webhook verified: event=${event}, type=${txType}, external_ref=${externalRef}, provider_ref=${providerRef}, status=${rawStatus}`
+  );
+
+  if (!externalRef && !providerRef) {
+    return res.status(200).send({ received: true, message: 'Missing reference, ignored.' });
+  }
+
+  const normalizedStatus = provider.normalizeStatus(rawStatus);
+
+  // 1. Handle Payout Webhook (Partner or Admin withdrawal updates)
+  if (txType === 'payout') {
+    const payout = externalRef
+      ? await PayoutTransaction.findOne({ externalRef })
+      : await PayoutTransaction.findOne({ providerRef });
+
+    if (!payout) {
+      logger.warn(`iKeePay H2H payout webhook for unknown ref: ${externalRef || providerRef}`);
+      return res.status(200).send({ received: true });
+    }
+
+    if (providerRef && !payout.providerRef) payout.providerRef = providerRef;
+    payout.rawWebhook = req.body;
+
+    if (payout.status === 'approved' || payout.status === 'rejected') {
+      return res.status(200).send({ received: true, message: 'Duplicate payout webhook.' });
+    }
+
+    if (normalizedStatus === 'approved') {
+      payout.status = 'approved';
+      await payout.save();
+      if (payout.role === 'partner' && payout.user) {
+        await User.findByIdAndUpdate(payout.user, { $inc: { 'partnership.totalWithdrawn': payout.amount } });
+      } else if (payout.role === 'admin') {
+        await PartnershipConfig.findOneAndUpdate({ key: 'default' }, { $inc: { adminPoolTotalWithdrawn: payout.amount } });
+      }
+    } else if (normalizedStatus === 'rejected') {
+      payout.status = 'rejected';
+      await payout.save();
+      if (payout.role === 'partner' && payout.user) {
+        await User.findByIdAndUpdate(payout.user, { $inc: { 'partnership.balance': payout.amount } });
+      } else if (payout.role === 'admin') {
+        await PartnershipConfig.findOneAndUpdate({ key: 'default' }, { $inc: { adminPoolBalance: payout.amount } });
+      }
+    }
+
+    return res.status(200).send({ received: true });
+  }
+
+  // 2. Handle Payin Webhook (Subscription or Partnership payment)
+  const payment = externalRef
+    ? await Payment.findOne({ externalRef })
+    : await Payment.findOne({ providerRef });
 
   if (!payment) {
-    logger.warn(`iKeePay webhook for unknown payment: order_id=${orderId}, ikeepay_ref=${ikeepayRef}`);
-    return sendSuccess(res, { message: 'Unknown payment, ignored.' });
+    logger.warn(`iKeePay H2H payin webhook for unknown payment: external_ref=${externalRef}, provider_ref=${providerRef}`);
+    return res.status(200).send({ received: true });
   }
 
   payment.webhookReceivedAt = new Date();
   payment.rawWebhook = req.body;
-  if (ikeepayRef) payment.providerRef = ikeepayRef;
+  if (providerRef) payment.providerRef = providerRef;
 
-  // Already final
   if (payment.status === 'approved') {
-    return sendSuccess(res, { message: 'Payment already approved.' });
+    return res.status(200).send({ received: true, message: 'Already approved.' });
   }
 
-  const isSuccess =
-    event === 'payment.success' ||
-    String(status).toLowerCase() === 'completed' ||
-    String(status).toLowerCase() === 'success';
-
-  if (isSuccess) {
+  if (normalizedStatus === 'approved') {
     payment.status = 'approved';
     await payment.save();
 
-    const plan = await getPlanById(payment.planId);
-    if (plan) {
-      const user = await User.findById(payment.user);
-      if (user) await activatePlan(user, plan);
+    if (payment.purpose !== 'partnership') {
+      const plan = await getPlanById(payment.planId);
+      if (plan && payment.user) {
+        const user = await User.findById(payment.user);
+        if (user) await activatePlan(user, plan, payment);
+      }
     }
 
     await logAuth('payment_webhook', {
-      message: `iKeePay Payment approved: ${payment.externalRef}`,
+      message: `iKeePay H2H Payin approved (${payment.purpose}): ${payment.externalRef}`,
       userId: payment.user,
-      metadata: { paymentId: payment._id, planId: payment.planId, ikeepayRef },
+      metadata: { paymentId: payment._id, planId: payment.planId, providerRef },
     });
 
-    return sendSuccess(res, { message: 'Payment approved and subscription activated.' });
+    return res.status(200).send({ received: true });
   }
 
-  if (['failed', 'cancelled', 'rejected'].includes(String(status).toLowerCase())) {
+  if (normalizedStatus === 'rejected') {
     payment.status = 'rejected';
     await payment.save();
   }
 
-  return sendSuccess(res, { message: `Payment status updated: ${payment.status}` });
+  return res.status(200).send({ received: true });
 });
 
 /**
  * POST /payments/checkout  (auth)
- * Legacy or direct checkout (e.g. SebPay or Demo).
+ * Direct checkout delegating to iKeePay H2H, SebPay, or Demo.
  */
 export const checkout = asyncHandler(async (req, res) => {
-  const { planId, phone, operator, provider: reqProvider } = req.body;
+  const { planId, phone, phoneNumber, operator, provider: reqProvider } = req.body;
   if (!planId) throw ApiError.badRequest('Plan ID is required.');
 
   const plan = await getPlanById(planId, { activeOnly: true });
   if (!plan) throw ApiError.badRequest('Invalid or inactive plan.');
   if (plan.price <= 0) throw ApiError.badRequest('This plan is free — no payment required.');
 
-  // If client requested iKeePay or active provider is iKeePay and no phone provided
   const activeProvider = reqProvider || settingsService.getValue('payments.provider') || config.payments.provider;
   if (activeProvider === 'ikeepay') {
     return initiateIkeepay(req, res);
   }
 
-  if (!phone || !String(phone).replace(/\s/g, '')) throw ApiError.badRequest('Phone number is required.');
-  if (operator && !OPERATORS.includes(operator)) throw ApiError.badRequest('Invalid operator.');
+  const rawPhone = phoneNumber || phone || '';
+  if (!rawPhone || !String(rawPhone).replace(/\s/g, '')) throw ApiError.badRequest('Phone number is required.');
+  if (operator && !OPERATORS.includes(String(operator).toLowerCase())) throw ApiError.badRequest('Invalid operator.');
 
   const provider = getProvider(activeProvider);
   const payment = await Payment.create({
@@ -493,7 +725,7 @@ export const checkout = asyncHandler(async (req, res) => {
     planId: plan.id,
     amount: plan.price,
     currency: plan.currency || config.payments.currency,
-    customerPhone: String(phone).replace(/\s/g, ''),
+    customerPhone: String(rawPhone).replace(/\s/g, ''),
     operator: operator || 'mtn',
     provider: provider.name,
     externalRef: `plan_${plan.id}_${req.user._id}_${Date.now()}`,
@@ -512,14 +744,13 @@ export const checkout = asyncHandler(async (req, res) => {
 
     payment.providerRef = result.providerRef;
     payment.status = result.status;
-    // Demo provider: approve instantly so the flow is testable zero-config.
     if (provider.name === 'demo' && result.status === 'pending') {
       payment.status = 'approved';
     }
     await payment.save();
 
     if (payment.status === 'approved') {
-      await activatePlan(req.user, plan);
+      await activatePlan(req.user, plan, payment);
     }
 
     return sendSuccess(res, {
@@ -547,7 +778,6 @@ export const checkout = asyncHandler(async (req, res) => {
 
 /**
  * POST /payments/webhook/sebpay  (PUBLIC)
- * SebPay POSTs here on final status.
  */
 export const webhook = asyncHandler(async (req, res) => {
   const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
@@ -586,7 +816,7 @@ export const webhook = asyncHandler(async (req, res) => {
     const plan = await getPlanById(payment.planId);
     if (plan) {
       const user = await User.findById(payment.user);
-      if (user) await activatePlan(user, plan);
+      if (user) await activatePlan(user, plan, payment);
     }
   }
 

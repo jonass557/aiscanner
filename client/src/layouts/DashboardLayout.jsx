@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ScanLine, History, CreditCard, User, Settings,
   Menu, X, LogOut, Moon, Sun, ShieldCheck, Layers, Radar, GraduationCap,
   CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe, Eye, Calculator, Cpu,
-  ArrowLeft, Share2,
+  ArrowLeft, Share2, Crown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -48,7 +48,9 @@ export default function DashboardLayout() {
   };
 
   const remaining =
-    user?.subscription?.plan === 'premium'
+    user?.subscription?.plan === 'premium' ||
+    user?.subscription?.scansPerMonth === -1 ||
+    (user?.partnership?.isActive && user?.partnership?.lifetimeAccess)
       ? '∞'
       : Math.max(0, (user?.subscription?.scansPerMonth || 0) - (user?.subscription?.scansUsed || 0));
 
@@ -80,6 +82,29 @@ export default function DashboardLayout() {
             {t(item.key)}
           </NavLink>
         ))}
+        <NavLink
+          to="/dashboard/partner"
+          onClick={() => setOpen(false)}
+          className={({ isActive }) =>
+            `flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+              isActive
+                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold'
+                : 'text-amber-400 hover:bg-amber-500/10 hover:text-amber-300'
+            }`
+          }
+        >
+          <Crown className="h-4 w-4 text-amber-400" />
+          <span>{user?.partnership?.isActive ? 'Espace Partenaire' : 'Devenir Partenaire'}</span>
+          {user?.partnership?.isActive ? (
+            <span className="ml-auto rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+              VIP
+            </span>
+          ) : (
+            <span className="ml-auto rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
+              30%
+            </span>
+          )}
+        </NavLink>
         {user?.referral?.enabled && (
           <NavLink
             to="/dashboard/referral"

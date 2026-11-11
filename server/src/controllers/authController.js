@@ -19,6 +19,7 @@ import {
   sendWelcomeEmail,
 } from '../services/emailService.js';
 import { logAuth } from '../services/logService.js';
+import { processPartnerCommissionSplit } from '../services/partnershipService.js';
 
 /**
  * POST /auth/register
@@ -50,9 +51,9 @@ export const register = asyncHandler(async (req, res) => {
     paidOrder = await Payment.findOne({ externalRef: orderId });
   }
 
-  // Check referral code
+  // Check referral code (from body OR stored on public paid order)
   let referredByUser = null;
-  const refCodeToFind = (reqRef || queryRef || '').trim().toUpperCase();
+  const refCodeToFind = (reqRef || queryRef || paidOrder?.referralCodeUsed || '').trim().toUpperCase();
   if (refCodeToFind) {
     referredByUser = await User.findOne({ referralCode: refCodeToFind });
   }
@@ -164,24 +165,38 @@ export const register = asyncHandler(async (req, res) => {
     },
   });
 
+  if (referredByUser && referredByUser.partnership?.isActive && referredByUser.partnership?.status === 'active') {
+    referredByUser.partnership.lastAffiliateAt = new Date();
+    await referredByUser.save().catch(() => {});
+  }
+
   if (paidOrder) {
     paidOrder.user = user._id;
     if (paidOrder.status !== 'approved') paidOrder.status = 'approved';
     await paidOrder.save();
 
-    // Credit referrer commission if enabled
-    if (referredByUser && referredByUser.referral?.enabled) {
+    if (referredByUser) {
       try {
-        const rate = (referredByUser.referral.commissionRate || 20) / 100;
-        const paidAmount = targetPlan?.effectivePrice ?? targetPlan?.price ?? paidOrder.amount ?? 7000;
-        const commission = Math.round(paidAmount * rate);
-        if (commission > 0) {
-          referredByUser.referral.balance = (referredByUser.referral.balance || 0) + commission;
-          referredByUser.referral.totalEarned = (referredByUser.referral.totalEarned || 0) + commission;
-          await referredByUser.save();
+        const paidAmount = paidOrder.amount ?? targetPlan?.effectivePrice ?? targetPlan?.price ?? 7000;
+        const handledByPartner = await processPartnerCommissionSplit({
+          subscriber: user,
+          payment: paidOrder,
+          plan: targetPlan,
+          paidAmount,
+        });
+
+        // Legacy referral fallback (20%) when referrer is not an active VIP Partner
+        if (!handledByPartner && referredByUser.referral?.enabled) {
+          const rate = (referredByUser.referral.commissionRate || 20) / 100;
+          const commission = Math.round(paidAmount * rate);
+          if (commission > 0) {
+            referredByUser.referral.balance = (referredByUser.referral.balance || 0) + commission;
+            referredByUser.referral.totalEarned = (referredByUser.referral.totalEarned || 0) + commission;
+            await referredByUser.save();
+          }
         }
       } catch (err) {
-        console.error('Failed to credit referral commission on register:', err);
+        console.error('Failed to credit referral/partner commission on register:', err);
       }
     }
   }
@@ -223,7 +238,9 @@ export const login = asyncHandler(async (req, res) => {
     throw ApiError.unauthorized('Invalid email or password.');
   }
 
-  if (user.trial?.isActive && user.trial?.endsAt && new Date() > new Date(user.trial.endsAt)) {
+  const hasLifetimePartner = Boolean(user.partnership?.isActive && user.partnership?.status === 'active' && user.partnership?.lifetimeAccess);
+
+  if (!hasLifetimePartner && user.trial?.isActive && user.trial?.endsAt && new Date() > new Date(user.trial.endsAt)) {
     user.trial.isActive = false;
     if (user.subscription.status === 'active') {
       user.subscription.status = 'expired';

@@ -90,8 +90,8 @@ const config = {
   },
 
   payments: {
-    // 'ikeepay' for iKeePay inline checkout, 'sebpay' for SebPay, or 'demo' (default)
-    provider: process.env.PAYMENT_PROVIDER || (process.env.IKEEPAY_PUBLIC_KEY ? 'ikeepay' : process.env.SEBPAY_SECRET_KEY ? 'sebpay' : 'demo'),
+    // 'ikeepay' for iKeePay H2H, 'sebpay' for SebPay, or 'demo' (default)
+    provider: process.env.PAYMENT_PROVIDER || (process.env.IKEEPAY_SECRET_KEY || process.env.IKEEPAY_PUBLIC_KEY ? 'ikeepay' : process.env.SEBPAY_SECRET_KEY ? 'sebpay' : 'demo'),
     currency: process.env.PAYMENT_CURRENCY || 'USD',
     sebpay: {
       publicKey: process.env.SEBPAY_PUBLIC_KEY,

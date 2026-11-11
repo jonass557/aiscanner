@@ -35,10 +35,12 @@ export default function Register() {
   const paramName = searchParams.get('name') || '';
   const orderId = searchParams.get('orderId') || '';
   const selectedPlan = searchParams.get('plan') || '1mois';
+  const storedRef = typeof window !== 'undefined' ? (localStorage.getItem('ai_scanner_ref') || '') : '';
+  const referralCode = (searchParams.get('ref') || searchParams.get('referralCode') || storedRef || '').trim().toUpperCase();
 
   // Si l'utilisateur clique directement sur le lien externe (ex: https://aiscanner-ten.vercel.app/register)
   // sans aucun paramètre ni plan ni commande, on le redirige vers la page d'accueil pour voir les forfaits d'abord.
-  const isDirectExternalClick = !searchParams.get('join') && !searchParams.get('plan') && !orderId && !window.history.state?.idx;
+  const isDirectExternalClick = !searchParams.get('join') && !searchParams.get('plan') && !orderId && !referralCode && !window.history.state?.idx;
 
   useEffect(() => {
     if (isDirectExternalClick) {
@@ -81,6 +83,7 @@ export default function Register() {
         plan: selectedPlan,
         deviceFingerprint: fp,
         orderId,
+        ref: referralCode,
       });
 
       toast.success('Compte créé avec succès ! Un code OTP vous a été envoyé par email.');

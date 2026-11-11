@@ -45,7 +45,6 @@ const userSchema = new mongoose.Schema(
     subscription: {
       plan: {
         type: String,
-        enum: ['free', 'pro', 'premium'],
         default: 'free',
       },
       status: {
@@ -108,6 +107,31 @@ const userSchema = new mongoose.Schema(
       balance: { type: Number, default: 0 }, // Solde disponible en FCFA
       totalEarned: { type: Number, default: 0 },
       totalWithdrawn: { type: Number, default: 0 },
+    },
+
+    // VIP Partnership Program (Accès à vie + Commission mensuelle configurable)
+    partnership: {
+      isActive: { type: Boolean, default: false },
+      status: {
+        type: String,
+        enum: ['none', 'pending_form', 'active', 'excluded', 'disabled'],
+        default: 'none',
+      },
+      joinedAt: { type: Date, default: null },
+      lifetimeAccess: { type: Boolean, default: false },
+      formSubmitted: { type: Boolean, default: false },
+      formSubmittedAt: { type: Date, default: null },
+      fullName: { type: String, default: '' },
+      email: { type: String, default: '' },
+      phone: { type: String, default: '' },
+      paymentRef: { type: String, default: '' },
+      paidAmount: { type: Number, default: 0 },
+      balance: { type: Number, default: 0 },
+      totalEarned: { type: Number, default: 0 },
+      totalWithdrawn: { type: Number, default: 0 },
+      lastAffiliateAt: { type: Date, default: null },
+      excludedReason: { type: String, default: '' },
+      excludedAt: { type: Date, default: null },
     },
 
     // Anti-Abuse device & IP tracking
@@ -196,9 +220,14 @@ userSchema.methods.checkAndResetMonthlyScans = function () {
   return false;
 };
 
-// Check if user can scan (unlimited scans on all active accounts and trials)
+// Check if user can scan (unlimited scans on all active accounts, lifetime partners and trials)
 userSchema.methods.canScan = function () {
   if (this.role === 'admin') return true;
+
+  // Active VIP Partner with lifetime access
+  if (this.partnership?.isActive && this.partnership?.status === 'active' && this.partnership?.lifetimeAccess) {
+    return true;
+  }
 
   // Active free trial
   if (this.trial?.isActive && this.trial?.endsAt && new Date() < new Date(this.trial.endsAt)) {

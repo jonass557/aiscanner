@@ -29,3 +29,8 @@ const getProvider = (providerName = config.payments.provider) => {
 
 export { getProvider, IkeepayProvider, SebPayProvider, DemoPaymentProvider };
 export { SEBPAY_SIGNATURE_HEADER } from './SebPayProvider.js';
+export {
+  IKEEPAY_SIGNATURE_HEADER,
+  IKEEPAY_H2H_COUNTRIES,
+  normalizeH2HPhone,
+} from './IkeepayProvider.js';

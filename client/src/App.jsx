@@ -35,6 +35,7 @@ const History = lazy(() => import('./pages/dashboard/History.jsx'));
 const AnalysisDetail = lazy(() => import('./pages/dashboard/AnalysisDetail.jsx'));
 const Subscription = lazy(() => import('./pages/dashboard/Subscription.jsx'));
 const Referral = lazy(() => import('./pages/dashboard/Referral.jsx'));
+const PartnerDashboard = lazy(() => import('./pages/dashboard/PartnerDashboard.jsx'));
 const Profile = lazy(() => import('./pages/dashboard/Profile.jsx'));
 const Settings = lazy(() => import('./pages/dashboard/Settings.jsx'));
 
@@ -44,6 +45,7 @@ const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics.jsx'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
 const AdminStrategies = lazy(() => import('./pages/admin/AdminStrategies.jsx'));
 const AdminPlans = lazy(() => import('./pages/admin/AdminPlans.jsx'));
+const AdminPartnership = lazy(() => import('./pages/admin/AdminPartnership.jsx'));
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews.jsx'));
 const AdminLogs = lazy(() => import('./pages/admin/AdminLogs.jsx'));
 const AdminAIConfig = lazy(() => import('./pages/admin/AdminAIConfig.jsx'));
@@ -92,6 +94,7 @@ export default function App() {
           <Route path="history" element={<History />} />
           <Route path="history/:id" element={<AnalysisDetail />} />
           <Route path="subscription" element={<Subscription />} />
+          <Route path="partner" element={<PartnerDashboard />} />
           <Route path="referral" element={<Referral />} />
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
@@ -111,6 +114,7 @@ export default function App() {
           <Route path="users" element={<AdminUsers />} />
           <Route path="strategies" element={<AdminStrategies />} />
           <Route path="plans" element={<AdminPlans />} />
+          <Route path="partnership" element={<AdminPartnership />} />
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="logs" element={<AdminLogs />} />
           <Route path="ai-config" element={<AdminAIConfig />} />

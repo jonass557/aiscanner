@@ -188,7 +188,8 @@ export default function AdminAIConfig() {
   const isGeminiActive = aiConfig?.activeProvider === 'gemini';
 
   const ikeepayConfigured = Boolean(
-    values['payments.ikeepay.publicKey'] ||
+    values['payments.ikeepay.secretKey'] ||
+    aiConfig?.payments?.ikeepay?.secretKeyPreview ||
     aiConfig?.payments?.ikeepay?.configured
   );
   const isIkeepayActive = (values['payments.provider'] || aiConfig?.activePaymentProvider) === 'ikeepay';
@@ -248,7 +249,7 @@ export default function AdminAIConfig() {
                   )}
                 </div>
                 <p className="text-xs text-slate-400">
-                  Tunnel de paiement Inline Checkout sans redirection externe. Supporte Cartes Bancaires (Visa/Mastercard) et Mobile Money (Orange, MTN, Moov, Wave...).
+                  Intégration officielle iKeePay H2H (https://api.ikeepay.com) : Encaissements (Payin), Retraits (Payout) &amp; Webhooks HMAC SHA-256 via clé secrète x-api-key.
                 </p>
               </div>
             </div>
@@ -306,7 +307,7 @@ export default function AdminAIConfig() {
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-300">
-                Clé Secrète iKeePay (sk_live_... ou sk_test_...)
+                Clé Secrète iKeePay H2H (x-api-key · sk_live_... ou sk_test_...) *
               </label>
               <div className="relative">
                 <input
@@ -329,7 +330,7 @@ export default function AdminAIConfig() {
                 </button>
               </div>
               <p className="mt-1 text-xs text-slate-400">
-                Chiffrée en AES-256 pour vérifier les paiements et sécuriser les webhooks.
+                Obligatoire pour les requêtes H2H (Payin, Payout, Verify) et la signature HMAC SHA-256 des webhooks (X-Ikeepay-Signature). Chiffrée en AES-256.
               </p>
             </div>
           </div>

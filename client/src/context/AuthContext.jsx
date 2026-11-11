@@ -58,9 +58,19 @@ export const AuthProvider = ({ children }) => {
 
   const refreshUser = loadUser;
 
+  const setSession = ({ accessToken, refreshToken, user: nextUser }) => {
+    if (accessToken && refreshToken) {
+      tokenStore.set(accessToken, refreshToken);
+    }
+    if (nextUser) {
+      setUser(nextUser);
+    }
+  };
+
   const value = {
     user,
     setUser,
+    setSession,
     loading,
     login,
     register,

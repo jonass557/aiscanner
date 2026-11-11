@@ -234,3 +234,22 @@ export const referralApi = {
   processWithdrawal: (id, payload) => api.post(`/referrals/admin/withdrawals/${id}/process`, payload),
   updateUserReferral: (userId, payload) => api.put(`/referrals/admin/users/${userId}`, payload),
 };
+
+
+export const partnershipApi = {
+  getConfig: () => api.get('/partnership/config'),
+  pay: (payload) => api.post('/partnership/pay', payload),
+  verifyPayment: (payload) => api.post('/partnership/verify-payment', payload),
+  completeRegistration: (payload) => api.post('/partnership/complete-registration', payload),
+  myDashboard: () => api.get('/partnership/my-dashboard'),
+  withdraw: (payload) => api.post('/partnership/withdraw', payload),
+  verifyPayout: (payload) => api.post('/partnership/payout/verify', payload),
+  // Admin endpoints
+  adminOverview: () => api.get('/partnership/admin/overview'),
+  adminUpdateConfig: (payload) => api.put('/partnership/admin/config', payload),
+  adminDeleteProgram: () => api.delete('/partnership/admin/config'),
+  adminUpdatePartnerStatus: (userId, payload) => api.patch(`/partnership/admin/partners/${userId}/status`, payload),
+  adminReleaseCommissions: () => api.post('/partnership/admin/release-commissions'),
+  adminWithdraw: (payload) => api.post('/partnership/admin/withdraw', payload),
+  adminVerifyPayout: (payload) => api.post('/partnership/admin/payout/verify', payload),
+};

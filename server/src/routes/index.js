@@ -21,6 +21,7 @@ import tradingDelegateRoutes from './tradingDelegateRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
 import referralRoutes from './referralRoutes.js';
+import partnershipRoutes from './partnershipRoutes.js';
 
 /**
  * Root API router. Mounts each domain's routes under /api/v1.
@@ -51,6 +52,7 @@ router.use('/voice', requireDbConnection, voiceRoutes);
 router.use('/assistant', requireDbConnection, assistantRoutes);
 router.use('/payments', requireDbConnection, paymentRoutes);
 router.use('/referrals', requireDbConnection, referralRoutes);
+router.use('/partnership', requireDbConnection, partnershipRoutes);
 router.use('/admin/reviews', requireDbConnection, reviewRoutes);
 router.use('/', requireDbConnection, multiTimeframeRoutes); // /multi-timeframe-scan + /multi-timeframe-analyses
 router.use('/', requireDbConnection, tradeValidatorRoutes); // /trade-validator + /trade-validations

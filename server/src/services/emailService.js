@@ -215,3 +215,32 @@ export const sendOpportunityAlertEmail = async (user, opportunity) => {
     ),
   });
 };
+
+/**
+ * Notify admin when a new VIP Partner submits their post-payment identification form.
+ */
+export const sendAdminPartnershipNotification = async ({ fullName, email, phone, paymentRef, amount, currency }) => {
+  const adminEmail = config.admin?.email || config.email?.user;
+  if (!adminEmail) return false;
+
+  const detailsHtml = `
+    <div style="margin:18px 0; padding:16px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; font-size:14px; color:#1e293b;">
+      <p style="margin:0 0 8px;"><strong>Nom complet :</strong> ${fullName}</p>
+      <p style="margin:0 0 8px;"><strong>Email :</strong> ${email}</p>
+      <p style="margin:0 0 8px;"><strong>Téléphone / WhatsApp :</strong> ${phone}</p>
+      <p style="margin:0 0 8px;"><strong>Montant payé :</strong> ${Number(amount || 0).toLocaleString()} ${currency || 'XOF'}</p>
+      <p style="margin:0;"><strong>Référence paiement :</strong> <code>${paymentRef}</code></p>
+    </div>
+  `;
+
+  return send({
+    to: adminEmail,
+    subject: `🤝 Nouveau Partenaire VIP inscrit : ${fullName} (${email})`,
+    html: baseTemplate(
+      'Nouveau Formulaire Partenaire Reçu',
+      `Un utilisateur vient de souscrire au Programme de Partenariat VIP et d'obtenir son accès à vie.${detailsHtml}`,
+      'Gérer les Partenaires (Admin)',
+      `${config.frontendUrl}/admin/partnership`
+    ),
+  });
+};

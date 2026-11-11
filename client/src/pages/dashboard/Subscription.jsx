@@ -1,19 +1,20 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-  Check, Zap, Smartphone, Gift, CreditCard, X, ShieldCheck,
-  History, Receipt, ExternalLink, RefreshCw, AlertCircle, CheckCircle2,
-  Calendar, ArrowUpRight,
+  Check, Zap, Smartphone, Gift, CreditCard, ShieldCheck,
+  History, Receipt, RefreshCw, CheckCircle2, Calendar, Crown, ArrowRight,
 } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
-import { userApi, paymentApi } from '../../services/endpoints.js';
+import { userApi, paymentApi, partnershipApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatDate } from '../../utils/format.js';
+import H2HPlanCheckoutModal from '../../components/payments/H2HPlanCheckoutModal.jsx';
+import PartnershipModal from '../../components/partnership/PartnershipModal.jsx';
 
 const OPERATORS = [
   { value: 'mtn', label: 'MTN Mobile Money' },
@@ -78,33 +79,27 @@ const FALLBACK_PLANS = [
 ];
 
 /**
- * Subscription Management & iKeePay Inline Checkout:
- * - Plans catalog (free, pro, premium) & live monthly usage
- * - iKeePay Inline Checkout modal with zero flash, mobile money & cards
- * - Real-time iframe window message listener (ikeepay-ready, ikeepay-success, ikeepay-close)
- * - Invoices & payment history tab
+ * Subscription Management & iKeePay H2H Direct Checkout + VIP Partnership Access
  */
 export default function Subscription() {
   const { user, refreshUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Tabs: 'plans' | 'history'
   const initialTab = searchParams.get('tab') === 'history' || searchParams.get('tab') === 'invoices' ? 'history' : 'plans';
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const [plans, setPlans] = useState(FALLBACK_PLANS);
   const [paymentConfig, setPaymentConfig] = useState(null);
+  const [partnerConfig, setPartnerConfig] = useState(null);
   const [paymentsList, setPaymentsList] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [changing, setChanging] = useState(null);
 
-  // iKeePay Inline Checkout state
-  const [ikeepayOverlayVisible, setIkeepayOverlayVisible] = useState(false);
-  const [methodModalPlan, setMethodModalPlan] = useState(null);
-  const [ikeepayIframeSrc, setIkeepayIframeSrc] = useState('');
-  const [ikeepayLoading, setIkeepayLoading] = useState(false);
-  const [currentOrderId, setCurrentOrderId] = useState(null);
-  const [selectedPlanForIkeepay, setSelectedPlanForIkeepay] = useState(null);
+  // H2H Plan Checkout Modal
+  const [h2hCheckoutPlan, setH2hCheckoutPlan] = useState(null);
+
+  // Partnership Modal
+  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
 
   // Legacy Mobile Money (SebPay) modal fallback
   const [payForSebpay, setPayForSebpay] = useState(null);
@@ -112,8 +107,7 @@ export default function Subscription() {
   const [sebpayPhone, setSebpayPhone] = useState('');
   const [payingSebpay, setPayingSebpay] = useState(false);
 
-  // Initial data loading: fetch dynamic database-backed plans from admin
-  useEffect(() => {
+  const loadData = () => {
     userApi.plans()
       .then(({ data }) => {
         if (Array.isArray(data?.data?.plans) && data.data.plans.length > 0) {
@@ -125,9 +119,16 @@ export default function Subscription() {
     paymentApi.getConfig()
       .then(({ data }) => setPaymentConfig(data?.data || null))
       .catch(() => {});
+
+    partnershipApi.getConfig()
+      .then(({ data }) => setPartnerConfig(data?.data || null))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
-  // Load history if activeTab is 'history'
   useEffect(() => {
     if (activeTab === 'history') {
       setLoadingHistory(true);
@@ -138,75 +139,17 @@ export default function Subscription() {
     }
   }, [activeTab]);
 
-  // Sync tab with URL search parameter
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setSearchParams(tab === 'history' ? { tab: 'history' } : {});
   };
 
-  /**
-   * Listen for iKeePay events emitted by the inline checkout iframe
-   * Structure spec:
-   * 1. 'ikeepay-ready': reveal the overlay modal
-   * 2. 'ikeepay-success': payment completed
-   * 3. 'ikeepay-close': close overlay modal
-   */
-  useEffect(() => {
-    const handleIkeepayMessage = async (event) => {
-      const data = event.data;
-
-      // 1. Ready event
-      if (data === 'ikeepay-ready') {
-        setIkeepayOverlayVisible(true);
-        setIkeepayLoading(false);
-      }
-
-      // 2. Success event
-      if (data === 'ikeepay-success' || (typeof data === 'object' && data?.event === 'payment.success')) {
-        toast.success('Paiement approuvé par iKeePay ! Activation du plan en cours…');
-        const ikeepayRef = typeof data === 'object' ? data?.ikeepay_ref : null;
-
-        if (currentOrderId) {
-          try {
-            await paymentApi.verifyIkeepay({ orderId: currentOrderId, ikeepayRef });
-          } catch (e) {
-            console.warn('Verification call:', e);
-          }
-        }
-
-        await refreshUser();
-        closeIkeepay();
-        toast.success('Votre abonnement est maintenant actif avec succès ! 🎉', { duration: 6000 });
-      }
-
-      // 3. Close event
-      if (data === 'ikeepay-close') {
-        closeIkeepay();
-      }
-    };
-
-    window.addEventListener('message', handleIkeepayMessage);
-    return () => window.removeEventListener('message', handleIkeepayMessage);
-  }, [currentOrderId, refreshUser]);
-
-  const closeIkeepay = () => {
-    setIkeepayOverlayVisible(false);
-    setIkeepayIframeSrc('');
-    setIkeepayLoading(false);
-    setCurrentOrderId(null);
-    setSelectedPlanForIkeepay(null);
-  };
-
   const currentPlan = user?.subscription?.plan;
+  const isLifetimePartner = Boolean(user?.partnership?.isActive && user?.partnership?.status === 'active' && user?.partnership?.lifetimeAccess);
 
-  /**
-   * User clicks to select, upgrade, or renew a plan
-   */
   const choosePlan = async (plan) => {
-    // Check if free trial is available for this user
     const trialAvailable = plan.trial?.enabled && user?.trial?.appliedFor !== plan.id;
 
-    // Free plan or Free trial
     if (plan.price === 0 || trialAvailable) {
       if (plan.id === currentPlan && !trialAvailable) return;
       setChanging(plan.id);
@@ -222,60 +165,15 @@ export default function Subscription() {
       return;
     }
 
-    // Paid Plan: check active payment provider (allows upgrade or renewal)
-    const isIkeepay = paymentConfig?.activeProvider === 'ikeepay' || paymentConfig?.ikeepay?.configured;
-
-    if (isIkeepay) {
-      // Prompt user to pick Mobile Money (XAF) or Crypto (USDT)
-      const isXaf = ['XAF', 'XOF', 'FCFA'].includes((plan.currency || '').toUpperCase());
-      if (isXaf) {
-        setMethodModalPlan(plan);
-      } else {
-        await startIkeepayCheckout(plan, 'USD');
-      }
-    } else {
-      // Fallback to Mobile Money (SebPay/Demo)
+    const activeProv = paymentConfig?.activeProvider || 'ikeepay';
+    if (activeProv === 'sebpay') {
       setPayForSebpay(plan);
       setSebpayPhone('');
+    } else {
+      setH2hCheckoutPlan(plan);
     }
   };
 
-  /**
-   * Initiate iKeePay checkout session and load inline iframe
-   */
-  const startIkeepayCheckout = async (plan, paymentCurrency = 'XAF') => {
-    setChanging(plan.id);
-    setSelectedPlanForIkeepay(plan);
-    setMethodModalPlan(null);
-    try {
-      const { data } = await paymentApi.initiateIkeepay({
-        planId: plan.id,
-        paymentCurrency,
-        paymentMethod: paymentCurrency === 'USDT' ? 'crypto' : 'mobile_money',
-        redirectUrl: `${window.location.origin}/dashboard/subscription?status=success`,
-      });
-
-      const session = data?.data;
-      if (!session?.checkoutUrl) {
-        throw new Error("L'URL du tunnel de paiement iKeePay n'a pas pu être générée.");
-      }
-
-      setCurrentOrderId(session.orderId);
-      setIkeepayIframeSrc(session.checkoutUrl);
-      setIkeepayLoading(true);
-      // Make overlay visible immediately with loader until 'ikeepay-ready' fires
-      setIkeepayOverlayVisible(true);
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-      closeIkeepay();
-    } finally {
-      setChanging(null);
-    }
-  };
-
-  /**
-   * SebPay legacy collection
-   */
   const paySebpay = async () => {
     if (!sebpayPhone.trim()) return toast.error('Entrez votre numéro Mobile Money.');
     setPayingSebpay(true);
@@ -289,7 +187,7 @@ export default function Subscription() {
       toast.success(data.message || 'Paiement initié.');
       setPayForSebpay(null);
       if (data.data?.status !== 'approved') {
-        toast('Confirmez la demande sur votre téléphone. Votre plan s\'activera après validation.', { icon: '📲', duration: 7000 });
+        toast("Confirmez la demande sur votre téléphone. Votre plan s'activera après validation.", { icon: '📲', duration: 7000 });
       }
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -298,10 +196,6 @@ export default function Subscription() {
     }
   };
 
-  const used = user?.subscription?.scansUsed || 0;
-  const limit = user?.subscription?.scansPerMonth || 0;
-  const pct = limit === -1 ? 0 : Math.min(100, (used / limit) * 100);
-
   const expirationDate = user?.subscription?.endDate || user?.trial?.endsAt;
   const nowMs = Date.now();
   const expMs = expirationDate ? new Date(expirationDate).getTime() : 0;
@@ -309,37 +203,31 @@ export default function Subscription() {
 
   return (
     <div className="space-y-6 text-slate-100">
-      {/* Top Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-black text-white flex items-center gap-2.5">
-            <CreditCard className="h-6 w-6 text-cyan-400" /> Abonnements &amp; Facturation
+            <CreditCard className="h-6 w-6 text-cyan-400" /> Abonnements &amp; Partenariat VIP
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Gérez votre forfait, activez l'essai gratuit ou souscrivez instantanément en toute sécurité.
+            Gérez votre forfait, souscrivez via iKeePay Mobile Money H2H ou devenez Partenaire VIP à vie.
           </p>
         </div>
 
-        {/* Tab switcher */}
         <div className="flex rounded-xl bg-slate-900 border border-slate-800 p-1">
           <button
             type="button"
             onClick={() => handleTabChange('plans')}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              activeTab === 'plans'
-                ? 'bg-cyan-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
+              activeTab === 'plans' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Zap className="h-3.5 w-3.5" /> Forfaits &amp; Souscription
+            <Zap className="h-3.5 w-3.5" /> Forfaits &amp; Partenariat
           </button>
           <button
             type="button"
             onClick={() => handleTabChange('history')}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              activeTab === 'history'
-                ? 'bg-cyan-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
+              activeTab === 'history' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
             }`}
           >
             <Receipt className="h-3.5 w-3.5" /> Historique &amp; Factures
@@ -349,36 +237,39 @@ export default function Subscription() {
 
       {activeTab === 'plans' ? (
         <>
-          {/* Current usage & Expiration countdown banner */}
+          {/* Current usage & Expiration banner */}
           <div className="rounded-2xl p-6 border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase font-bold tracking-wider text-slate-400">Votre Forfait Actuel</p>
-                <div className="flex items-center gap-3 mt-1.5">
+                <p className="text-xs uppercase font-bold tracking-wider text-slate-400">Votre Statut Actuel</p>
+                <div className="flex flex-wrap items-center gap-3 mt-1.5">
                   <span className="text-2xl font-black capitalize text-white">
-                    {plans.find((p) => p.id === currentPlan)?.name || currentPlan || '1 Mois'}
+                    {isLifetimePartner
+                      ? 'Partenaire VIP — Accès à Vie'
+                      : plans.find((p) => p.id === currentPlan)?.name || currentPlan || '1 Mois'}
                   </span>
-                  <Badge tone={user?.subscription?.status === 'active' ? 'green' : 'yellow'} className="text-xs px-3 py-0.5 font-bold">
-                    {user?.subscription?.status === 'active' ? 'Actif' : user?.subscription?.status || 'Inactif'}
+                  <Badge tone={isLifetimePartner || user?.subscription?.status === 'active' ? 'green' : 'yellow'} className="text-xs px-3 py-0.5 font-bold">
+                    {isLifetimePartner ? 'Accès à Vie Actif' : user?.subscription?.status === 'active' ? 'Actif' : user?.subscription?.status || 'Inactif'}
                   </Badge>
                 </div>
               </div>
 
-              {/* Expiration countdown box */}
               <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex items-center gap-4 shadow-inner">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                  <Calendar className="h-5 w-5" />
+                  {isLifetimePartner ? <Crown className="h-5 w-5 text-amber-400" /> : <Calendar className="h-5 w-5" />}
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Temps restant avant expiration</span>
-                  <div className="text-sm font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
-                    {daysRemaining > 0 ? (
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Validité de l'accès</span>
+                  <div className="text-sm font-extrabold text-slate-100 mt-0.5">
+                    {isLifetimePartner ? (
+                      <span className="text-amber-400 font-black">Illimité à vie (Partenaire VIP)</span>
+                    ) : daysRemaining > 0 ? (
                       <span className="text-emerald-400 font-extrabold">{daysRemaining} jour{daysRemaining > 1 ? 's' : ''} restant{daysRemaining > 1 ? 's' : ''}</span>
                     ) : (
                       <span className="text-rose-400 font-bold">Abonnement expiré</span>
                     )}
                   </div>
-                  {expirationDate && (
+                  {!isLifetimePartner && expirationDate && (
                     <span className="text-[11px] text-slate-400 block mt-0.5">
                       Expire le {new Date(expirationDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
                     </span>
@@ -386,19 +277,46 @@ export default function Subscription() {
                 </div>
               </div>
             </div>
-
-            <div className="mt-5 border-t border-slate-800/80 pt-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-300">
-              <span className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                Scans et détections IA : <strong className="text-emerald-400">Illimités (∞)</strong>
-              </span>
-              <span className="text-slate-400">
-                Besoin de changer de formule ? Sélectionnez un forfait ci-dessous pour upgrader instantanément.
-              </span>
-            </div>
           </div>
 
-          {/* Pricing cards grid - High contrast dark styling */}
+          {/* Programme de Partenariat CTA Card for existing logged-in users */}
+          {partnerConfig?.isEnabled && !partnerConfig?.isDeleted && !isLifetimePartner && (
+            <div className="rounded-2xl border-2 border-amber-500/50 bg-gradient-to-r from-amber-950/40 via-slate-900 to-orange-950/30 p-6 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-slate-950 shadow-lg">
+                  <Crown className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-black text-amber-300">{partnerConfig.title || 'Programme de Partenariat VIP'}</h3>
+                    <span className="rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[11px] font-bold text-amber-300">
+                      {partnerConfig.spotsRemaining} / {partnerConfig.maxPartners} places restantes
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-200">{partnerConfig.subtitle}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Même si vous avez déjà un abonnement en cours, votre statut bascule immédiatement en Partenaire à Vie + {partnerConfig.commissionRate || 30}% de commission chaque mois.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={Number(partnerConfig.spotsRemaining) <= 0}
+                onClick={() => setPartnerModalOpen(true)}
+                className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3.5 text-sm font-black text-slate-950 shadow-lg hover:brightness-110 transition disabled:opacity-40"
+              >
+                <Crown className="h-4 w-4" />
+                <span>
+                  {Number(partnerConfig.spotsRemaining) <= 0
+                    ? 'Programme Complet'
+                    : `Devenir Partenaire (${Number(partnerConfig.price || 0).toLocaleString('fr-FR')} ${partnerConfig.currency || 'XOF'})`}
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Pricing cards grid */}
           <div className="grid gap-6 lg:grid-cols-3">
             {plans.map((plan) => {
               const isCurrent = plan.id === currentPlan;
@@ -439,16 +357,11 @@ export default function Subscription() {
                           <span className="text-4xl font-black text-amber-400">
                             {Number(plan.promo.price).toLocaleString()}
                           </span>
-                          <span className="text-sm font-semibold text-slate-400">
-                            {plan.currency || 'XOF'}
-                          </span>
+                          <span className="text-sm font-semibold text-slate-400">{plan.currency || 'XOF'}</span>
                           <span className="text-sm text-slate-500 line-through">
                             {Number(plan.price).toLocaleString()} {plan.currency}
                           </span>
                         </div>
-                        <p className="text-[11px] font-medium text-amber-300 mt-1">
-                          Tarif promo : {plan.promo.durationMonths} {plan.promo.durationMonths === 1 ? 'mois' : 'mois'}, puis {Number(plan.price).toLocaleString()} {plan.currency}
-                        </p>
                       </div>
                     ) : (
                       <div className="flex items-baseline gap-1.5">
@@ -456,9 +369,7 @@ export default function Subscription() {
                           {plan.price === 0 ? 'Gratuit' : Number(plan.price).toLocaleString()}
                         </span>
                         {plan.price > 0 && (
-                          <span className="text-sm font-semibold text-slate-400">
-                            {plan.currency || 'FCFA'}
-                          </span>
+                          <span className="text-sm font-semibold text-slate-400">{plan.currency || 'FCFA'}</span>
                         )}
                       </div>
                     )}
@@ -490,7 +401,7 @@ export default function Subscription() {
                     ) : trialAvailable ? (
                       <><Gift className="h-4 w-4" /> Démarrer l'essai gratuit</>
                     ) : plan.price > 0 ? (
-                      <><CreditCard className="h-4 w-4" /> Passer à ce forfait (Upgrade)</>
+                      <><CreditCard className="h-4 w-4" /> Payer via iKeePay H2H</>
                     ) : (
                       <><Zap className="h-4 w-4" /> Choisir {plan.name}</>
                     )}
@@ -500,34 +411,22 @@ export default function Subscription() {
             })}
           </div>
 
-          {/* Secure Payment Gateway Guarantee */}
+          {/* Security / Payment Gateway Guarantee */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 <ShieldCheck className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Paiement 100% Sécurisé via iKeePay</p>
+                <p className="text-sm font-bold text-white">Paiement Direct Sécurisé via iKeePay H2H</p>
                 <p className="text-xs text-slate-400">
-                  Cartes Visa, Mastercard et Mobile Money (Orange Money, MTN, Moov, Wave). Chiffrement bancaire SSL 256-bit.
+                  Mobile Money (Orange, MTN, Wave, Moov, Mobicash, Airtel, Vodacom). Activation instantanée dès validation.
                 </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-lg bg-slate-800/80 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700/60">
-                Mobile Money
-              </span>
-              <span className="rounded-lg bg-slate-800/80 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700/60">
-                Cartes Bancaires
-              </span>
-              <span className="rounded-lg bg-emerald-950/60 px-2.5 py-1 text-xs font-bold text-emerald-400 border border-emerald-800/60">
-                Activation Immédiate
-              </span>
             </div>
           </div>
         </>
       ) : (
-        /* Invoices & Payment History Tab */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -553,7 +452,6 @@ export default function Subscription() {
             <div className="rounded-2xl border border-slate-800 bg-slate-900/90 text-center py-12 p-6 shadow-xl">
               <Receipt className="h-10 w-10 text-slate-500 mx-auto mb-2 opacity-60" />
               <p className="font-semibold text-slate-200">Aucun paiement enregistré pour l'instant</p>
-              <p className="text-xs text-slate-400 mt-1">Vos factures et reçus apparaîtront ici dès votre premier règlement.</p>
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-xl overflow-x-auto">
@@ -561,9 +459,9 @@ export default function Subscription() {
                 <thead className="border-b border-slate-800 bg-slate-950/70 text-xs uppercase font-bold text-slate-400">
                   <tr>
                     <th className="px-5 py-3.5">Référence / Date</th>
-                    <th className="px-5 py-3.5">Plan</th>
+                    <th className="px-5 py-3.5">Type / Plan</th>
+                    <th className="px-5 py-3.5">Opérateur</th>
                     <th className="px-5 py-3.5">Montant</th>
-                    <th className="px-5 py-3.5">Passerelle</th>
                     <th className="px-5 py-3.5">Statut</th>
                   </tr>
                 </thead>
@@ -571,25 +469,23 @@ export default function Subscription() {
                   {paymentsList.map((p) => (
                     <tr key={p._id} className="hover:bg-slate-800/30 transition">
                       <td className="px-5 py-4">
-                        <div className="font-mono text-xs font-bold text-white">
-                          {p.externalRef || p.providerRef || p._id}
-                        </div>
+                        <div className="font-mono text-xs font-bold text-white">{p.externalRef || p.providerRef || p._id}</div>
                         <div className="text-xs text-slate-400 mt-0.5">{formatDate(p.createdAt)}</div>
                       </td>
-                      <td className="px-5 py-4 font-semibold capitalize text-white">
-                        {p.planId}
+                      <td className="px-5 py-4 font-semibold text-white">
+                        {p.purpose === 'partnership' ? 'Partenariat VIP À Vie' : p.planId}
+                      </td>
+                      <td className="px-5 py-4 text-xs font-medium text-slate-300">
+                        {p.operator} ({p.country || 'CI'})
                       </td>
                       <td className="px-5 py-4 font-bold text-white">
                         {Number(p.amount).toLocaleString()} {p.currency}
-                      </td>
-                      <td className="px-5 py-4 text-xs font-medium capitalize text-slate-300">
-                        {p.provider === 'ikeepay' ? 'iKeePay (Inline)' : p.provider}
                       </td>
                       <td className="px-5 py-4">
                         {p.status === 'approved' ? (
                           <Badge tone="green"><CheckCircle2 className="h-3 w-3" /> Approuvé</Badge>
                         ) : p.status === 'pending' ? (
-                          <Badge tone="yellow">En cours</Badge>
+                          <Badge tone="yellow">En attente</Badge>
                         ) : (
                           <Badge tone="red">Échoué</Badge>
                         )}
@@ -603,54 +499,36 @@ export default function Subscription() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 1. iKeePay Inline Checkout Iframe Modal (Matching exact iKeePay spec)    */}
-      {/* ========================================================================= */}
-      <div
-        id="ikeepay-overlay"
-        style={{ display: ikeepayOverlayVisible ? 'flex' : 'none' }}
-        className="fixed inset-0 z-50 items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all"
-      >
-        <div className="relative w-full max-w-[460px] h-[90vh] max-h-[820px] rounded-2xl overflow-hidden bg-slate-900 border border-slate-700 shadow-2xl flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-800/90 border-b border-slate-700 select-none">
-            <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-              <CreditCard className="w-4 h-4" />
-              <span>Tunnel de Paiement iKeePay {selectedPlanForIkeepay?.name ? `· ${selectedPlanForIkeepay.name}` : ''}</span>
-            </div>
-            <button
-              type="button"
-              onClick={closeIkeepay}
-              className="rounded-lg p-1 text-slate-400 hover:text-white hover:bg-slate-700 transition"
-              title="Fermer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      {/* iKeePay H2H Direct Checkout Modal */}
+      <H2HPlanCheckoutModal
+        isOpen={Boolean(h2hCheckoutPlan)}
+        plan={h2hCheckoutPlan}
+        isAuthenticated
+        userEmail={user?.email || ''}
+        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
+        userPhone={user?.phone || ''}
+        onClose={() => setH2hCheckoutPlan(null)}
+        onApproved={async () => {
+          await refreshUser();
+          setTimeout(() => {
+            setH2hCheckoutPlan(null);
+            toast.success('Votre abonnement est désormais actif !');
+          }, 1000);
+        }}
+      />
 
-          {/* Iframe Body */}
-          <div className="relative flex-1 w-full bg-slate-950">
-            {ikeepayLoading && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-950 text-slate-400">
-                <Spinner />
-                <p className="text-xs font-medium">Initialisation du paiement sécurisé iKeePay…</p>
-              </div>
-            )}
-            <iframe
-              id="ikeepay-iframe"
-              src={ikeepayIframeSrc}
-              allowTransparency="true"
-              className="w-full h-full border-none bg-transparent"
-              title="Paiement iKeePay"
-              onLoad={() => setIkeepayLoading(false)}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Partnership Modal for logged-in users */}
+      <PartnershipModal
+        isOpen={partnerModalOpen}
+        config={partnerConfig}
+        onClose={() => setPartnerModalOpen(false)}
+        onCompleted={async () => {
+          await refreshUser();
+          loadData();
+        }}
+      />
 
-      {/* ========================================================================= */}
-      {/* 2. SebPay Legacy Mobile Money Modal                                       */}
-      {/* ========================================================================= */}
+      {/* SebPay Legacy Mobile Money Modal */}
       <Modal open={!!payForSebpay} onClose={() => !payingSebpay && setPayForSebpay(null)} title={`Souscrire à ${payForSebpay?.name || ''}`}>
         {payForSebpay && (
           <div className="space-y-4">
@@ -695,10 +573,6 @@ export default function Subscription() {
               />
             </div>
 
-            <p className="text-xs text-gray-400">
-              Vous recevrez une demande de validation sur votre téléphone. Votre plan s'activera dès la confirmation du paiement.
-            </p>
-
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setPayForSebpay(null)} disabled={payingSebpay}>
                 Annuler
@@ -710,87 +584,6 @@ export default function Subscription() {
           </div>
         )}
       </Modal>
-      {/* PAYMENT METHOD SELECTION MODAL (Mobile Money vs Crypto USDT) */}
-      {methodModalPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-cyan-400">Paiement Sécurisé iKeePay</span>
-                <h3 className="text-lg font-bold text-white mt-0.5">
-                  Choisir le Mode de Paiement
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMethodModalPlan(null)}
-                className="rounded-lg p-1 text-slate-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Sélectionnez votre moyen de paiement pour souscrire au <strong>{methodModalPlan.name}</strong> :
-            </p>
-
-            <div className="space-y-3 pt-1">
-              <button
-                type="button"
-                onClick={() => startIkeepayCheckout(methodModalPlan, 'XAF')}
-                className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 text-white transition group shadow-md"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500 text-slate-950 font-black">
-                    <i className="fa-solid fa-mobile-screen text-base"></i>
-                  </div>
-                  <div className="text-left">
-                    <span className="font-bold text-sm block text-white group-hover:text-cyan-300">
-                      Mobile Money / Carte Bancaire
-                    </span>
-                    <span className="text-xs text-slate-400">Orange Money, MTN, Moov, Wave, Visa</span>
-                  </div>
-                </div>
-                <span className="font-mono font-extrabold text-sm text-cyan-400">
-                  {Number(methodModalPlan.promo?.enabled ? methodModalPlan.promo.price : methodModalPlan.price).toLocaleString()} XAF
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => startIkeepayCheckout(methodModalPlan, 'USDT')}
-                className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-white transition group shadow-md"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-black">
-                    <i className="fa-brands fa-bitcoin text-base"></i>
-                  </div>
-                  <div className="text-left">
-                    <span className="font-bold text-sm block text-white group-hover:text-emerald-300">
-                      Cryptomonnaie USDT
-                    </span>
-                    <span className="text-xs text-slate-400">TRC20 / BEP20 (Taux : 1$ = 655 XAF)</span>
-                  </div>
-                </div>
-                <span className="font-mono font-extrabold text-sm text-emerald-400">
-                  ≈ {Math.max(1, Number(((methodModalPlan.promo?.enabled ? methodModalPlan.promo.price : methodModalPlan.price) / 655).toFixed(2)))} USDT
-                </span>
-              </button>
-            </div>
-
-            <div className="pt-2 text-center border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setMethodModalPlan(null)}
-                className="text-xs text-slate-400 hover:text-slate-300 font-semibold"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

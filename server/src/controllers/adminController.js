@@ -284,9 +284,9 @@ export const getAIConfig = asyncHandler(async (req, res) => {
       payments: {
         sebpay: { configured: Boolean(val('payments.sebpay.secretKey')), keyPreview: mask(val('payments.sebpay.secretKey')) },
         ikeepay: {
-          configured: Boolean(val('payments.ikeepay.publicKey')),
+          configured: Boolean(val('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey),
           publicKeyPreview: mask(val('payments.ikeepay.publicKey')),
-          secretKeyPreview: mask(val('payments.ikeepay.secretKey')),
+          secretKeyPreview: mask(val('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey),
           mobileMoneyEnabled: val('payments.ikeepay.mobileMoneyEnabled') !== false,
         },
       },
@@ -345,28 +345,26 @@ export const testProvider = asyncHandler(async (req, res) => {
   const provider = String(req.body.provider || '').toLowerCase();
 
   if (provider === 'ikeepay') {
-    const publicKey = settingsService.getValue('payments.ikeepay.publicKey') || config.payments.ikeepay?.publicKey;
     const secretKey = settingsService.getValue('payments.ikeepay.secretKey') || config.payments.ikeepay?.secretKey;
-    if (!publicKey) {
-      return sendSuccess(res, { data: { ok: false, message: 'Aucune clé publique iKeePay configurée.' } });
+    if (!secretKey || !secretKey.trim()) {
+      return sendSuccess(res, { data: { ok: false, message: 'Aucune clé secrète iKeePay H2H (x-api-key) configurée.' } });
     }
     let ok = false;
     let message = '';
     try {
-      const baseUrl = settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl || 'https://api.ikeepay.com';
-      const headers = { Accept: 'application/json' };
-      if (secretKey) {
-        headers.Authorization = `Bearer ${secretKey.trim()}`;
-        headers['x-api-key'] = secretKey.trim();
-      }
-      const r = await fetch(`${baseUrl}/checkout-verify/ping_test_ref`, {
-        headers,
+      const baseUrl = (settingsService.getValue('payments.ikeepay.baseUrl') || config.payments.ikeepay?.baseUrl || 'https://api.ikeepay.com').replace(/\/$/, '');
+      const r = await fetch(`${baseUrl}/h2h-verify/ping_test_ref`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'x-api-key': secretKey.trim(),
+        },
         signal: AbortSignal.timeout(8000),
       });
       ok = r.status !== 401 && r.status !== 403;
       message = ok
-        ? `Connexion à l'API iKeePay validée (HTTP ${r.status}). Passerelle prête à recevoir les paiements.`
-        : `iKeePay a retourné une erreur d'authentification HTTP ${r.status}. Vérifiez votre clé secrète/publique.`;
+        ? `Connexion iKeePay H2H validée (HTTP ${r.status}). Passerelle Payin/Payout prête.`
+        : `iKeePay H2H a retourné une erreur d'authentification HTTP ${r.status}. Vérifiez votre clé secrète (x-api-key).`;
     } catch (err) {
       if (publicKey.startsWith('pk_live_') || publicKey.startsWith('pk_test_')) {
         ok = true;
