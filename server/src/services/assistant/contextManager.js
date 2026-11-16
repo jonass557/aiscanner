@@ -34,15 +34,14 @@ export const extractSymbols = (text) => {
     }
   }
 
-  // 2. Token-level exact/alias resolution for anything missed (e.g. "or", "btc").
+  // 2. Token-level exact/alias resolution for anything missed (e.g. "or", "btc", "l'or", "eur/usd").
+  //    Handles French contractions and slash notations by splitting on apostrophes and slashes.
   //    Strict (no fuzzy) so short tokens like "et"/"si" can't false-match.
-  if (found.length === 0) {
-    const tokens = lower.split(/[\s,;?!.]+/);
-    for (const token of tokens) {
-      if (token.length < 2) continue;
-      const entry = resolveSymbol(token, { fuzzy: false });
-      if (entry && !found.includes(entry.symbol)) found.push(entry.symbol);
-    }
+  const tokens = lower.split(/[\s,;?!.'’/()\[\]-]+/);
+  for (const token of tokens) {
+    if (token.length < 2) continue;
+    const entry = resolveSymbol(token, { fuzzy: false });
+    if (entry && !found.includes(entry.symbol)) found.push(entry.symbol);
   }
 
   return found;

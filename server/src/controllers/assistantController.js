@@ -29,34 +29,109 @@ const decisionLabel = (d, lang = 'fr') => {
 const analysisToText = (analysis, snapshot, lang = 'fr') => {
   const tp = analysis.tradePlan || {};
   const rep = analysis.report || {};
+  const ta = analysis.technicalAnalysis || {};
   const isEn = lang === 'en';
   const real = snapshot?.isRealData
-    ? (isEn ? `live data (${snapshot.source})` : `données temps réel (${snapshot.source})`)
-    : (isEn ? 'simulated data (demo)' : 'données simulées (démo)');
-  const head = isEn
-    ? `${analysis.symbol} ${analysis.timeframe} · ${decisionLabel(analysis.decision, 'en')} · confidence ${analysis.confidenceScore}% · ${real}.`
-    : `${analysis.symbol} ${analysis.timeframe} · ${decisionLabel(analysis.decision, 'fr')} · confiance ${analysis.confidenceScore}% · ${real}.`;
+    ? (isEn ? `Live data (${snapshot.source})` : `Données temps réel (${snapshot.source})`)
+    : (isEn ? 'Simulated data (demo)' : 'Données simulées (démo)');
+
+  const decisionBadge = analysis.decision === 'BUY'
+    ? (isEn ? '🟢 BUY' : '🟢 ACHAT (BUY)')
+    : analysis.decision === 'SELL'
+      ? (isEn ? '🔴 SELL' : '🔴 VENTE (SELL)')
+      : (isEn ? '🟡 WAIT' : '🟡 ATTENDRE (WAIT)');
+
+  const lines = [
+    isEn
+      ? `### 📊 Institutional Analysis: ${analysis.symbol} (${analysis.timeframe})`
+      : `### 📊 Analyse Institutionnelle : ${analysis.symbol} (${analysis.timeframe})`,
+    isEn
+      ? `**Recommended Decision:** ${decisionBadge} · **Confidence:** ${analysis.confidenceScore}% · *${real}*`
+      : `**Décision recommandée :** ${decisionBadge} · **Confiance :** ${analysis.confidenceScore}% · *${real}*`,
+    isEn
+      ? `**Current Price:** \`${analysis.currentPrice || snapshot?.quote?.price || '—'}\``
+      : `**Prix actuel :** \`${analysis.currentPrice || snapshot?.quote?.price || '—'}\``,
+    '',
+    isEn ? '#### 🧭 1. Trend & Market Structure' : '#### 🧭 1. Tendance & Structure de Marché',
+    `• **${isEn ? 'Structure' : 'Structure globale'} :** ${ta.marketStructure || (isEn ? 'Structure analysis in progress' : 'Structure institutionnelle identifiée')}`,
+    ta.momentum ? `• **Momentum :** ${ta.momentum}` : null,
+    rep.summary ? `• **${isEn ? 'Context' : 'Synthèse technique'} :** ${rep.summary}` : null,
+    '',
+    isEn ? '#### 🎯 2. Recommended Position & Trade Plan' : '#### 🎯 2. Prise de Position & Plan de Trade',
+  ];
 
   if (analysis.decision === 'WAIT') {
-    const zone = tp.entry != null ? (isEn ? `\n\nZone to wait for: ${tp.entry}` : `\n\nZone à attendre : ${tp.entry}`) : '';
-    return `${head}${zone}\n\n${tp.waitReason || rep.summary || (isEn ? 'Wait for better market structure alignment.' : 'Attendre une meilleure configuration.')}`;
+    lines.push(
+      tp.entry != null
+        ? (isEn
+            ? `• **Key Level to Watch (Optimal Entry):** \`${tp.entry}\``
+            : `• **Zone clé à surveiller (Entrée idéale) :** \`${tp.entry}\``)
+        : (isEn
+            ? '• **Immediate entry not recommended at current market price.**'
+            : '• **Prise de position immédiate déconseillée au cours actuel.**'),
+      tp.waitReason
+        ? `• **${isEn ? 'Wait Reason' : 'Raison d\'attente'} :** ${tp.waitReason}`
+        : (isEn
+            ? '• **Advice:** Wait for confirmation / rejection at the key level before entering.'
+            : '• **Conseil :** Attendre une confirmation de rejet ou de cassure avant d\'entrer.'),
+      tp.takeProfit1
+        ? (isEn
+            ? `• **Potential Targets Once Validated:** TP1: \`${tp.takeProfit1}\`${tp.takeProfit2 ? ` | TP2: \`${tp.takeProfit2}\`` : ''}`
+            : `• **Objectifs cibles une fois validé :** TP1: \`${tp.takeProfit1}\`${tp.takeProfit2 ? ` | TP2: \`${tp.takeProfit2}\`` : ''}`)
+        : null
+    );
+  } else if (analysis.decision === 'NO_TRADE') {
+    lines.push(
+      isEn
+        ? '• **No exploitable high-probability setup identified on this timeframe.**'
+        : '• **Aucun setup exploitable à haute probabilité identifié sur cette unité de temps.**',
+      rep.summary ? `• ${rep.summary}` : null
+    );
+  } else {
+    lines.push(
+      `• **${isEn ? 'Favored Direction' : 'Sens privilégié'} :** ${decisionBadge}`,
+      `• **${isEn ? 'Entry Level' : 'Niveau d\'Entrée'} :** \`${tp.entry}\``,
+      `• **Stop Loss :** \`${tp.stopLoss}\``,
+      `• **Take Profit 1 :** \`${tp.takeProfit1}\``,
+      tp.takeProfit2 ? `• **Take Profit 2 :** \`${tp.takeProfit2}\`` : null,
+      tp.takeProfit3 ? `• **Take Profit 3 :** \`${tp.takeProfit3}\`` : null,
+      `• **${isEn ? 'Risk / Reward Ratio' : 'Ratio Risque / Rendement'} :** \`${tp.riskRewardRatio || '1:2+'}\``,
+      `• **${isEn ? 'Estimated Probability' : 'Probabilité estimée'} :** ${tp.estimatedProbability || analysis.confidenceScore}%`,
+      tp.tradeType ? `• **${isEn ? 'Trade Horizon' : 'Horizon'} :** ${String(tp.tradeType).toUpperCase()}` : null,
+      tp.estimatedDuration ? `• **${isEn ? 'Estimated Duration' : 'Durée estimée'} :** ${tp.estimatedDuration}` : null
+    );
   }
-  if (analysis.decision === 'NO_TRADE') {
-    return `${head}\n\n${rep.summary || (isEn ? 'No exploitable setup.' : 'Pas de setup exploitable.')}`;
+
+  // Institutional confluences and reasoning
+  const reasoning = Array.isArray(rep.reasoning) && rep.reasoning.length ? rep.reasoning : rep.confluences;
+  if (Array.isArray(reasoning) && reasoning.length) {
+    lines.push(
+      '',
+      isEn ? '#### 🔍 3. Institutional Confluences & Reasoning' : '#### 🔍 3. Confluences & Raisonnement Institutionnel',
+      ...reasoning.slice(0, 4).map((r) => `• ${typeof r === 'string' ? r : r.note || r.label || JSON.stringify(r)}`)
+    );
   }
-  const lines = [
-    head,
+
+  // Key detected SMC / ICT levels
+  const ob = (ta.orderBlocks || []).map((x) => x.level || x.note).filter(Boolean);
+  const fvg = (ta.fairValueGaps || []).map((x) => x.level || x.note).filter(Boolean);
+  if (ob.length || fvg.length) {
+    lines.push(
+      '',
+      isEn ? '#### 📌 4. Key SMC / ICT Levels' : '#### 📌 4. Niveaux Clés Détectés (SMC / ICT)',
+      ob.length ? `• **Order Blocks :** ${ob.slice(0, 2).join(', ')}` : null,
+      fvg.length ? `• **Fair Value Gaps (FVG) :** ${fvg.slice(0, 2).join(', ')}` : null
+    );
+  }
+
+  // Risk notice
+  lines.push(
     '',
-    isEn ? `Entry: ${tp.entry}` : `Entrée : ${tp.entry}`,
-    `Stop Loss: ${tp.stopLoss}`,
-    `Take Profit 1/2/3: ${tp.takeProfit1} / ${tp.takeProfit2} / ${tp.takeProfit3}`,
     isEn
-      ? `R:R: ${tp.riskRewardRatio} · Estimated Probability: ${tp.estimatedProbability}% · Type: ${tp.tradeType || '—'}`
-      : `R:R : ${tp.riskRewardRatio} · Probabilité estimée : ${tp.estimatedProbability}% · Type : ${tp.tradeType || '—'}`,
-    isEn ? `Estimated Duration: ${tp.estimatedDuration || '—'}` : `Durée estimée : ${tp.estimatedDuration || '—'}`,
-    '',
-    rep.summary || '',
-  ];
+      ? '💡 *Risk Rule: Never risk more than 1% to 2% of your total capital per trade.*'
+      : '💡 *Règle d\'or du Professeur : Ne risquez jamais plus de 1% à 2% de votre capital total sur ce trade.*'
+  );
+
   return lines.filter(Boolean).join('\n');
 };
 
@@ -318,20 +393,21 @@ export const sendMessage = asyncHandler(async (req, res) => {
       .slice(0, 6);
 
     const isTrending = intent.action === 'trending';
+    const isEn = lang === 'en';
     const movers = ranked
       .slice(0, isTrending ? 4 : 6)
-      .map((m) => `• ${m.symbol} : ${m.price} (${m.changePct >= 0 ? '+' : ''}${m.changePct.toFixed(2)}%)`)
+      .map((m) => `• **${m.symbol}** (${m.market || 'marché'}) : \`${m.price}\` (${m.changePct >= 0 ? '+' : ''}${m.changePct.toFixed(2)}%)`)
       .join('\n');
 
-    const synthetic = universe.filter((u) => u.market === 'synthetic');
-    const syntheticLine = synthetic.length
-      ? `\n\nIndices synthétiques Deriv suivis : ${synthetic.map((s) => s.symbol).join(', ')}.`
-      : '';
+    const title = isTrending
+      ? (isEn ? '📈 **Top Trending Markets Right Now (Recent Price Action):**' : '📈 **Marchés les plus actifs et en tendance en ce moment :**')
+      : (isEn ? '🌟 **Top Market Opportunities Ranked by Movement:**' : '🌟 **Meilleures opportunités de mouvement identifiées :**');
 
-    assistantText =
-      (isTrending
-        ? `Marchés les plus en tendance en ce moment (mouvements récents) :\n${movers}`
-        : `Meilleurs marchés du moment (classés par mouvement) :\n${movers}`) + syntheticLine;
+    const suggestion = isEn
+      ? `💡 *To get a full institutional trade setup (Entry, Stop Loss, Take Profit, Structure), ask for example:*\n👉 \`Analyze ${ranked[0]?.symbol || 'EURUSD'} in H1\``
+      : `💡 *Pour obtenir une analyse institutionnelle complète (structure, tendance, Entrée, Stop Loss, TP) sur l'un de ces actifs, dites-moi simplement :*\n👉 \`Analyse ${ranked[0]?.symbol || 'EURUSD'} en H1\``;
+
+    assistantText = [title, '', movers, '', suggestion].join('\n');
   } else {
     // ---- Coach / teach / chitchat / explain — mentor reply (free) ----
     const { reply } = await mentorReply({

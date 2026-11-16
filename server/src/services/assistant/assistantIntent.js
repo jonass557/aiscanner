@@ -1,4 +1,5 @@
 import { resolveSymbol } from '../marketData/symbolCatalog.js';
+import { extractSymbols } from './contextManager.js';
 
 /**
  * AI Trading Assistant intent engine.
@@ -61,50 +62,115 @@ export const parseAssistantIntent = (text) => {
   const confMatch = t.match(/(\d{2,3})\s*%/);
   if (confMatch && has(t, ['confiance', 'confidence'])) params.minConfidence = Number(confMatch[1]);
 
-  // --- Which action? ----------------------------------------------------------
-  // Compare first (mentions two symbols or "compare les deux").
-  if (has(t, ['compare', 'comparaison', 'comparer', 'les deux', 'lequel est plus fiable', 'plus fiable'])) {
-    return { action: 'compare', params, requiresAnalysis: true, requiresData: true };
+  // --- Identify if any tradable financial symbol is mentioned in this query ---
+  const symbols = extractSymbols(text);
+  if (symbols.length > 0) {
+    params.symbols = symbols;
   }
 
-  // Market-wide scans.
-  if (has(t, ['meilleur', 'best', 'top', 'opportunite', 'opportunity', 'quels marches'])) {
-    return { action: 'best_markets', params, requiresAnalysis: false, requiresData: true };
-  }
-  if (has(t, ['tendance', 'trend', 'tendancie', 'qui monte', 'qui baisse', 'momentum'])) {
-    return { action: 'trending', params, requiresAnalysis: false, requiresData: true };
-  }
-  // "Donne-moi un trade avec ratio 1:3" → find a setup respecting the constraints.
-  if (has(t, ['un trade', 'un signal', 'un setup', 'find', 'trouve', 'cherche', 'donne-moi un trade', 'trade avec', 'setups'])) {
-    return { action: 'find_setups', params, requiresAnalysis: true, requiresData: true };
-  }
-  if (has(t, ['acheter ou vendre', 'buy or sell', 'dois-je acheter', 'achat ou vente', 'que faire'])) {
-    return { action: 'should_i_trade', params, requiresAnalysis: true, requiresData: true };
-  }
-  if (has(t, ['risque', 'risk', 'faiblesse', 'weakness', 'danger', 'dangerous'])) {
-    return { action: 'show_risks', params, requiresAnalysis: true, requiresData: true };
+  // =========================================================================
+  // CASE 1: The user explicitly mentions one or more financial assets
+  // e.g. "Analyse audcad en H4 et donne moi la tendance...", "Quelle est la tendance sur EURUSD", "Acheter ou vendre du BTC ?"
+  // Any query referencing a specific symbol should NEVER be hijacked by global trending lists!
+  // =========================================================================
+  if (symbols.length > 0) {
+    // 1A. Comparison between two or more symbols
+    if (
+      symbols.length >= 2 ||
+      has(t, ['compare', 'comparaison', 'comparer', 'versus', 'vs', 'les deux', 'lequel est plus fiable', 'plus fiable', 'entre les deux'])
+    ) {
+      return { action: 'compare', params, requiresAnalysis: true, requiresData: true };
+    }
+
+    // 1B. Risk inquiry on this symbol
+    if (has(t, ['risque', 'risk', 'danger', 'faiblesse', 'weakness', 'dangerous', 'piege'])) {
+      return { action: 'show_risks', params, requiresAnalysis: true, requiresData: true };
+    }
+
+    // 1C. Setup with constraints requested on this symbol
+    if (has(t, ['un trade', 'un signal', 'un setup', 'cherche un trade', 'trouve un trade', 'signal'])) {
+      return { action: 'find_setups', params, requiresAnalysis: true, requiresData: true };
+    }
+
+    // 1D. Explicit buy/sell advice on this symbol (when not an explicit "analyse")
+    if (
+      !has(t, ['analyse', 'analyze', 'analyser', 'scanne', 'scan', 'examine', 'etudie']) &&
+      has(t, ['acheter ou vendre', 'buy or sell', 'dois-je acheter', 'dois-je vendre', 'achat ou vente', 'long ou short', 'entrer maintenant', 'entrer en position'])
+    ) {
+      return { action: 'should_i_trade', params, requiresAnalysis: true, requiresData: true };
+    }
+
+    // 1E. All other requests mentioning this symbol (full institutional analysis, trend, position, outlook)
+    // Examples: "Analyse audcad en H4 et donne moi la tendance...", "Quelle est la tendance sur EURUSD", "AUDCAD H4"
+    return { action: 'analyze', params, requiresAnalysis: true, requiresData: true };
   }
 
-  // Explicit analysis of a symbol.
+  // =========================================================================
+  // CASE 2: No specific symbol named in the message
+  // =========================================================================
+
+  // 2A. Explicit request to analyze (will attempt to inherit previous symbol from conversation history)
   if (has(t, ['analyse', 'analyze', 'analyser', 'scanne', 'scan', 'regarde', 'examine', 'etude', 'etudie'])) {
     return { action: 'analyze', params, requiresAnalysis: true, requiresData: true };
   }
 
-  // Teaching / coaching / open questions.
-  if (has(t, ['cest quoi', 'c\'est quoi', 'quest ce que', 'qu\'est-ce que', 'explique', 'explain', 'apprends', 'apprendre', 'cours', 'tuto', 'lecon', 'defini', 'difference entre'])) {
+  // 2B. Compare without naming symbols (e.g. "compare les deux", "lequel est meilleur")
+  if (has(t, ['compare', 'comparaison', 'comparer', 'les deux', 'lequel est plus fiable', 'plus fiable'])) {
+    return { action: 'compare', params, requiresAnalysis: true, requiresData: true };
+  }
+
+  // 2C. Generic setup search without symbol
+  if (has(t, ['un trade', 'un signal', 'un setup', 'find', 'trouve', 'cherche', 'donne-moi un trade', 'trade avec', 'setups'])) {
+    return { action: 'find_setups', params, requiresAnalysis: true, requiresData: true };
+  }
+
+  // 2D. Generic trading direction question without symbol
+  if (has(t, ['acheter ou vendre', 'buy or sell', 'dois-je acheter', 'achat ou vente', 'prise de position', 'que faire'])) {
+    return { action: 'should_i_trade', params, requiresAnalysis: true, requiresData: true };
+  }
+
+  // 2E. Generic risk inquiry
+  if (has(t, ['risque', 'risk', 'faiblesse', 'weakness', 'danger', 'dangerous'])) {
+    return { action: 'show_risks', params, requiresAnalysis: true, requiresData: true };
+  }
+
+  // 2F. Broad market ranking across the entire universe (ONLY when no specific asset is targeted)
+  if (has(t, ['meilleur marche', 'meilleurs marches', 'best market', 'top opportunite', 'top marches', 'quels marches'])) {
+    return { action: 'best_markets', params, requiresAnalysis: false, requiresData: true };
+  }
+  if (
+    has(t, [
+      'marche en tendance', 'marches en tendance', 'qui est en tendance', 'qui monte le plus',
+      'qui baisse le plus', 'plus forte hausse', 'plus forte baisse', 'trending markets', 'top movers'
+    ])
+  ) {
+    return { action: 'trending', params, requiresAnalysis: false, requiresData: true };
+  }
+
+  // 2G. Educational / Teaching questions (Mentor explains SMC, ICT, indicators, concepts)
+  if (
+    has(t, [
+      'cest quoi', 'c\'est quoi', 'c’est quoi', 'c est quoi', 'quest ce que', 'qu\'est-ce que',
+      'explique', 'explain', 'apprends', 'apprendre', 'cours', 'tuto', 'lecon', 'leçon', 'defini',
+      'difference entre', 'comment fonctionne', 'pourquoi', 'definition'
+    ])
+  ) {
     return { action: 'teach', params, requiresAnalysis: false, requiresData: false };
   }
-  if (has(t, ['conseil', 'advice', 'erreur', 'error', 'fomo', 'revenge', 'overtrading', 'discipline', 'emotion', 'mental'])) {
+
+  // 2H. Psychological / Coaching advice
+  if (
+    has(t, [
+      'conseil', 'advice', 'erreur', 'error', 'fomo', 'revenge', 'overtrading',
+      'discipline', 'emotion', 'mental', 'psychologie', 'perte', 'gestion du risque'
+    ])
+  ) {
     return { action: 'coach', params, requiresAnalysis: false, requiresData: false };
   }
 
-  // Bare-symbol shortcut: the whole message is (or contains only) a tradable
-  // symbol — "euraud", "eur/aud", "gold", "btc h4". No action verb, but the user
-  // clearly wants that market analyzed. Route to `analyze` instead of falling
-  // through to the mentor (which would answer off-topic).
-  const bareTokens = t.split(/[\s,;?!.]+/).filter((w) => w.length >= 2);
+  // 2I. Bare-symbol token shortcut fallback
+  const bareTokens = t.split(/[\s,;?!.'’/()\[\]-]+/).filter((w) => w.length >= 2);
   const symbolTokens = bareTokens.filter((w) => resolveSymbol(w, { fuzzy: false }));
-  // Also try the message as a single mention (handles "eur/aud" kept intact).
   const wholeMatch = resolveSymbol(t.replace(/\s+/g, ''), { fuzzy: false });
   const onlySymbolsAndTf = bareTokens.every(
     (w) => resolveSymbol(w, { fuzzy: false }) || TIMEFRAMES.includes(w.toUpperCase())
@@ -113,6 +179,6 @@ export const parseAssistantIntent = (text) => {
     return { action: 'analyze', params, requiresAnalysis: true, requiresData: true };
   }
 
-  // Default: open-ended mentor question (educational / chit-chat).
+  // 2J. Default: open-ended AI Mentor conversation
   return { action: 'chitchat', params, requiresAnalysis: false, requiresData: false };
 };
