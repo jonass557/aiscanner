@@ -112,4 +112,8 @@ Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this
 /**
  * Builds the full text prompt sent alongside the image.
  */
-export const buildUserPrompt = () => ANALYSIS_INSTRUCTIONS;
+export const buildUserPrompt = (lang = 'fr') =>
+  ANALYSIS_INSTRUCTIONS +
+  (lang === 'en'
+    ? '\n\nIMPORTANT LANGUAGE DIRECTIVE: Write ALL descriptive text fields (marketStructure, momentum, volatility, notes, waitReason, summary, validationReasons, confluences, risks, weaknesses, missingElements) in clear, professional ENGLISH.'
+    : '\n\nIMPORTANT : Rédigez TOUS les champs textuels descriptifs (marketStructure, momentum, volatility, notes, waitReason, summary, validationReasons, confluences, risks, weaknesses, missingElements) en FRANÇAIS professionnel.');

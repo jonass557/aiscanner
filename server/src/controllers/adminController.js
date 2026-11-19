@@ -145,16 +145,41 @@ export const updateUser = asyncHandler(async (req, res) => {
   const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate, referralEnabled, commissionRate } = req.body;
 
   if (plan) {
-    // Admin override: allow assigning any plan, active or not, free or paid.
-    const planDoc = await Plan.findOne({ id: plan }).lean();
-    if (!planDoc) throw ApiError.badRequest('Invalid plan.');
-    user.subscription.plan = planDoc.id;
-    user.subscription.scansPerMonth = -1; // illimité
-    user.subscription.status = 'active';
-    user.subscription.startDate = new Date();
-    const end = new Date();
-    end.setMonth(end.getMonth() + 1);
-    user.subscription.endDate = end;
+    if (plan === 'partner_lifetime') {
+      user.partnership = user.partnership || {};
+      user.partnership.isActive = true;
+      user.partnership.status = 'active';
+      user.partnership.lifetimeAccess = true;
+      if (!user.partnership.joinedAt) user.partnership.joinedAt = new Date();
+      user.partnership.excludedAt = null;
+      user.partnership.excludedReason = '';
+      user.subscription.plan = 'partner_lifetime';
+      user.subscription.scansPerMonth = -1;
+      user.subscription.status = 'active';
+      user.subscription.startDate = new Date();
+      user.subscription.endDate = null;
+      if (user.trial) user.trial.isActive = false;
+    } else if (plan === 'free') {
+      user.subscription.plan = 'free';
+      user.subscription.scansPerMonth = 0;
+      user.subscription.status = status || 'active';
+    } else {
+      // Admin override: allow assigning any plan from Plan collection, active or not.
+      const planDoc = await Plan.findOne({ id: plan }).lean();
+      if (!planDoc) throw ApiError.badRequest('Invalid plan.');
+      user.subscription.plan = planDoc.id;
+      user.subscription.scansPerMonth = planDoc.scansPerMonth ?? -1;
+      user.subscription.status = 'active';
+      user.subscription.startDate = new Date();
+      const end = new Date();
+      if (planDoc.durationDays && Number(planDoc.durationDays) > 0) {
+        end.setDate(end.getDate() + Number(planDoc.durationDays));
+      } else {
+        end.setMonth(end.getMonth() + Number(planDoc.promo?.durationMonths || 1));
+      }
+      user.subscription.endDate = end;
+      if (user.trial) user.trial.isActive = false;
+    }
   }
   if (status) user.subscription.status = status;
   if (role) user.role = role;
@@ -169,11 +194,15 @@ export const updateUser = asyncHandler(async (req, res) => {
   if (typeof trialDays === 'number') {
     user.trial = user.trial || {};
     user.trial.days = trialDays;
-    user.trial.isActive = trialDays > 0;
-    user.trial.startedAt = user.trial.startedAt || new Date();
-    user.trial.endsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
-    user.subscription.status = 'active';
-    user.subscription.endDate = user.trial.endsAt;
+    user.trial.isActive = trialDays > 0 && !plan;
+    if (trialDays > 0) {
+      user.trial.startedAt = user.trial.startedAt || new Date();
+      user.trial.endsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+      if (!plan) {
+        user.subscription.status = 'active';
+        user.subscription.endDate = user.trial.endsAt;
+      }
+    }
   }
   if (typeof extendTrialDays === 'number' && extendTrialDays > 0) {
     user.trial = user.trial || {};

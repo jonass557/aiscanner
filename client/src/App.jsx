@@ -120,6 +120,7 @@ export default function App() {
           <Route path="ai-config" element={<AdminAIConfig />} />
         </Route>
 
+        <Route path="/partner" element={<Navigate to="/dashboard/partner" replace />} />
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />
       </Routes>

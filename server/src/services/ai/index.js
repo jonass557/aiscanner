@@ -151,14 +151,14 @@ export const assertVisionReady = () => {
  * @param {string} [params.providerName]
  * @returns {Promise<{ analysis: Object, meta: Object }>}
  */
-export const analyzeChart = async ({ imageUrl, providerName }) => {
+export const analyzeChart = async ({ imageUrl, providerName, lang = 'fr' }) => {
   const startedAt = Date.now();
 
   const { result: raw, provider } = await runWithFallback(providerName, (p) =>
     p.analyze({
       imageUrl,
       systemPrompt: SYSTEM_PROMPT,
-      userPrompt: buildUserPrompt(),
+      userPrompt: buildUserPrompt(lang),
     })
   );
 
@@ -185,14 +185,14 @@ export const analyzeChart = async ({ imageUrl, providerName }) => {
  * @param {string} [params.providerName]
  * @returns {Promise<{ analysis: Object, meta: Object }>}
  */
-export const analyzeMultiTimeframe = async ({ images, timeframes, customStrategy = '', providerName }) => {
+export const analyzeMultiTimeframe = async ({ images, timeframes, customStrategy = '', providerName, lang = 'fr' }) => {
   const startedAt = Date.now();
 
   const { result: raw, provider } = await runWithFallback(providerName, (p) =>
     p.analyzeMultiple({
       images,
       systemPrompt: MTF_SYSTEM_PROMPT,
-      userPrompt: buildMtfUserPrompt(timeframes || images.map((i) => i.label), customStrategy),
+      userPrompt: buildMtfUserPrompt(timeframes || images.map((i) => i.label), customStrategy, lang),
     })
   );
 

@@ -3,6 +3,7 @@ import { sendSuccess } from '../utils/response.js';
 import MultiTimeframeAnalysis from '../models/MultiTimeframeAnalysis.js';
 import { uploadImage, deleteImage } from '../services/uploadService.js';
 import { analyzeMultiTimeframe, assertVisionReady } from '../services/ai/index.js';
+import { resolveRequestLanguage } from '../utils/language.js';
 import { logScan } from '../services/logService.js';
 import logger from '../config/logger.js';
 
@@ -92,10 +93,12 @@ export const scanMultiTimeframe = asyncHandler(async (req, res) => {
 
   try {
     // 3. Run AI analysis across all images
+    const lang = resolveRequestLanguage(req, effectiveStrategy);
     const { analysis, meta } = await analyzeMultiTimeframe({
       images: uploaded.map((u) => ({ url: u.url, label: u.timeframe })),
       timeframes: uploaded.map((u) => u.timeframe),
       customStrategy: effectiveStrategy,
+      lang,
     });
 
     // 4. Merge the model's per-timeframe reads back onto our uploaded images

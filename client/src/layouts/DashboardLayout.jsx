@@ -94,7 +94,11 @@ export default function DashboardLayout() {
           }
         >
           <Crown className="h-4 w-4 text-amber-400" />
-          <span>{user?.partnership?.isActive ? 'Espace Partenaire' : 'Devenir Partenaire'}</span>
+          <span>
+            {lang === 'en'
+              ? (user?.partnership?.isActive ? 'Partner Space' : 'Become a Partner')
+              : (user?.partnership?.isActive ? 'Espace Partenaire' : 'Devenir Partenaire')}
+          </span>
           {user?.partnership?.isActive ? (
             <span className="ml-auto rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
               VIP

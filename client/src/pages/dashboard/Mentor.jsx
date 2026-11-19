@@ -35,6 +35,7 @@ import { mentorApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import { renderMarkdown } from '../../utils/markdown.jsx';
 import { useSpeech } from '../../hooks/useSpeech.js';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 const LEVELS = [
   { value: 'beginner', label: '🎓 Débutant' },
@@ -61,10 +62,17 @@ export default function Mentor() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [curriculumTabOpen, setCurriculumTabOpen] = useState(false);
 
+  const { lang: globalLang } = useLanguage();
   // Multilingual & Japanese Candlestick Diagram states
   const [mentorLang, setMentorLang] = useState(() => {
-    return localStorage.getItem('mentor_language') || 'fr';
+    return localStorage.getItem('acs_lang') || localStorage.getItem('mentor_language') || 'fr';
   });
+  useEffect(() => {
+    if (globalLang && globalLang !== mentorLang) {
+      setMentorLang(globalLang);
+      localStorage.setItem('mentor_language', globalLang);
+    }
+  }, [globalLang]);
   const [showDiagram, setShowDiagram] = useState(false);
   const [diagramPreset, setDiagramPreset] = useState('bos_continuation');
 

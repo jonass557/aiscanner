@@ -35,6 +35,8 @@ export const tokenStore = {
 api.interceptors.request.use((config) => {
   const token = tokenStore.getAccess();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const activeLang = localStorage.getItem('acs_lang') || 'fr';
+  config.headers['x-language'] = activeLang;
   return config;
 });
 

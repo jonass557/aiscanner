@@ -28,6 +28,7 @@ import { formatDate } from '../../utils/format.js';
 /** Admin user management: list, search, custom trial days, subscription dates, anti-abuse audit. */
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
+  const [availablePlans, setAvailablePlans] = useState([]);
   const [meta, setMeta] = useState({ page: 1, totalPages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -49,6 +50,13 @@ export default function AdminUsers() {
       setLoading(false);
     }
   }, [page, search]);
+
+  useEffect(() => {
+    adminApi
+      .plans()
+      .then(({ data }) => setAvailablePlans(data?.data?.plans || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(load, search ? 400 : 0);
@@ -274,6 +282,13 @@ export default function AdminUsers() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openEdit(u)}
+                            className="px-2.5 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-[11px] font-bold flex items-center gap-1"
+                            title="Activer ou modifier le plan de cet utilisateur"
+                          >
+                            <Sparkles className="h-3 w-3" /> Activer Plan
+                          </button>
+                          <button
+                            onClick={() => openEdit(u)}
                             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500"
                             title="Modifier les jours d'essai et l'abonnement"
                           >
@@ -380,18 +395,27 @@ export default function AdminUsers() {
             {/* Plan and Status */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Plan Assigné</label>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Plan Assigné (Activation Admin)</label>
                 <select
                   className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500"
                   value={form.plan}
-                  onChange={(e) => setForm({ ...form, plan: e.target.value })}
+                  onChange={(e) => setForm({ ...form, plan: e.target.value, status: e.target.value === 'free' ? form.status : 'active' })}
                 >
-                  <option value="free">Free</option>
-                  <option value="1mois">1 Mois (7 000 FCFA)</option>
-                  <option value="2mois">2 Mois (13 000 FCFA)</option>
-                  <option value="1an">1 An VIP (65 000 FCFA)</option>
-                  <option value="pro">Pro (Legacy)</option>
-                  <option value="premium">Premium (Legacy)</option>
+                  <option value="free">Free (Gratuit)</option>
+                  {availablePlans.length > 0 ? (
+                    availablePlans.map((pl) => (
+                      <option key={pl.id} value={pl.id}>
+                        {pl.name} ({Number(pl.price || 0).toLocaleString('fr-FR')} {pl.currency || 'XOF'})
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="1mois">1 Mois</option>
+                      <option value="2mois">2 Mois</option>
+                      <option value="1an">1 An VIP</option>
+                    </>
+                  )}
+                  <option value="partner_lifetime">Partenaire VIP (Accès à vie)</option>
                 </select>
               </div>
 

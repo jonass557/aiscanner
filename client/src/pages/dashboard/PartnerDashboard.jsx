@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Crown,
@@ -16,6 +17,8 @@ import {
   Clock,
   ShieldAlert,
   Ban,
+  FileText,
+  PenTool,
 } from 'lucide-react';
 import { partnershipApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
@@ -140,8 +143,16 @@ export default function PartnerDashboard() {
             {p.excludedReason || "Votre accès au Programme de Partenariat a été suspendu ou exclu par l'administrateur."}
           </p>
           <p className="text-xs text-slate-400">
-            Vos avantages (accès à vie et perception de nouvelles commissions) sont temporairement désactivés. Contactez le support ou l'administration pour une éventuelle réactivation.
+            Vos avantages (accès à vie et perception de nouvelles commissions) sont désactivés. Vous pouvez toutefois souscrire à un autre plan d'abonnement si vous le souhaitez.
           </p>
+          <div className="pt-2">
+            <Link
+              to="/dashboard/subscription"
+              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-slate-950 hover:bg-amber-400 transition"
+            >
+              Souscrire à un autre plan
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -464,6 +475,52 @@ export default function PartnerDashboard() {
           </div>
         )}
       </div>
+
+      {/* Signed Partnership Terms & Digital Signature Record */}
+      {(p.signedTermsSnapshot || p.signatureDataUrl) && (
+        <div className="rounded-2xl border border-amber-500/30 bg-slate-900/90 p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <FileText className="h-4 w-4 text-amber-400" /> Document des Termes &amp; Conditions Signé
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Signataire : <strong className="text-slate-200">{p.signatureName || p.fullName}</strong>
+                {p.signedAt ? ` · Signé le ${new Date(p.signedAt).toLocaleString('fr-FR')}` : ''}
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-bold text-emerald-300">
+              <PenTool className="h-3 w-3" /> Signé Numériquement
+            </span>
+          </div>
+
+          {p.signedTermsSnapshot && (
+            <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/90 p-4 text-xs leading-relaxed text-slate-300 whitespace-pre-wrap">
+              {p.signedTermsSnapshot}
+            </div>
+          )}
+
+          {p.signatureDataUrl && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Votre Signature Enregistrée :
+                </p>
+                <img
+                  src={p.signatureDataUrl}
+                  alt="Signature numérique du partenaire"
+                  className="h-16 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1 object-contain"
+                />
+              </div>
+              <div className="text-xs text-slate-400 space-y-0.5">
+                <p>Partenaire : <strong className="text-white">{p.fullName}</strong></p>
+                <p>Email : <strong className="text-white">{p.email}</strong></p>
+                <p>Téléphone : <strong className="text-white">{p.phone}</strong></p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* H2H Payout Withdrawal Modal */}
       {withdrawOpen && (

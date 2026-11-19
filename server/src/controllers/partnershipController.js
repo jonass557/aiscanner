@@ -28,7 +28,7 @@ import {
 export const getPublicPartnershipConfig = asyncHandler(async (req, res) => {
   const cfg = await getOrCreatePartnershipConfig();
   const activePartnersCount = await countActivePartners();
-  const maxPartners = Math.max(1, Number(cfg.maxPartners || 50));
+  const maxPartners = Math.max(1, Number(cfg.maxPartners || 20));
   const spotsRemaining = Math.max(0, maxPartners - activePartnersCount);
 
   return sendSuccess(res, {
@@ -83,7 +83,7 @@ export const initiatePartnershipPayment = asyncHandler(async (req, res) => {
   }
 
   const activeProvider = settingsService.getValue('payments.provider') || config.payments.provider || 'ikeepay';
-  const amount = Math.max(0, Number(cfg.price || 50000));
+  const amount = Math.max(0, Number(cfg.price ?? 5000));
   const currency = cfg.currency || 'XOF';
   const orderId = `PART_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -271,7 +271,7 @@ export const verifyPartnershipPayment = asyncHandler(async (req, res) => {
  * Immediately grants lifetime partner advantages & dispatches form details to Admin.
  */
 export const completePartnershipRegistration = asyncHandler(async (req, res) => {
-  const { orderId, fullName, email, phone, password } = req.body;
+  const { orderId, fullName, email, phone, password, signatureDataUrl, signatureName } = req.body;
 
   if (!orderId) throw ApiError.badRequest('Référence de paiement requise.');
   if (!fullName || String(fullName).trim().length < 2) {
@@ -285,6 +285,12 @@ export const completePartnershipRegistration = asyncHandler(async (req, res) => 
   if (!cleanPhone || cleanPhone.length < 8) {
     throw ApiError.badRequest('Un numéro de téléphone valide est requis.');
   }
+  if (!signatureDataUrl && !signatureName) {
+    throw ApiError.badRequest('La signature numérique des termes et conditions est requise.');
+  }
+
+  const cfg = await getOrCreatePartnershipConfig();
+  const signedTermsSnapshot = cfg.termsAndConditions || '';
 
   const payment = await Payment.findOne({ externalRef: orderId, purpose: 'partnership' });
   if (!payment) throw ApiError.notFound('Paiement partenariat introuvable.');
@@ -336,6 +342,9 @@ export const completePartnershipRegistration = asyncHandler(async (req, res) => 
       phone: cleanPhone,
       paymentRef: payment.externalRef,
       paidAmount: payment.amount,
+      signatureDataUrl,
+      signatureName: signatureName || fullName,
+      signedTermsSnapshot,
     });
 
     if (!req.user || String(req.user._id) !== String(targetUser._id)) {
@@ -377,6 +386,9 @@ export const completePartnershipRegistration = asyncHandler(async (req, res) => 
       phone: cleanPhone,
       paymentRef: payment.externalRef,
       paidAmount: payment.amount,
+      signatureDataUrl,
+      signatureName: signatureName || fullName,
+      signedTermsSnapshot,
     });
 
     isNewAccount = true;
@@ -402,7 +414,7 @@ export const completePartnershipRegistration = asyncHandler(async (req, res) => 
     },
   });
 
-  // Notify admin by email asynchronously
+  // Notify admin by email asynchronously (including signed Terms & Conditions + digital signature)
   sendAdminPartnershipNotification({
     fullName,
     email: cleanEmail,
@@ -410,6 +422,10 @@ export const completePartnershipRegistration = asyncHandler(async (req, res) => 
     paymentRef: payment.externalRef,
     amount: payment.amount,
     currency: payment.currency,
+    signatureName: signatureName || fullName,
+    signatureDataUrl,
+    signedAt: targetUser.partnership?.signedAt,
+    signedTermsSnapshot,
   }).catch((err) => logger.warn(`Partnership admin notification email failed: ${err.message}`));
 
   const payload = {
@@ -542,6 +558,10 @@ export const getMyPartnerDashboard = asyncHandler(async (req, res) => {
         fullName: user.partnership?.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
         email: user.partnership?.email || user.email,
         phone: user.partnership?.phone || user.phone || '',
+        signatureDataUrl: user.partnership?.signatureDataUrl || '',
+        signatureName: user.partnership?.signatureName || '',
+        signedAt: user.partnership?.signedAt || null,
+        signedTermsSnapshot: user.partnership?.signedTermsSnapshot || '',
       },
       programConfig: {
         isEnabled: Boolean(cfg.isEnabled && !cfg.isDeleted),
@@ -808,6 +828,10 @@ export const adminGetPartnershipOverview = asyncHandler(async (req, res) => {
       formPhone: p.partnership?.phone || p.phone || '',
       formSubmitted: Boolean(p.partnership?.formSubmitted),
       formSubmittedAt: p.partnership?.formSubmittedAt,
+      signatureDataUrl: p.partnership?.signatureDataUrl || '',
+      signatureName: p.partnership?.signatureName || '',
+      signedAt: p.partnership?.signedAt || null,
+      signedTermsSnapshot: p.partnership?.signedTermsSnapshot || '',
       paymentRef: p.partnership?.paymentRef || '',
       paidAmount: p.partnership?.paidAmount || 0,
       referralCode: p.referralCode,
@@ -830,7 +854,7 @@ export const adminGetPartnershipOverview = asyncHandler(async (req, res) => {
   });
 
   const activePartnersCount = partners.filter((p) => p.isActive && p.status === 'active').length;
-  const maxPartners = Math.max(1, Number(cfg.maxPartners || 50));
+  const maxPartners = Math.max(1, Number(cfg.maxPartners || 20));
 
   return sendSuccess(res, {
     data: {
@@ -951,12 +975,16 @@ export const adminUpdatePartnerStatus = asyncHandler(async (req, res) => {
     partner.partnership.excludedReason =
       reason || (action === 'exclude' ? 'Exclu pour inactivité mensuelle (0 affilié)' : "Programme désactivé par l'administrateur");
 
-    // Revoke lifetime access immediately if they don't have an active paid subscription with a future endDate
+    // Revoke lifetime access immediately and restore regular plan eligibility if they were on partner_lifetime
     const hasValidPaidEnd =
       partner.subscription?.plan !== 'partner_lifetime' &&
       partner.subscription?.endDate &&
       new Date(partner.subscription.endDate) > new Date();
 
+    if (partner.subscription?.plan === 'partner_lifetime') {
+      partner.subscription.plan = 'free';
+      partner.subscription.scansPerMonth = 0;
+    }
     if (!hasValidPaidEnd) {
       partner.subscription.status = 'expired';
     }

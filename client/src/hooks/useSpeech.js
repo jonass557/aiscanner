@@ -229,7 +229,8 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
 
       // Nettoyer et transcrire le texte pour une prononciation fluide et humaine
       let clean = String(text)
-        .replace(/```[\s\S]*?```/g, '') // supprimer les blocs de code
+        .replace(/```[\s\S]*?```/g, '') // supprimer les blocs de code / SVG
+        .replace(/<svg[\s\S]*?<\/svg>/gi, '') // supprimer les SVG inline
         .replace(/[#*_~`]/g, '')
         .replace(/https?:\/\/\S+/g, '') // supprimer les URLs
         .replace(/\[.*?\]\(.*?\)/g, '')

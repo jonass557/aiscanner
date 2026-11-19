@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,6 +19,8 @@ import {
   CheckCircle2,
   ArrowRight,
   Lock,
+  PenTool,
+  Eraser,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { partnershipApi } from '../../services/endpoints.js';
@@ -39,6 +41,15 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
 
   const [step, setStep] = useState('details'); // 'details' | 'payment' | 'pending' | 'form' | 'success'
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  // Digital signature state (Step 1)
+  const canvasRef = useRef(null);
+  const isDrawingRef = useRef(false);
+  const [hasSignature, setHasSignature] = useState(false);
+  const [signatureDataUrl, setSignatureDataUrl] = useState('');
+  const [signatureName, setSignatureName] = useState(
+    user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : ''
+  );
 
   // Payment fields
   const [country, setCountry] = useState('CI');
@@ -69,6 +80,9 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
     if (isOpen) {
       setStep('details');
       setAcceptedTerms(false);
+      setHasSignature(false);
+      setSignatureDataUrl('');
+      setSignatureName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
       setPayEmail(user?.email || '');
       setPhoneNumber(user?.phone || '');
       setFormFullName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
@@ -190,6 +204,8 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
         email: formEmail.trim(),
         phone: formPhone.trim(),
         password: formPassword || undefined,
+        signatureDataUrl,
+        signatureName: (signatureName || formFullName).trim(),
       });
 
       const d = data?.data || {};
@@ -297,9 +313,131 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
                 </span>
               </label>
 
+              {/* Digital Signature Box */}
+              <div className="rounded-2xl border border-amber-500/30 bg-slate-950/80 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-300">
+                    <PenTool className="h-3.5 w-3.5" />
+                    Signature Numérique Obligatoire *
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const canvas = canvasRef.current;
+                      if (canvas) {
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                      }
+                      setHasSignature(false);
+                      setSignatureDataUrl('');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:bg-slate-700"
+                  >
+                    <Eraser className="h-3 w-3" /> Effacer
+                  </button>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-400">
+                    Nom complet du signataire *
+                  </label>
+                  <input
+                    type="text"
+                    value={signatureName}
+                    onChange={(e) => setSignatureName(e.target.value)}
+                    placeholder="Ex: Jean Kouassi"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-400">
+                    Dessinez votre signature ci-dessous (souris ou doigt) :
+                  </label>
+                  <canvas
+                    ref={canvasRef}
+                    width={520}
+                    height={120}
+                    onMouseDown={(e) => {
+                      const canvas = canvasRef.current;
+                      if (!canvas) return;
+                      const rect = canvas.getBoundingClientRect();
+                      const scaleX = canvas.width / rect.width;
+                      const scaleY = canvas.height / rect.height;
+                      const ctx = canvas.getContext('2d');
+                      ctx.strokeStyle = '#fbbf24';
+                      ctx.lineWidth = 2.5;
+                      ctx.lineCap = 'round';
+                      ctx.lineJoin = 'round';
+                      ctx.beginPath();
+                      ctx.moveTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+                      isDrawingRef.current = true;
+                    }}
+                    onMouseMove={(e) => {
+                      if (!isDrawingRef.current || !canvasRef.current) return;
+                      const canvas = canvasRef.current;
+                      const rect = canvas.getBoundingClientRect();
+                      const scaleX = canvas.width / rect.width;
+                      const scaleY = canvas.height / rect.height;
+                      const ctx = canvas.getContext('2d');
+                      ctx.lineTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+                      ctx.stroke();
+                      setHasSignature(true);
+                    }}
+                    onMouseUp={() => {
+                      if (!isDrawingRef.current || !canvasRef.current) return;
+                      isDrawingRef.current = false;
+                      setSignatureDataUrl(canvasRef.current.toDataURL('image/png'));
+                    }}
+                    onMouseLeave={() => {
+                      if (isDrawingRef.current && canvasRef.current) {
+                        isDrawingRef.current = false;
+                        setSignatureDataUrl(canvasRef.current.toDataURL('image/png'));
+                      }
+                    }}
+                    onTouchStart={(e) => {
+                      const canvas = canvasRef.current;
+                      if (!canvas || !e.touches[0]) return;
+                      const rect = canvas.getBoundingClientRect();
+                      const scaleX = canvas.width / rect.width;
+                      const scaleY = canvas.height / rect.height;
+                      const ctx = canvas.getContext('2d');
+                      ctx.strokeStyle = '#fbbf24';
+                      ctx.lineWidth = 2.5;
+                      ctx.lineCap = 'round';
+                      ctx.lineJoin = 'round';
+                      ctx.beginPath();
+                      ctx.moveTo((e.touches[0].clientX - rect.left) * scaleX, (e.touches[0].clientY - rect.top) * scaleY);
+                      isDrawingRef.current = true;
+                    }}
+                    onTouchMove={(e) => {
+                      if (!isDrawingRef.current || !canvasRef.current || !e.touches[0]) return;
+                      e.preventDefault();
+                      const canvas = canvasRef.current;
+                      const rect = canvas.getBoundingClientRect();
+                      const scaleX = canvas.width / rect.width;
+                      const scaleY = canvas.height / rect.height;
+                      const ctx = canvas.getContext('2d');
+                      ctx.lineTo((e.touches[0].clientX - rect.left) * scaleX, (e.touches[0].clientY - rect.top) * scaleY);
+                      ctx.stroke();
+                      setHasSignature(true);
+                    }}
+                    onTouchEnd={() => {
+                      if (!isDrawingRef.current || !canvasRef.current) return;
+                      isDrawingRef.current = false;
+                      setSignatureDataUrl(canvasRef.current.toDataURL('image/png'));
+                    }}
+                    className="w-full h-28 rounded-xl border border-dashed border-slate-700 bg-slate-900 cursor-crosshair touch-none"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Une copie du document signé numériquement sera envoyée à l'administrateur et enregistrée dans votre Dashboard Partenaire.
+                  </p>
+                </div>
+              </div>
+
               <button
                 type="button"
-                disabled={!acceptedTerms || spotsRemaining <= 0}
+                disabled={!acceptedTerms || !hasSignature || !signatureName.trim() || spotsRemaining <= 0}
                 onClick={() => setStep('payment')}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/20 hover:brightness-110 transition disabled:opacity-40"
               >

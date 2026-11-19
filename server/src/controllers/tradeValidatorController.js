@@ -6,6 +6,7 @@ import { getProvider, assertVisionReady } from '../services/ai/index.js';
 import { TV_SYSTEM_PROMPT, buildTradeValidatorPrompt, TV_OUTPUT_SCHEMA } from '../services/ai/tradeValidatorPrompt.js';
 import { parseTradeValidationResponse } from '../services/ai/tradeValidatorParser.js';
 import { logScan } from '../services/logService.js';
+import { resolveRequestLanguage } from '../utils/language.js';
 import logger from '../config/logger.js';
 
 /**
@@ -74,6 +75,10 @@ export const validateTrade = asyncHandler(async (req, res) => {
     const provider = getProvider();
     const startedAt = Date.now();
 
+    const lang = resolveRequestLanguage(req, tradeParams?.strategy || '');
+    const langInstruction = lang === 'en'
+      ? '\n\nIMPORTANT: Write all descriptive text fields in clear, professional ENGLISH.'
+      : '\n\nIMPORTANT : Rédigez tous les champs textuels descriptifs en FRANÇAIS professionnel.';
     const userPrompt =
       buildTradeValidatorPrompt({
         symbol,
@@ -85,7 +90,7 @@ export const validateTrade = asyncHandler(async (req, res) => {
         strategy: tradeParams?.strategy,
         riskPercent: tradeParams?.riskPercent,
         accountBalance: tradeParams?.accountBalance,
-      }) + `\n\nReturn ONLY a JSON object with this exact shape:\n${TV_OUTPUT_SCHEMA}`;
+      }) + `\n\nReturn ONLY a JSON object with this exact shape:\n${TV_OUTPUT_SCHEMA}${langInstruction}`;
 
     // validateTrade() runs vision analysis when an image is present, else a
     // text-only chat. The mock provider returns a schema-valid sample.

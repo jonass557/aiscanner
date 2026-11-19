@@ -7,6 +7,7 @@ import { mentorReply } from '../services/ai/index.js';
 import Analysis from '../models/Analysis.js';
 import Opportunity from '../models/Opportunity.js';
 import { getUpcomingHighImpact } from '../services/economicCalendarService.js';
+import { resolveRequestLanguage } from '../utils/language.js';
 
 /**
  * Resolves a dataKey against the user's live context so the voice assistant
@@ -76,7 +77,7 @@ export const handleVoiceCommand = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('Transcript is required.');
   }
   const text = String(transcript).trim();
-  const lang = String(language || 'fr').slice(0, 2);
+  const lang = resolveRequestLanguage(req, text);
 
   // 1. Parse intent
   const intent = parseIntent(text);
@@ -117,9 +118,12 @@ export const handleVoiceCommand = asyncHandler(async (req, res) => {
         messages: [
           {
             role: 'user',
-            content: `Contexte de mon dernier trade : ${ctx}\n\nRéponds en français, en 1 à 3 phrases concises, sans markdown. Ma question : ${text}`,
+            content: lang === 'en'
+              ? `Context of my latest trade: ${ctx}\n\nAnswer concisely in English (1 to 3 sentences), no markdown. My question: ${text}`
+              : `Contexte de mon dernier trade : ${ctx}\n\nRéponds en français, en 1 à 3 phrases concises, sans markdown. Ma question : ${text}`,
           },
         ],
+        lang,
       });
       reply = aiReply;
     }
@@ -131,6 +135,7 @@ export const handleVoiceCommand = asyncHandler(async (req, res) => {
         : 'Answer concisely (2-4 sentences), in English, no markdown or lists.';
     const { reply: aiReply } = await mentorReply({
       messages: [{ role: 'user', content: `${instruction}\n\n${text}` }],
+      lang,
     });
     reply = aiReply;
   }

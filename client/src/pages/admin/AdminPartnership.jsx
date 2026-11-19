@@ -28,6 +28,7 @@ export default function AdminPartnership() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('partners'); // 'partners' | 'config' | 'revenue'
+  const [viewingContract, setViewingContract] = useState(null);
 
   // Config editor state
   const [cfgForm, setCfgForm] = useState(null);
@@ -411,6 +412,15 @@ export default function AdminPartnership() {
                               Activer à nouveau
                             </button>
                           )}
+                          {(p.signatureDataUrl || p.signedTermsSnapshot) && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingContract(p)}
+                              className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5 font-bold text-amber-300 hover:bg-amber-500/25"
+                            >
+                              Contrat Signé
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handlePartnerAction(p, 'remove')}
@@ -692,6 +702,47 @@ export default function AdminPartnership() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {viewingContract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="w-full max-w-2xl rounded-3xl border border-amber-500/40 bg-slate-900 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-lg font-black text-white">
+                  Contrat Partenaire Signé — {viewingContract.formFullName || viewingContract.email}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Signataire : {viewingContract.signatureName || viewingContract.formFullName}
+                  {viewingContract.signedAt ? ` · Le ${new Date(viewingContract.signedAt).toLocaleString('fr-FR')}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingContract(null)}
+                className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-300 hover:text-white"
+              >
+                Fermer
+              </button>
+            </div>
+
+            {viewingContract.signedTermsSnapshot && (
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs leading-relaxed text-slate-300 whitespace-pre-wrap">
+                {viewingContract.signedTermsSnapshot}
+              </div>
+            )}
+
+            {viewingContract.signatureDataUrl && (
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                <p className="text-xs font-semibold text-slate-400 mb-2">Signature numérique capturée :</p>
+                <img
+                  src={viewingContract.signatureDataUrl}
+                  alt="Signature partenaire"
+                  className="h-24 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 object-contain"
+                />
               </div>
             )}
           </div>

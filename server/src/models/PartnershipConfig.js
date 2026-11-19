@@ -28,9 +28,9 @@ const partnershipConfigSchema = new mongoose.Schema(
       default: 'Accès à vie illimité + 30% de commission récurrente chaque mois sur tous vos affiliés',
     },
     badgeText: { type: String, default: 'Places Limitées · VIP Partenaire' },
-    price: { type: Number, default: 50000, min: 0 },
+    price: { type: Number, default: 5000, min: 0 },
     currency: { type: String, default: 'XOF' },
-    maxPartners: { type: Number, default: 50, min: 1 },
+    maxPartners: { type: Number, default: 20, min: 1 },
     commissionRate: { type: Number, default: 30, min: 1, max: 95 },
     creditTiming: {
       type: String,

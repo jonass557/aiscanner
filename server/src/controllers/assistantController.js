@@ -9,6 +9,7 @@ import { analyzeMarketData, mentorReply } from '../services/ai/index.js';
 import { getUpcomingHighImpact } from '../services/economicCalendarService.js';
 import { logScan } from '../services/logService.js';
 import logger from '../config/logger.js';
+import { resolveRequestLanguage } from '../utils/language.js';
 
 // Actions that analyze market data and consume a scan credit.
 const ANALYSIS_ACTIONS = ['analyze', 'find_setups', 'should_i_trade', 'show_risks'];
@@ -218,7 +219,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   const { content, language } = req.body;
   if (!content || !String(content).trim()) throw ApiError.badRequest('Message is required.');
   const text = String(content).trim();
-  const lang = language || (req.headers['accept-language']?.includes('en') ? 'en' : 'fr');
+  const lang = resolveRequestLanguage(req, text);
 
   // Load (or create) the conversation, then the message history.
   let conv = await AssistantConversation.findOne({ _id: req.params.id, user: user._id });
@@ -264,6 +265,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
       snapshot,
       preferences: {
         ...(user.preferences || {}),
+        language: lang,
         customStrategy: text,
       },
       strategy: ctx.strategy || 'custom',
@@ -324,7 +326,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
       const snapshot = await requireSnapshot(symbol, timeframe);
       const { analysis } = await analyzeMarketData({
         snapshot,
-        preferences: user.preferences || {},
+        preferences: { ...(user.preferences || {}), language: lang },
         strategy: ctx.strategy,
         intentParams: intent.params,
       });

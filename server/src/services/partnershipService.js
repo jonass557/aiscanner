@@ -61,7 +61,10 @@ export const countActivePartners = async () => {
 /**
  * Grant / activate lifetime Partner benefits on a user document.
  */
-export const activatePartnershipForUser = async (user, { fullName, email, phone, paymentRef, paidAmount } = {}) => {
+export const activatePartnershipForUser = async (
+  user,
+  { fullName, email, phone, paymentRef, paidAmount, signatureDataUrl, signatureName, signedTermsSnapshot } = {}
+) => {
   if (!user.partnership) user.partnership = {};
 
   user.partnership.isActive = true;
@@ -75,6 +78,10 @@ export const activatePartnershipForUser = async (user, { fullName, email, phone,
   if (fullName) user.partnership.fullName = String(fullName).trim();
   if (email) user.partnership.email = String(email).toLowerCase().trim();
   if (phone) user.partnership.phone = String(phone).trim();
+  if (signatureDataUrl) user.partnership.signatureDataUrl = String(signatureDataUrl).slice(0, 150000);
+  if (signatureName) user.partnership.signatureName = String(signatureName).trim();
+  if (signatureDataUrl || signatureName) user.partnership.signedAt = new Date();
+  if (signedTermsSnapshot) user.partnership.signedTermsSnapshot = String(signedTermsSnapshot);
   if (paymentRef) user.partnership.paymentRef = paymentRef;
   if (paidAmount !== undefined) user.partnership.paidAmount = Number(paidAmount) || 0;
   user.partnership.excludedAt = null;

@@ -4,6 +4,7 @@ import MentorConversation from '../models/MentorConversation.js';
 import { mentorReply } from '../services/ai/index.js';
 import { logAi } from '../services/logService.js';
 import logger from '../config/logger.js';
+import { resolveRequestLanguage } from '../utils/language.js';
 
 import { getInitialCurriculum } from '../services/ai/curriculumData.js';
 import { gradeExercise } from '../services/ai/index.js';
@@ -139,7 +140,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
       .slice(-CONTEXT_WINDOW)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    const userLang = req.body.lang || req.user.preferences?.language || 'fr';
+    const userLang = resolveRequestLanguage(req, content);
 
     const { reply, meta } = await mentorReply({
       messages: history,
@@ -239,7 +240,7 @@ export const submitExercise = asyncHandler(async (req, res) => {
       conversation.activeLessonIndex = nextIndex;
 
       const nextLesson = conversation.curriculum[nextIndex];
-      const userLang = req.body.lang || 'fr';
+      const userLang = resolveRequestLanguage(req);
 
       try {
         const { reply } = await mentorReply({

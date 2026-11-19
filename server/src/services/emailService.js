@@ -219,17 +219,47 @@ export const sendOpportunityAlertEmail = async (user, opportunity) => {
 /**
  * Notify admin when a new VIP Partner submits their post-payment identification form.
  */
-export const sendAdminPartnershipNotification = async ({ fullName, email, phone, paymentRef, amount, currency }) => {
+export const sendAdminPartnershipNotification = async ({
+  fullName,
+  email,
+  phone,
+  paymentRef,
+  amount,
+  currency,
+  signatureName,
+  signatureDataUrl,
+  signedAt,
+  signedTermsSnapshot,
+}) => {
   const adminEmail = config.admin?.email || config.email?.user;
   if (!adminEmail) return false;
 
+  const esc = (v = '') =>
+    String(v)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const safeSigImg =
+    signatureDataUrl && String(signatureDataUrl).startsWith('data:image/')
+      ? `<div style="margin-top:10px;"><p style="margin:0 0 6px; font-weight:600;">Signature numérique :</p><img src="${signatureDataUrl}" alt="Signature numérique" style="max-width:280px; max-height:110px; border:1px solid #cbd5e1; border-radius:8px; background:#ffffff; padding:6px;" /></div>`
+      : '';
+
+  const safeTerms = signedTermsSnapshot
+    ? `<div style="margin-top:14px; padding:12px; border-radius:8px; background:#ffffff; border:1px solid #cbd5e1; font-size:12px; color:#334155; white-space:pre-wrap; max-height:360px; overflow:auto;"><strong>Document des Termes & Conditions signé :</strong>\n\n${esc(signedTermsSnapshot)}</div>`
+    : '';
+
   const detailsHtml = `
     <div style="margin:18px 0; padding:16px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; font-size:14px; color:#1e293b;">
-      <p style="margin:0 0 8px;"><strong>Nom complet :</strong> ${fullName}</p>
-      <p style="margin:0 0 8px;"><strong>Email :</strong> ${email}</p>
-      <p style="margin:0 0 8px;"><strong>Téléphone / WhatsApp :</strong> ${phone}</p>
-      <p style="margin:0 0 8px;"><strong>Montant payé :</strong> ${Number(amount || 0).toLocaleString()} ${currency || 'XOF'}</p>
-      <p style="margin:0;"><strong>Référence paiement :</strong> <code>${paymentRef}</code></p>
+      <p style="margin:0 0 8px;"><strong>Nom complet :</strong> ${esc(fullName)}</p>
+      <p style="margin:0 0 8px;"><strong>Email :</strong> ${esc(email)}</p>
+      <p style="margin:0 0 8px;"><strong>Téléphone / WhatsApp :</strong> ${esc(phone)}</p>
+      <p style="margin:0 0 8px;"><strong>Montant payé :</strong> ${Number(amount || 0).toLocaleString()} ${esc(currency || 'XOF')}</p>
+      <p style="margin:0 0 8px;"><strong>Référence paiement :</strong> <code>${esc(paymentRef)}</code></p>
+      <p style="margin:0 0 8px;"><strong>Signataire numérique :</strong> ${esc(signatureName || fullName)} (${signedAt ? new Date(signedAt).toLocaleString('fr-FR') : new Date().toLocaleString('fr-FR')})</p>
+      ${safeSigImg}
+      ${safeTerms}
     </div>
   `;
 

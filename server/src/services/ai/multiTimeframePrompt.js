@@ -21,7 +21,7 @@ CRITICAL RULES OF PROFESSIONAL MULTI-TIMEFRAME ANALYSIS:
 - If a custom user strategy is provided, rigorously test and verify whether the confluence across all timeframes meets or violates the user's strategy criteria.
 - Never invent levels or prices that are not visible.`;
 
-export const buildMtfUserPrompt = (timeframes = [], customStrategy = '') => {
+export const buildMtfUserPrompt = (timeframes = [], customStrategy = '', lang = 'fr') => {
   const tfList = timeframes.length ? timeframes.join(', ') : 'the provided timeframes';
   return `Analyze the provided charts. They are all the SAME symbol across these timeframes (from lowest to highest): ${tfList}.
 
@@ -95,5 +95,7 @@ Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this
     "waitReason": string|null
   },
   "summary": string
+}
+${lang === 'en' ? '\nIMPORTANT: Write all descriptive text fields in clear, professional ENGLISH.' : '\nIMPORTANT : Rédigez tous les champs textuels descriptifs en FRANÇAIS professionnel.'}
 }`;
 };
