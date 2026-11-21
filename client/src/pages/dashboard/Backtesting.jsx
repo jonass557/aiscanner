@@ -175,6 +175,14 @@ export const DRAWING_TOOLS_CATEGORIES = [
     ],
   },
   {
+    id: 'shapes',
+    nameFr: 'Catégorie Formes & Zones',
+    nameEn: 'Shapes & Zones',
+    tools: [
+      { id: 'rectangle', symbol: '▭', nameFr: 'Rectangle (Zone OB / Supply / Demand)', nameEn: 'Rectangle Zone', points: 2 },
+    ],
+  },
+  {
     id: 'fibonacci',
     nameFr: 'Catégorie Fibonacci & Gann',
     nameEn: 'Fibonacci & Gann',
@@ -406,6 +414,8 @@ export default function Backtesting() {
   const [pendingPoints, setPendingPoints] = useState([]);
   const [selectedDrawingId, setSelectedDrawingId] = useState(null);
   const [showToolSettings, setShowToolSettings] = useState(false);
+  const [toolbarPos, setToolbarPos] = useState(null); // { x, y } when dragged by mouse or finger
+  const [toolbarDrag, setToolbarDrag] = useState(null);
   const [drawings, setDrawings] = useState(() => {
     try {
       const saved = localStorage.getItem('backtest_drawings');
@@ -646,33 +656,44 @@ export default function Backtesting() {
     const endSec = Math.floor(new Date(`${eDate}T23:59:59Z`).getTime() / 1000);
 
     const applyRangeData = (bars) => {
-      const filtered = bars.filter((c) => c.time >= startSec && c.time <= endSec);
-      if (filtered.length >= 3) {
-        setAllCandles(filtered);
-        const startBars = Math.min(15, filtered.length);
-        setCutIndex(startBars);
-        setReplayIndex(startBars);
+      // Keep ALL historical candles up to endSec so prior periods stay visible on the chart!
+      const bounded = bars.filter((c) => c.time <= endSec);
+      const inRangeCount = bounded.filter((c) => c.time >= startSec).length;
+      if (inRangeCount >= 3) {
+        setAllCandles(bounded);
+        const startIdx = bounded.findIndex((c) => c.time >= startSec);
+        const initialReplayIdx = startIdx > 0 ? startIdx : Math.min(15, bounded.length);
+        setCutIndex(initialReplayIdx);
+        setReplayIndex(initialReplayIdx);
         setShowDateRangeModal(false);
         if (mainSeriesRef.current) {
-          const visible = filtered.slice(0, startBars);
+          const visible = bounded.slice(0, initialReplayIdx);
           if (chartType === 'line' || chartType === 'area') {
             mainSeriesRef.current.setData(visible.map((c) => ({ time: c.time, value: c.close })));
           } else {
             mainSeriesRef.current.setData(visible);
           }
+          setTimeout(() => {
+            try {
+              chartInstanceRef.current?.timeScale().scrollToRealTime();
+            } catch {}
+          }, 60);
         }
         toast.success(
           isEn
-            ? `Backtest bounded: ${sDate} to ${eDate}. Chart positioned at start date.`
-            : `Période délimitée : ${sDate} au ${eDate}. Graphique positionné au début de la période.`
+            ? `Backtest bounded: ${sDate} to ${eDate}. Prior history preserved & positioned at start date.`
+            : `Période délimitée : ${sDate} au ${eDate}. Historique précédent conservé et graphique positionné au début.`
         );
         return true;
       }
       return false;
     };
 
-    if (applyRangeData(allCandles)) return;
+    // Only reuse in-memory candles if they already include history before startSec
+    const hasPriorInMemory = allCandles.length > 0 && allCandles[0].time < startSec;
+    if (hasPriorInMemory && applyRangeData(allCandles)) return;
 
+    const historyStartSec = startSec - 90 * 86400; // ensure at least 90 days of prior candles for context
     marketApi
       .snapshot(selectedPair.symbol, timeframe, 25000)
       .then(({ data }) => {
@@ -680,14 +701,14 @@ export default function Backtesting() {
         const sorted =
           raw.length > 0
             ? sanitizeCandles(raw, selectedPair.base)
-            : generateRealisticCandles(selectedPair.base, timeframe, 15000, startSec, endSec);
+            : generateRealisticCandles(selectedPair.base, timeframe, 15000, historyStartSec, endSec);
         if (!applyRangeData(sorted)) {
-          const continuous = generateRealisticCandles(selectedPair.base, timeframe, 15000, startSec, endSec);
+          const continuous = generateRealisticCandles(selectedPair.base, timeframe, 15000, historyStartSec, endSec);
           applyRangeData(continuous);
         }
       })
       .catch(() => {
-        const continuous = generateRealisticCandles(selectedPair.base, timeframe, 15000, startSec, endSec);
+        const continuous = generateRealisticCandles(selectedPair.base, timeframe, 15000, historyStartSec, endSec);
         applyRangeData(continuous);
       });
   };
@@ -949,10 +970,11 @@ export default function Backtesting() {
                 price: p1.price,
                 time2: p1.time,
                 price2: p1.price,
-                color: activeTool === 'fibonacci' ? '#eab308' : '#3b82f6',
+                color: activeTool === 'fibonacci' ? '#2962ff' : activeTool === 'rectangle' ? '#6366f1' : '#3b82f6',
                 lineWidth: 2,
                 lineStyle: 'solid',
-                fibLevels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0],
+                fillOpacity: 0.16,
+                fibLevels: [0, 0.5, 0.62, 0.705, 0.79, 1.0],
               };
               setDrawings((prev) => [...prev, newDrawing]);
               setSelectedDrawingId(id);
@@ -979,10 +1001,11 @@ export default function Backtesting() {
                 price: p1.price,
                 time2: p2.time,
                 price2: p2.price,
-                color: activeTool === 'fibonacci' ? '#eab308' : '#3b82f6',
+                color: activeTool === 'fibonacci' ? '#2962ff' : activeTool === 'rectangle' ? '#6366f1' : '#3b82f6',
                 lineWidth: 2,
                 lineStyle: 'solid',
-                fibLevels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0],
+                fillOpacity: 0.16,
+                fibLevels: [0, 0.5, 0.62, 0.705, 0.79, 1.0],
               };
               setDrawings((prev) => [...prev, newDrawing]);
               setSelectedDrawingId(id);
@@ -1745,10 +1768,11 @@ export default function Backtesting() {
         price: Number((currentPrice - range).toFixed(dp)),
         time2: curTime + tfSec * 10,
         price2: Number((currentPrice + range).toFixed(dp)),
-        color: type === 'fibonacci' ? '#eab308' : '#3b82f6',
+        color: type === 'fibonacci' ? '#2962ff' : type === 'rectangle' ? '#6366f1' : '#3b82f6',
         lineWidth: 2,
         lineStyle: 'solid',
-        fibLevels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0],
+        fillOpacity: 0.16,
+        fibLevels: [0, 0.5, 0.62, 0.705, 0.79, 1.0],
       };
       setDrawings((prev) => [...prev, d]);
       setSelectedDrawingId(id);
@@ -1802,47 +1826,64 @@ export default function Backtesting() {
     return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
   }, []);
 
-  // Coordinate mapper for drawings overlay
+  // Helper: estimate bar duration in seconds from loaded candles (for infinite future/past logical coordinates)
+  const getBarIntervalSec = useCallback(() => {
+    const bars = allCandlesRef.current;
+    if (bars && bars.length >= 2) {
+      const idx = Math.min(bars.length - 1, Math.max(1, replayIndex || bars.length - 1));
+      const diff = Number(bars[idx]?.time) - Number(bars[idx - 1]?.time);
+      if (diff > 0 && Number.isFinite(diff)) return diff;
+    }
+    return 3600;
+  }, [replayIndex]);
+
+  // Coordinate mapper for drawings overlay (supports infinite future/past whitespace via logical indices)
   const getCoords = useCallback((time, price) => {
-    if (!chartInstanceRef.current || !mainSeriesRef.current || !time || price == null) return null;
+    if (!chartInstanceRef.current || !mainSeriesRef.current || time == null || price == null) return null;
     try {
-      const sec = toUnixSec(time);
-      const x = chartInstanceRef.current.timeScale().timeToCoordinate(sec || time);
+      const ts = chartInstanceRef.current.timeScale();
+      const sec = toUnixSec(time) || Number(time);
+      let x = ts.timeToCoordinate(sec);
+      if (x == null && allCandlesRef.current.length > 0 && Number.isFinite(sec)) {
+        const bars = allCandlesRef.current;
+        const maxVisIdx = Math.max(0, Math.min(bars.length - 1, (replayIndex || bars.length) - 1));
+        const refBar = bars[maxVisIdx];
+        const barSec = getBarIntervalSec();
+        if (refBar && barSec > 0) {
+          const logical = maxVisIdx + (sec - Number(refBar.time)) / barSec;
+          x = ts.logicalToCoordinate(logical);
+        }
+      }
       const y = mainSeriesRef.current.priceToCoordinate(price);
       if (x == null || y == null || isNaN(x) || isNaN(y)) return null;
       return { x, y };
     } catch {
       return null;
     }
-  }, [toUnixSec]);
+  }, [toUnixSec, replayIndex, getBarIntervalSec]);
 
-  // Inverse mapper: converts (pixelX, pixelY) back to { time, price }
+  // Inverse mapper: converts (pixelX, pixelY) back to { time, price } — works even in empty future space!
   const getPointFromCoords = useCallback((pixelX, pixelY) => {
     if (!chartInstanceRef.current || !mainSeriesRef.current) return null;
     try {
+      const ts = chartInstanceRef.current.timeScale();
       const price = mainSeriesRef.current.coordinateToPrice(pixelY);
-      let time = chartInstanceRef.current.timeScale().coordinateToTime(pixelX);
-      if (!time && allCandlesRef.current.length > 0) {
-        let bestTime = null;
-        let minDiff = Infinity;
-        for (let i = 0; i < allCandlesRef.current.length; i++) {
-          const c = allCandlesRef.current[i];
-          const cx = chartInstanceRef.current.timeScale().timeToCoordinate(c.time);
-          if (cx != null) {
-            const diff = Math.abs(cx - pixelX);
-            if (diff < minDiff) {
-              minDiff = diff;
-              bestTime = c.time;
-            }
-          }
+      let time = ts.coordinateToTime(pixelX);
+      if (time == null && allCandlesRef.current.length > 0) {
+        const logical = ts.coordinateToLogical(pixelX);
+        const bars = allCandlesRef.current;
+        const maxVisIdx = Math.max(0, Math.min(bars.length - 1, (replayIndex || bars.length) - 1));
+        const refBar = bars[maxVisIdx];
+        const barSec = getBarIntervalSec();
+        if (logical != null && refBar && barSec > 0) {
+          time = Math.round(Number(refBar.time) + (logical - maxVisIdx) * barSec);
         }
-        time = bestTime;
       }
       return { time, price };
     } catch {
       return null;
     }
-  }, []);
+  }, [replayIndex, getBarIntervalSec]);
 
   // Initiate dragging handle or entire body of a drawing (Mouse + Touch + Pointer)
   const handleStartDrag = useCallback((e, drawing, handle) => {
@@ -1909,8 +1950,7 @@ export default function Backtesting() {
               };
             }
             if (dragState.handle === 'width') {
-              const sec = toUnixSec(d.time);
-              const startX = chartInstanceRef.current.timeScale().timeToCoordinate(sec || d.time);
+              const startX = getCoords(d.time, d.entry)?.x;
               if (startX != null) {
                 const newW = Math.max(60, pixelX - startX);
                 return { ...d, boxW: Math.round(newW) };
@@ -1945,12 +1985,18 @@ export default function Backtesting() {
             return { ...d, price: currPrice, time: curT || init.time };
           }
 
-          // 2-point tools (trendline, ray, fibonacci, gann_box, fib_channel)
+          // 2-point tools (trendline, ray, rectangle, fibonacci, gann_box, fib_channel)
           if (dragState.handle === 'p1') {
             return { ...d, price: currPrice, time: curT || init.time };
           }
           if (dragState.handle === 'p2') {
             return { ...d, price2: currPrice, time2: curT || init.time2 };
+          }
+          if (dragState.handle === 'tr') {
+            return { ...d, price: currPrice, time2: curT || init.time2 };
+          }
+          if (dragState.handle === 'bl') {
+            return { ...d, price2: currPrice, time: curT || init.time };
           }
           if (dragState.handle === 'body') {
             const startPrice = mainSeriesRef.current.coordinateToPrice(dragState.startY - rect.top);
@@ -1999,6 +2045,35 @@ export default function Backtesting() {
       window.removeEventListener('mouseup', handlePointerUp);
     };
   }, [dragState, getPointFromCoords, toUnixSec]);
+
+  // Draggable floating tool toolbar (Mouse + Touch)
+  useEffect(() => {
+    if (!toolbarDrag) return;
+    const onMove = (e) => {
+      if (!chartContainerRef.current) return;
+      const rect = chartContainerRef.current.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? 0);
+      const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? 0);
+      const nextX = Math.max(8, Math.min(rect.width - 240, toolbarDrag.origX + (clientX - toolbarDrag.startX)));
+      const nextY = Math.max(8, Math.min(rect.height - 56, toolbarDrag.origY + (clientY - toolbarDrag.startY)));
+      setToolbarPos({ x: nextX, y: nextY });
+    };
+    const onUp = () => setToolbarDrag(null);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [toolbarDrag]);
 
   return (
     <div
@@ -2473,9 +2548,40 @@ export default function Backtesting() {
             </div>
           )}
 
-          {/* Floating TradingView Properties Toolbar when a drawing is selected */}
+          {/* Floating TradingView Properties Toolbar when a drawing is selected (Draggable on PC & Mobile) */}
           {selectedDrawing && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-xl border border-gray-700 bg-[#0d1322]/95 px-3 py-1.5 shadow-2xl backdrop-blur-md animate-fadeIn text-xs">
+            <div
+              style={
+                toolbarPos
+                  ? { left: `${toolbarPos.x}px`, top: `${toolbarPos.y}px` }
+                  : { top: '12px', left: '50%', transform: 'translateX(-50%)' }
+              }
+              className="absolute z-20 flex flex-wrap items-center gap-2 rounded-xl border border-gray-700 bg-[#0d1322]/95 px-2.5 py-1.5 shadow-2xl backdrop-blur-md animate-fadeIn text-xs max-w-[94vw]"
+            >
+              {/* Drag Grip Handle (Mouse & Touch) */}
+              <button
+                type="button"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  if (!chartContainerRef.current) return;
+                  const rect = chartContainerRef.current.getBoundingClientRect();
+                  const curX = toolbarPos ? toolbarPos.x : Math.max(8, rect.width / 2 - 180);
+                  const curY = toolbarPos ? toolbarPos.y : 12;
+                  setToolbarDrag({ startX: e.clientX, startY: e.clientY, origX: curX, origY: curY });
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
+                  if (!chartContainerRef.current || !e.touches[0]) return;
+                  const rect = chartContainerRef.current.getBoundingClientRect();
+                  const curX = toolbarPos ? toolbarPos.x : Math.max(8, rect.width / 2 - 180);
+                  const curY = toolbarPos ? toolbarPos.y : 12;
+                  setToolbarDrag({ startX: e.touches[0].clientX, startY: e.touches[0].clientY, origX: curX, origY: curY });
+                }}
+                className="flex h-6 w-5 items-center justify-center rounded text-gray-400 hover:bg-gray-800 hover:text-white cursor-grab active:cursor-grabbing touch-none"
+                title="Déplacer cette barre"
+              >
+                ⋮⋮
+              </button>
               <div className="flex items-center gap-1.5 border-r border-gray-700 pr-2">
                 <span className="flex h-5 w-5 items-center justify-center rounded bg-gray-800 text-amber-400 font-bold text-xs">
                   {selectedToolMeta?.symbol || '✏️'}
@@ -2908,47 +3014,98 @@ export default function Backtesting() {
                 );
               }
 
+              if (d.type === 'rectangle') {
+                const p1 = getCoords(d.time, d.price);
+                const p2 = getCoords(d.time2, d.price2);
+                if (!p1 || !p2) return null;
+                const rx = Math.min(p1.x, p2.x);
+                const ry = Math.min(p1.y, p2.y);
+                const rw = Math.max(4, Math.abs(p2.x - p1.x));
+                const rh = Math.max(4, Math.abs(p2.y - p1.y));
+                const strokeCol = d.color || '#6366f1';
+                return (
+                  <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    <rect
+                      x={rx}
+                      y={ry}
+                      width={rw}
+                      height={rh}
+                      fill={strokeCol}
+                      fillOpacity={d.fillOpacity ?? 0.16}
+                      stroke={strokeCol}
+                      strokeWidth={d.lineWidth || 2}
+                      strokeDasharray={d.lineStyle === 'dashed' ? '6,6' : d.lineStyle === 'dotted' ? '2,4' : 'none'}
+                      cursor="move"
+                      {...makeDragProps(d, 'body')}
+                    />
+                    {d.text && (
+                      <text x={rx + 8} y={ry + 16} fill="#f8fafc" fontSize={11} fontWeight="bold" style={{ pointerEvents: 'none' }}>
+                        {d.text}
+                      </text>
+                    )}
+                    {isSelected && (
+                      <>
+                        <circle cx={p1.x} cy={p1.y} r={6} fill="#ffffff" stroke="#2962ff" strokeWidth={2} cursor="nwse-resize" {...makeDragProps(d, 'p1')} />
+                        <circle cx={p2.x} cy={p2.y} r={6} fill="#ffffff" stroke="#2962ff" strokeWidth={2} cursor="nwse-resize" {...makeDragProps(d, 'p2')} />
+                        <circle cx={p2.x} cy={p1.y} r={6} fill="#ffffff" stroke="#2962ff" strokeWidth={2} cursor="nesw-resize" {...makeDragProps(d, 'tr')} />
+                        <circle cx={p1.x} cy={p2.y} r={6} fill="#ffffff" stroke="#2962ff" strokeWidth={2} cursor="nesw-resize" {...makeDragProps(d, 'bl')} />
+                      </>
+                    )}
+                  </g>
+                );
+              }
+
               if (d.type === 'fibonacci') {
                 const p1 = getCoords(d.time, d.price);
                 const p2 = getCoords(d.time2, d.price2);
                 if (!p1 || !p2) return null;
-                const lvls = d.fibLevels || [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+                const lvls = d.fibLevels || [0, 0.5, 0.62, 0.705, 0.79, 1.0];
                 const minX = Math.min(p1.x, p2.x);
-                const maxX = Math.max(p1.x, p2.x) + 260;
+                const maxX = Math.max(Math.max(p1.x, p2.x), minX + 40) + (d.extendRight ? 260 : 0);
                 const diff = d.price2 - d.price;
-                const y50 = mainSeriesRef.current?.priceToCoordinate(d.price + diff * 0.5);
-                const y618 = mainSeriesRef.current?.priceToCoordinate(d.price + diff * 0.618);
+                const topY = Math.min(p1.y, p2.y);
+                const botY = Math.max(p1.y, p2.y);
+
+                const getFibColor = (lvl) => {
+                  if (lvl === 0) return '#ef4444';
+                  if (lvl === 0.5) return '#22c55e';
+                  if (lvl === 0.618 || lvl === 0.62) return '#0d9488';
+                  if (lvl === 0.705) return '#2563eb';
+                  if (lvl === 0.786 || lvl === 0.79) return '#06b6d4';
+                  if (lvl === 1 || lvl === 1.0) return '#64748b';
+                  return d.color || '#94a3b8';
+                };
+
                 return (
                   <g key={d.id} className="pointer-events-auto cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDrawingId(d.id); }}>
+                    {/* Full-area transparent hit zone for easy dragging */}
+                    <rect
+                      x={minX}
+                      y={topY}
+                      width={Math.max(20, maxX - minX)}
+                      height={Math.max(20, botY - topY)}
+                      fill="transparent"
+                      cursor="move"
+                      {...makeDragProps(d, 'body')}
+                    />
+                    {/* Dashed diagonal trend anchor line (TradingView style) */}
                     <line
                       x1={p1.x}
                       y1={p1.y}
                       x2={p2.x}
                       y2={p2.y}
-                      stroke={d.color || '#eab308'}
-                      strokeWidth={1}
-                      strokeDasharray="3,3"
-                      opacity={0.6}
+                      stroke="#94a3b8"
+                      strokeWidth={1.5}
+                      strokeDasharray="6,6"
                       cursor="move"
                       {...makeDragProps(d, 'body')}
                     />
-                    {y50 != null && y618 != null && (
-                      <rect
-                        x={minX}
-                        y={Math.min(y50, y618)}
-                        width={maxX - minX}
-                        height={Math.abs(y618 - y50)}
-                        fill="#eab308"
-                        fillOpacity={0.15}
-                        cursor="move"
-                        {...makeDragProps(d, 'body')}
-                      />
-                    )}
                     {lvls.map((lvl) => {
-                      const lvlPrice = d.price + diff * lvl;
+                      // TradingView Fib: p2 (end) = 0, p1 (start) = 1
+                      const lvlPrice = d.price2 - diff * lvl;
                       const lvlY = mainSeriesRef.current?.priceToCoordinate(lvlPrice);
                       if (lvlY == null) return null;
-                      const isGolden = lvl === 0.618 || lvl === 0.5;
+                      const col = getFibColor(lvl);
                       return (
                         <g key={lvl}>
                           <line
@@ -2956,11 +3113,12 @@ export default function Backtesting() {
                             y1={lvlY}
                             x2={maxX}
                             y2={lvlY}
-                            stroke={isGolden ? '#eab308' : d.color || '#94a3b8'}
-                            strokeWidth={isGolden ? 1.5 : 1}
-                            strokeDasharray={lvl === 0 || lvl === 1 ? 'none' : '4,4'}
+                            stroke={col}
+                            strokeWidth={d.lineWidth || 1.75}
+                            cursor="move"
+                            {...makeDragProps(d, 'body')}
                           />
-                          <text x={minX + 4} y={lvlY - 3} fill={isGolden ? '#facc15' : '#cbd5e1'} fontSize={10} fontFamily="monospace" fontWeight="bold">
+                          <text x={maxX + 8} y={lvlY + 4} fill={col} fontSize={11} fontFamily="monospace" fontWeight="bold">
                             {lvl} ({formatPrice(lvlPrice)})
                           </text>
                         </g>
@@ -2968,8 +3126,8 @@ export default function Backtesting() {
                     })}
                     {d.text && (
                       <g>
-                        <rect x={minX + 4} y={Math.min(p1.y, p2.y) - 22} width={Math.max(60, d.text.length * 6.5 + 10)} height={18} rx={3} fill="#0d1322" stroke="#eab308" strokeWidth={1} />
-                        <text x={minX + 8} y={Math.min(p1.y, p2.y) - 10} fill="#facc15" fontSize={10} fontWeight="bold">{d.text}</text>
+                        <rect x={minX + 4} y={topY - 22} width={Math.max(60, d.text.length * 6.5 + 10)} height={18} rx={3} fill="#0d1322" stroke="#2962ff" strokeWidth={1} />
+                        <text x={minX + 8} y={topY - 10} fill="#f8fafc" fontSize={10} fontWeight="bold">{d.text}</text>
                       </g>
                     )}
                     {isSelected && (
@@ -2977,20 +3135,20 @@ export default function Backtesting() {
                         <circle
                           cx={p1.x}
                           cy={p1.y}
-                          r={6}
-                          fill="#facc15"
-                          stroke="#fff"
-                          strokeWidth={2}
+                          r={7}
+                          fill="#ffffff"
+                          stroke="#2962ff"
+                          strokeWidth={2.5}
                           cursor="crosshair"
                           {...makeDragProps(d, 'p1')}
                         />
                         <circle
                           cx={p2.x}
                           cy={p2.y}
-                          r={6}
-                          fill="#facc15"
-                          stroke="#fff"
-                          strokeWidth={2}
+                          r={7}
+                          fill="#ffffff"
+                          stroke="#2962ff"
+                          strokeWidth={2.5}
                           cursor="crosshair"
                           {...makeDragProps(d, 'p2')}
                         />
@@ -3068,15 +3226,19 @@ export default function Backtesting() {
               }
 
               if (d.type === 'long_position') {
-                const entryY = mainSeriesRef.current?.priceToCoordinate(d.entry);
+                const entryCoord = getCoords(d.time, d.entry);
                 const tpY = mainSeriesRef.current?.priceToCoordinate(d.tp);
                 const slY = mainSeriesRef.current?.priceToCoordinate(d.sl);
-                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(d.time) || d.time);
+                const startX = entryCoord?.x;
+                const entryY = entryCoord?.y;
                 if (entryY == null || tpY == null || slY == null || startX == null) return null;
                 const boxW = d.boxW || 240;
                 const endX = startX + boxW;
-                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(currentCandle.time) || currentCandle.time) : startX;
+                const currentX = currentCandle ? getCoords(currentCandle.time, currentCandle.close)?.x : startX;
                 const progX = currentX != null ? Math.max(startX, Math.min(currentX, endX)) : startX;
+                const livePrice = currentCandle ? Math.max(Math.min(d.sl, d.tp), Math.min(Math.max(d.sl, d.tp), currentCandle.close)) : d.tp;
+                const liveY = currentX != null && currentX > startX ? (mainSeriesRef.current?.priceToCoordinate(livePrice) ?? tpY) : tpY;
+                const arrowEndX = currentX != null && currentX > startX ? progX : endX;
                 const traversedW = Math.max(0, progX - startX);
                 const remainingW = Math.max(0, endX - progX);
                 const targetH = Math.max(1, entryY - tpY);
@@ -3163,6 +3325,17 @@ export default function Backtesting() {
 
                     {/* Entry separator line */}
                     <line x1={startX} y1={entryY} x2={endX} y2={entryY} stroke="#ffffff" strokeWidth={1.5} />
+                    {/* TradingView dashed diagonal price-movement arrow */}
+                    <line
+                      x1={startX}
+                      y1={entryY}
+                      x2={arrowEndX}
+                      y2={liveY}
+                      stroke="#94a3b8"
+                      strokeWidth={1.5}
+                      strokeDasharray="5,4"
+                    />
+                    <circle cx={arrowEndX} cy={liveY} r={3} fill="#94a3b8" />
                     {/* Entry drag hit zone */}
                     <line
                       x1={startX}
@@ -3290,15 +3463,19 @@ export default function Backtesting() {
               }
 
               if (d.type === 'short_position') {
-                const entryY = mainSeriesRef.current?.priceToCoordinate(d.entry);
+                const entryCoord = getCoords(d.time, d.entry);
                 const tpY = mainSeriesRef.current?.priceToCoordinate(d.tp);
                 const slY = mainSeriesRef.current?.priceToCoordinate(d.sl);
-                const startX = chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(d.time) || d.time);
+                const startX = entryCoord?.x;
+                const entryY = entryCoord?.y;
                 if (entryY == null || tpY == null || slY == null || startX == null) return null;
                 const boxW = d.boxW || 240;
                 const endX = startX + boxW;
-                const currentX = currentCandle ? chartInstanceRef.current?.timeScale().timeToCoordinate(toUnixSec(currentCandle.time) || currentCandle.time) : startX;
+                const currentX = currentCandle ? getCoords(currentCandle.time, currentCandle.close)?.x : startX;
                 const progX = currentX != null ? Math.max(startX, Math.min(currentX, endX)) : startX;
+                const livePrice = currentCandle ? Math.max(Math.min(d.sl, d.tp), Math.min(Math.max(d.sl, d.tp), currentCandle.close)) : d.tp;
+                const liveY = currentX != null && currentX > startX ? (mainSeriesRef.current?.priceToCoordinate(livePrice) ?? tpY) : tpY;
+                const arrowEndX = currentX != null && currentX > startX ? progX : endX;
                 const traversedW = Math.max(0, progX - startX);
                 const remainingW = Math.max(0, endX - progX);
                 const stopH = Math.max(1, entryY - slY);
@@ -3383,6 +3560,17 @@ export default function Backtesting() {
 
                     {/* Entry separator line */}
                     <line x1={startX} y1={entryY} x2={endX} y2={entryY} stroke="#ffffff" strokeWidth={1.5} />
+                    {/* TradingView dashed diagonal price-movement arrow */}
+                    <line
+                      x1={startX}
+                      y1={entryY}
+                      x2={arrowEndX}
+                      y2={liveY}
+                      stroke="#94a3b8"
+                      strokeWidth={1.5}
+                      strokeDasharray="5,4"
+                    />
+                    <circle cx={arrowEndX} cy={liveY} r={3} fill="#94a3b8" />
                     {/* Entry drag hit zone */}
                     <line
                       x1={startX}
@@ -4549,15 +4737,26 @@ export default function Backtesting() {
               </div>
             )}
 
-            {/* Fibonacci Levels Config */}
+            {/* Fibonacci Levels Config (TradingView + ICT) */}
             {selectedDrawing.type === 'fibonacci' && (
-              <div className="space-y-2 pt-2 border-t border-gray-800">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block">
-                  Niveaux de Fibonacci
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {[0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.618].map((lvl) => {
-                    const currentLvls = selectedDrawing.fibLevels || [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+              <div className="space-y-3 pt-2 border-t border-gray-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                    Niveaux de Fibonacci
+                  </label>
+                  <label className="flex items-center gap-1.5 text-[11px] text-gray-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedDrawing.extendRight)}
+                      onChange={(e) => updateDrawingProperty(selectedDrawing.id, { extendRight: e.target.checked })}
+                      className="rounded text-blue-500"
+                    />
+                    Étendre à droite
+                  </label>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  {[0, 0.236, 0.382, 0.5, 0.618, 0.62, 0.705, 0.786, 0.79, 1.0, 1.272, 1.618].map((lvl) => {
+                    const currentLvls = selectedDrawing.fibLevels || [0, 0.5, 0.62, 0.705, 0.79, 1.0];
                     const checked = currentLvls.includes(lvl);
                     return (
                       <label key={lvl} className="flex items-center gap-2 p-1.5 rounded-lg bg-gray-800/60 hover:bg-gray-800 cursor-pointer">
