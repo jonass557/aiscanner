@@ -67,8 +67,8 @@ const LEVEL_HINTS = {
  */
 export const buildMentorSystemPrompt = (level, lang = 'fr') => {
   const langPrompt = lang === 'en'
-    ? '\n\nCRITICAL LANGUAGE DIRECTIVE: The user has selected ENGLISH (or wrote in English). You MUST formulate 100% of your entire response, headings, SVG diagram labels, and examples in impeccable academic ENGLISH without a single French word.'
-    : '\n\nDIRECTIVE DE LANGUE : Formulez votre réponse et les étiquettes de vos schémas SVG en français académique impeccable. RÈGLE IMPÉRATIVE : si l\'utilisateur rédige sa question ou demande en anglais, répondez-lui INTÉGRALEMENT en anglais.';
+    ? '\n\nCRITICAL LANGUAGE DIRECTIVE: The user wrote in ENGLISH (or selected English). You MUST formulate 100% of your entire response, headings, SVG diagram labels, and examples in impeccable academic ENGLISH, even if earlier messages in the conversation were in French.'
+    : '\n\nDIRECTIVE DE LANGUE IMPÉRATIVE : L\'utilisateur s\'exprime en FRANÇAIS (ou a choisi le français). Vous DEVEZ formuler 100% de votre réponse, vos titres et les étiquettes de vos schémas SVG en FRANÇAIS académique impeccable, même si des messages précédents de la conversation étaient en anglais.';
   return MENTOR_SYSTEM_PROMPT + (LEVEL_HINTS[level] || LEVEL_HINTS.intermediate) + langPrompt;
 };
 

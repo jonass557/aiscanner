@@ -14,14 +14,14 @@ export const detectTextLanguage = (text = '') => {
   // Clear French diacritics or unmistakable French words
   if (
     /[àâäéèêëïîôöùûüÿçœæ]/i.test(s) ||
-    /\b(bonjour|salut|tendance|donne|quel|quelle|quels|quelles|prise|position|achat|vente|attendre|est-ce|c'est|explique|pourquoi|comment|marche|marches|cours|merci|svp|privilegier|entre|avec|sur|pour)\b/i.test(lower)
+    /\b(bonjour|salut|tendance|tendence|donne|quel|quelle|quels|quelles|prise|position|achat|vente|attendre|est-ce|c'est|explique|pourquoi|comment|marche|marches|cours|merci|svp|privilegier|entre|avec|sur|pour|sa|son|ses|mon|ma|mes|le|la|les|du|des|un|une|je|tu|nous|vous|quoi|longterm|longterms|court|terme)\b/i.test(lower)
   ) {
     return 'fr';
   }
 
   // Clear English words / trading phrases
   if (
-    /\b(what|how|should|tell|give|please|explain|current|which|between|the|with|buy|sell|trend|market|markets|analyze|today|trade|setup|strategy|risk|entry|stop|target|this|that|can you|do i)\b/i.test(lower)
+    /\b(what|how|should|tell|give|please|explain|current|which|between|the|with|buy|sell|trend|market|markets|analyze|today|trade|setup|strategy|risk|entry|stop|target|this|that|can you|do i|its|long term|short term)\b/i.test(lower)
   ) {
     return 'en';
   }
@@ -31,12 +31,12 @@ export const detectTextLanguage = (text = '') => {
 
 /**
  * Resolve effective language ('fr' | 'en') for an API request.
- * If the user writes in English, always responds in English.
- * Otherwise uses explicit body/query -> x-language header -> saved preference -> 'fr'.
+ * Always prioritizes the language the user actually wrote their message in ('fr' or 'en'),
+ * then falls back to explicit body/query -> x-language header -> saved preference -> 'fr'.
  */
 export const resolveRequestLanguage = (req, text = '') => {
   const textLang = detectTextLanguage(text);
-  if (textLang === 'en') return 'en';
+  if (textLang === 'fr' || textLang === 'en') return textLang;
 
   const explicit = req?.body?.language || req?.body?.lang || req?.query?.lang || req?.query?.language;
   if (explicit) {
