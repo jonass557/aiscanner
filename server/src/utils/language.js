@@ -11,10 +11,10 @@ export const detectTextLanguage = (text = '') => {
   if (!s) return null;
   const lower = s.toLowerCase();
 
-  // Clear French diacritics or unmistakable French words
+  // Clear French diacritics or unmistakable French words (note: 'analyse' with 's' is French; 'analyze' with 'z' is English)
   if (
     /[àâäéèêëïîôöùûüÿçœæ]/i.test(s) ||
-    /\b(bonjour|salut|tendance|tendence|donne|quel|quelle|quels|quelles|prise|position|achat|vente|attendre|est-ce|c'est|explique|pourquoi|comment|marche|marches|cours|merci|svp|privilegier|entre|avec|sur|pour|sa|son|ses|mon|ma|mes|le|la|les|du|des|un|une|je|tu|nous|vous|quoi|longterm|longterms|court|terme)\b/i.test(lower)
+    /\b(bonjour|bonsoir|salut|analyse|analyser|scanne|compare|comparer|tendance|tendence|donne|quel|quelle|quels|quelles|prise|position|achat|vente|attendre|est-ce|c'est|explique|pourquoi|comment|marche|marches|cours|merci|svp|privilegier|entre|avec|sur|pour|sa|son|ses|mon|ma|mes|le|la|les|du|des|un|une|je|tu|nous|vous|quoi|longterm|longterms|court|terme|meilleur|meilleurs|niveau|niveaux|objectif|objectifs|risque|risques|strategie|oui|non|combien)\b/i.test(lower)
   ) {
     return 'fr';
   }

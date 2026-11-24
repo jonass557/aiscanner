@@ -392,6 +392,11 @@ export const computeStrategicOverlay = ({
   const dir = isBullish ? 'BUY' : 'SELL';
   const targetRR = Number(strategyObj?.targetRiskReward) || (isSnR ? 2.8 : isIct ? 3.8 : 3.5);
 
+  const isOrderAlreadyHit = (e, s, t1) => {
+    if (e == null || s == null || t1 == null) return false;
+    return isBullish ? last.close >= t1 || last.close <= s : last.close <= t1 || last.close >= s;
+  };
+
   if (isSnR) {
     // SUPPORT & RESISTANCE (PRICE ACTION)
     const resistanceZone = {
@@ -423,21 +428,27 @@ export const computeStrategicOverlay = ({
     const eqhPrice = fmt(swingHigh + range * 0.025);
     const eqlPrice = fmt(swingLow - range * 0.025);
 
-    const entry = fmt(
+    let entry = fmt(
       tradePlan?.entry ||
         (isBullish ? supportZone.top + range * 0.03 : resistanceZone.bottom - range * 0.03)
     );
-    const sl = fmt(
+    let sl = fmt(
       tradePlan?.stopLoss ||
         (isBullish ? supportZone.bottom - range * 0.055 : resistanceZone.top + range * 0.055)
     );
     const risk = Math.max(Math.abs(entry - sl), range * 0.05);
-    const tp1 = fmt(
+    let tp1 = fmt(
       tradePlan?.takeProfit1 || (isBullish ? entry + risk * 1.6 : entry - risk * 1.6)
     );
-    const tp2 = fmt(
+    let tp2 = fmt(
       tradePlan?.takeProfit2 || (isBullish ? resistanceZone.bottom : supportZone.top)
     );
+    if (isOrderAlreadyHit(entry, sl, tp1)) {
+      entry = null;
+      sl = null;
+      tp1 = null;
+      tp2 = null;
+    }
 
     return {
       strategyName: strategyObj?.name || 'Support & Résistance Institutionnel (Price Action)',
@@ -512,16 +523,22 @@ export const computeStrategicOverlay = ({
       color: '#3b82f6',
     };
 
-    const entry = fmt(tradePlan?.entry || last.close);
-    const sl = fmt(
+    let entry = fmt(tradePlan?.entry || last.close);
+    let sl = fmt(
       tradePlan?.stopLoss ||
         (isBullish ? demandZone.bottom - range * 0.04 : supplyZone.top + range * 0.04)
     );
     const risk = Math.max(Math.abs(entry - sl), range * 0.05);
-    const tp1 = fmt(tradePlan?.takeProfit1 || (isBullish ? entry + risk * 1.8 : entry - risk * 1.8));
-    const tp2 = fmt(
+    let tp1 = fmt(tradePlan?.takeProfit1 || (isBullish ? entry + risk * 1.8 : entry - risk * 1.8));
+    let tp2 = fmt(
       tradePlan?.takeProfit2 || (isBullish ? entry + risk * targetRR : entry - risk * targetRR)
     );
+    if (isOrderAlreadyHit(entry, sl, tp1)) {
+      entry = null;
+      sl = null;
+      tp1 = null;
+      tp2 = null;
+    }
 
     return {
       strategyName: strategyObj?.name || 'Trend Momentum & Pullback EMA',
@@ -599,19 +616,50 @@ export const computeStrategicOverlay = ({
   const bslPrice = fmt(swingHigh + range * 0.02);
   const sslPrice = fmt(swingLow - range * 0.02);
 
-  const entry = fmt(
+  let entry = fmt(
     tradePlan?.entry ||
       (isBullish ? demandZone.top + range * 0.015 : supplyZone.bottom - range * 0.015)
   );
-  const sl = fmt(
+  let sl = fmt(
     tradePlan?.stopLoss ||
       (isBullish ? sslPrice - range * 0.025 : bslPrice + range * 0.025)
   );
-  const risk = Math.max(Math.abs(entry - sl), range * 0.05);
-  const tp1 = fmt(
+  let risk = Math.max(Math.abs(entry - sl), range * 0.05);
+  let tp1 = fmt(
     tradePlan?.takeProfit1 || (isBullish ? fvgMid + range * 0.15 : fvgMid - range * 0.15)
   );
-  const tp2 = fmt(tradePlan?.takeProfit2 || (isBullish ? bslPrice : sslPrice));
+  let tp2 = fmt(tradePlan?.takeProfit2 || (isBullish ? bslPrice : sslPrice));
+
+  if (isOrderAlreadyHit(entry, sl, tp1)) {
+    if (!tradePlan) {
+      // Re-anchor a fresh valid order ahead of current price if room remains before major Supply/Demand
+      const freshEntry = fmt(isBullish ? Math.min(last.close, fvgMid) : Math.max(last.close, fvgMid));
+      const freshSl = fmt(isBullish ? demandZone.bottom - range * 0.025 : supplyZone.top + range * 0.025);
+      const freshTp1 = fmt(isBullish ? supplyZone.bottom : demandZone.top);
+      const freshTp2 = fmt(isBullish ? bslPrice : sslPrice);
+      const freshValid = isBullish
+        ? freshTp1 > last.close + range * 0.03 && freshSl < freshEntry && freshEntry <= last.close
+        : freshTp1 < last.close - range * 0.03 && freshSl > freshEntry && freshEntry >= last.close;
+
+      if (freshValid) {
+        entry = freshEntry;
+        sl = freshSl;
+        tp1 = freshTp1;
+        tp2 = freshTp2;
+        risk = Math.max(Math.abs(entry - sl), range * 0.05);
+      } else {
+        entry = null;
+        sl = null;
+        tp1 = null;
+        tp2 = null;
+      }
+    } else {
+      entry = null;
+      sl = null;
+      tp1 = null;
+      tp2 = null;
+    }
+  }
 
   return {
     strategyName:

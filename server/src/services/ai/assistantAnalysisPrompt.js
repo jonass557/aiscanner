@@ -80,6 +80,11 @@ export const buildAssistantAnalysisPrompt = ({ snapshot, preferences = {}, strat
     ? `This is REAL live market data from ${snapshot.source}.`
     : `NOTE: This is SIMULATED data (source: ${snapshot.source}). ${snapshot.note || ''} State this clearly in your summary so the user knows the analysis is for demonstration.`;
 
+  const targetLang = (preferences.language || 'fr') === 'en' ? 'en' : 'fr';
+  const langRule = targetLang === 'en'
+    ? 'CRITICAL LANGUAGE RULE: Write EVERY descriptive string value inside the JSON (marketStructure, momentum, volatility, note, waitReason, summary, validationReasons, confluences, risks, weaknesses, missingElements, reasoning) strictly in clear professional ENGLISH.'
+    : 'RÈGLE DE LANGUE IMPÉRATIVE : Rédigez CHAQUE valeur textuelle descriptive du JSON (marketStructure, momentum, volatility, note, waitReason, summary, validationReasons, confluences, risks, weaknesses, missingElements, reasoning) STRICTEMENT EN FRANÇAIS (aucune phrase en anglais).';
+
   return `Analyze ${snapshot.symbol} on the ${snapshot.timeframe} timeframe.
 
 MARKET: ${snapshot.marketLabel}
@@ -92,10 +97,10 @@ ${summarizeCandles(snapshot.candles)}
 STRATEGY:
 ${strategyInstruction(strategy, preferences)}
 
-USER PROFILE: level=${preferences.level || 'intermediate'}, language=${preferences.language || 'fr'}
+USER PROFILE: level=${preferences.level || 'intermediate'}, language=${targetLang}
 ${constraints.length ? `\nCONSTRAINTS:\n${constraints.join('\n')}` : ''}
 
-Produce a complete institutional analysis and respond in the user's language (${preferences.language || 'fr'}).
+${langRule}
 
 Return ONLY valid JSON (no markdown fences) matching EXACTLY this schema:
 {
