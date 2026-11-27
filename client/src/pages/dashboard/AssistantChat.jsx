@@ -342,7 +342,11 @@ export default function AssistantChat() {
           )}
 
           {(messages || []).map((m, i) => (
-            <AssistantMessage key={i} message={m} onSpeak={speak} />
+            <AssistantMessage
+              key={i}
+              message={m}
+              onSpeak={(txt) => speak(txt, lang === 'en' ? 'en-US' : 'fr-FR')}
+            />
           ))}
 
           {interim && (

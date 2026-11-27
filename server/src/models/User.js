@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import config from '../config/index.js';
 
 const userSchema = new mongoose.Schema(
   {
@@ -233,13 +234,32 @@ userSchema.methods.canScan = function () {
     return true;
   }
 
-  // Active free trial
-  if (this.trial?.isActive && this.trial?.endsAt && new Date() < new Date(this.trial.endsAt)) {
+  const freeTrialGloballyEnabled = config.features?.freeTrialEnabled !== false;
+
+  // Active free trial (only if global free trial is enabled)
+  if (freeTrialGloballyEnabled && this.trial?.isActive && this.trial?.endsAt && new Date() < new Date(this.trial.endsAt)) {
     return true;
   }
 
-  // Active paid or free plan
-  return this.subscription?.status === 'active';
+  // If global free trial is disabled, free/non-paying accounts cannot use the platform until they subscribe
+  if (!freeTrialGloballyEnabled && (!this.subscription?.plan || this.subscription.plan === 'free')) {
+    return false;
+  }
+
+  // Also block if user was only on an active trial (not a paid subscription) when free trial is disabled
+  if (!freeTrialGloballyEnabled && this.trial?.isActive && (!this.subscription?.endDate || (this.trial?.endsAt && new Date(this.subscription.endDate).getTime() <= new Date(this.trial.endsAt).getTime()))) {
+    return false;
+  }
+
+  if (this.subscription?.status !== 'active') {
+    return false;
+  }
+
+  if (this.subscription?.endDate && new Date() > new Date(this.subscription.endDate)) {
+    return false;
+  }
+
+  return true;
 };
 
 // Increment scan count for tracking

@@ -1,7 +1,7 @@
 import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import Plan from '../models/Plan.js';
-import { listAllPlans } from '../services/planService.js';
+import { listAllPlans, DEFAULT_PLANS } from '../services/planService.js';
 import { logAdmin } from '../services/logService.js';
 
 /**
@@ -53,8 +53,12 @@ export const createPlan = asyncHandler(async (req, res) => {
 
 /** PATCH /admin/plans/:id — update a plan (price, scans, features, trial, isActive…). */
 export const updatePlan = asyncHandler(async (req, res) => {
-  const plan = await Plan.findOne({ id: req.params.id });
-  if (!plan) throw ApiError.notFound('Plan not found.');
+  let plan = await Plan.findOne({ id: req.params.id });
+  if (!plan) {
+    const def = DEFAULT_PLANS.find((p) => p.id === req.params.id);
+    if (!def) throw ApiError.notFound('Plan not found.');
+    plan = await Plan.create(def);
+  }
 
   for (const field of PLAN_FIELDS) {
     if (req.body[field] !== undefined) plan[field] = req.body[field];
@@ -79,8 +83,12 @@ export const updatePlan = asyncHandler(async (req, res) => {
 
 /** POST /admin/plans/:id/toggle — enable/disable a plan. */
 export const togglePlan = asyncHandler(async (req, res) => {
-  const plan = await Plan.findOne({ id: req.params.id });
-  if (!plan) throw ApiError.notFound('Plan not found.');
+  let plan = await Plan.findOne({ id: req.params.id });
+  if (!plan) {
+    const def = DEFAULT_PLANS.find((p) => p.id === req.params.id);
+    if (!def) throw ApiError.notFound('Plan not found.');
+    plan = await Plan.create(def);
+  }
   plan.isActive = !plan.isActive;
   await plan.save();
   await logAdmin('toggle_plan', { message: `Admin ${plan.isActive ? 'enabled' : 'disabled'} plan ${plan.id}`, userId: req.user._id, metadata: { planId: plan.id, isActive: plan.isActive } });

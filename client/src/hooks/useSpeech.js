@@ -240,13 +240,17 @@ export function useSpeech({ lang = 'fr-FR', onResult } = {}) {
 
       if (!clean) return;
 
-      // Détecter la langue
+      // Détecter la langue réelle du texte (empêche de lire du français avec une voix anglaise)
+      const hasFrenchMarkers =
+        /[éèêëàâäîïôöùûüçœæ]/i.test(clean) ||
+        /\b(analyse|tendance|decision|décision|confiance|entree|entrée|achat|vente|attendre|donnees|données|marche|marché|structure|bonjour|merci|prix|actuel|risque|objectif|pour cent|institutionnelle)\b/i.test(clean);
       const isEnglish =
-        customLang === 'en' ||
-        customLang === 'en-US' ||
-        (/^[a-zA-Z0-9\s,.'!?-]+$/.test(clean) &&
-          (clean.includes('the ') || clean.includes('is ') || clean.includes('trading ') || clean.includes('market ')));
-      const targetLang = customLang || (isEnglish ? 'en-US' : lang || 'fr-FR');
+        !hasFrenchMarkers &&
+        (customLang === 'en' ||
+          customLang === 'en-US' ||
+          (/^[a-zA-Z0-9\s,.'!?:-]+$/.test(clean) &&
+            /\b(the|is|trading|market|analyze|trend|buy|sell|entry|target|confidence|institutional)\b/i.test(clean)));
+      const targetLang = hasFrenchMarkers ? 'fr-FR' : (customLang || (isEnglish ? 'en-US' : lang || 'fr-FR'));
 
       // Prononciation optimisée pour le trading et la finance
       if (!isEnglish) {

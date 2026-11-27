@@ -120,7 +120,8 @@ export const register = asyncHandler(async (req, res) => {
     targetPlan = await Plan.findOne({ id: '1mois' }) || await Plan.findOne({ 'trial.enabled': true, isActive: true });
   }
 
-  const trialEnabled = Boolean(targetPlan?.trial?.enabled && !isPaidSubscriber);
+  const globalFreeTrialEnabled = config.features?.freeTrialEnabled !== false;
+  const trialEnabled = Boolean(globalFreeTrialEnabled && targetPlan?.trial?.enabled && !isPaidSubscriber);
   const trialDays = targetPlan?.trial?.days || 7;
   const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
@@ -148,10 +149,10 @@ export const register = asyncHandler(async (req, res) => {
     registrationIp: clientIp,
     deviceFingerprint,
     subscription: {
-      plan: targetPlan ? targetPlan.id : '1mois',
-      status: 'active',
+      plan: isPaidSubscriber ? (targetPlan ? targetPlan.id : '1mois') : (trialEnabled ? (targetPlan ? targetPlan.id : '1mois') : 'free'),
+      status: isPaidSubscriber || trialEnabled ? 'active' : 'expired',
       startDate: new Date(),
-      endDate: isPaidSubscriber ? paidSubEndsAt : trialEndsAt,
+      endDate: isPaidSubscriber ? paidSubEndsAt : (trialEnabled ? trialEndsAt : null),
       scansPerMonth: -1, // scans illimités pour tous les plans
       scansUsed: 0,
     },
@@ -255,7 +256,14 @@ export const login = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, {
     message: 'Logged in successfully.',
-    data: { user, accessToken, refreshToken, requireEmailVerification: config.features.requireEmailVerification },
+    data: {
+      user,
+      accessToken,
+      refreshToken,
+      requireEmailVerification: config.features.requireEmailVerification,
+      freeTrialEnabled: config.features?.freeTrialEnabled !== false,
+      canScan: user.canScan(),
+    },
   });
 });
 
@@ -387,6 +395,11 @@ export const getMe = asyncHandler(async (req, res) => {
   // Surface the effective verification requirement so the client can decide
   // whether to show the "verify your email" gate. Reflects the runtime toggle.
   return sendSuccess(res, {
-    data: { user, requireEmailVerification: config.features.requireEmailVerification },
+    data: {
+      user,
+      requireEmailVerification: config.features.requireEmailVerification,
+      freeTrialEnabled: config.features?.freeTrialEnabled !== false,
+      canScan: user.canScan(),
+    },
   });
 });

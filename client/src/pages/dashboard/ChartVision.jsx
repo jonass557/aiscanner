@@ -410,8 +410,9 @@ export default function ChartVision() {
     clearChartLines();
 
     if (autoTrace && analysis) {
-      // 1. Supply Zone bounds
-      if (analysis.supplyZone) {
+      const hasSinglePosition = Boolean(analysis.entry && analysis.sl && analysis.tp1);
+      // Only draw Supply/Demand/Mid/Liquidity horizontal price lines when no active single position is shown
+      if (!hasSinglePosition && analysis.supplyZone) {
         const lineSupplyTop = seriesRef.current.createPriceLine({
           price: analysis.supplyZone.top,
           color: '#ef4444',
@@ -432,7 +433,7 @@ export default function ChartVision() {
       }
 
       // 2. Demand Zone bounds
-      if (analysis.demandZone) {
+      if (!hasSinglePosition && analysis.demandZone) {
         const lineDemandTop = seriesRef.current.createPriceLine({
           price: analysis.demandZone.top,
           color: 'rgba(16, 185, 129, 0.75)',
@@ -453,7 +454,7 @@ export default function ChartVision() {
       }
 
       // 3. Mid Zone / FVG / Pivot Retest
-      if (analysis.midZone) {
+      if (!hasSinglePosition && analysis.midZone) {
         const lineMid = seriesRef.current.createPriceLine({
           price: (analysis.midZone.top + analysis.midZone.bottom) / 2,
           color: analysis.midZone.color || '#8b5cf6',
@@ -466,7 +467,7 @@ export default function ChartVision() {
       }
 
       // 4. Liquidity Pools (BSL / SSL or EQH / EQL)
-      if (Array.isArray(analysis.liquidityPools)) {
+      if (!hasSinglePosition && Array.isArray(analysis.liquidityPools)) {
         analysis.liquidityPools.forEach((liq) => {
           const isBsl = liq.type.includes('BSL') || liq.type.includes('EQH') || liq.type.includes('HIGH');
           const lineLiq = seriesRef.current.createPriceLine({

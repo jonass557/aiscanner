@@ -123,8 +123,10 @@ const fromConfig = (id) => {
  */
 export const getPublicPlans = async () => {
   try {
-    const plans = await Plan.find({ isActive: true }).sort({ order: 1, price: 1 }).lean();
-    if (plans.length) return plans;
+    const totalCount = await Plan.countDocuments();
+    if (totalCount > 0) {
+      return await Plan.find({ isActive: true }).sort({ order: 1, price: 1 }).lean();
+    }
   } catch (err) {
     logger.warn(`getPublicPlans DB read failed: ${err.message}`);
   }

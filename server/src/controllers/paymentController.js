@@ -53,11 +53,15 @@ const activatePlan = async (user, plan, payment = null) => {
 
   await user.save();
 
-  // Credit VIP Partner (configurable 30% partner / 70% admin split) or legacy referral (20%)
+  // Credit VIP Partner (configurable 30% partner / 70% admin split) or legacy referral (20%),
+  // and always credit the Unified Admin Wallet with net subscription revenue when not handled by VIP split.
+  const paidAmount = payment?.amount ?? plan.effectivePrice ?? plan.price ?? 7000;
+  let handledByPartner = false;
+  let legacyCommission = 0;
+
   if (user.referredBy) {
     try {
-      const paidAmount = payment?.amount ?? plan.effectivePrice ?? plan.price ?? 7000;
-      const handledByPartner = await processPartnerCommissionSplit({
+      handledByPartner = await processPartnerCommissionSplit({
         subscriber: user,
         payment,
         plan,
@@ -70,6 +74,7 @@ const activatePlan = async (user, plan, payment = null) => {
           const rate = (referrer.referral.commissionRate || 20) / 100;
           const commission = Math.round(paidAmount * rate);
           if (commission > 0) {
+            legacyCommission = commission;
             referrer.referral.balance = (referrer.referral.balance || 0) + commission;
             referrer.referral.totalEarned = (referrer.referral.totalEarned || 0) + commission;
             await referrer.save();
@@ -78,6 +83,31 @@ const activatePlan = async (user, plan, payment = null) => {
       }
     } catch (err) {
       logger.error(`Failed to credit referral/partner commission on activatePlan: ${err.message}`);
+    }
+  }
+
+  if (!handledByPartner && payment && !payment.splitApplied) {
+    try {
+      const netAdmin = Math.max(0, Math.round(paidAmount - legacyCommission));
+      if (netAdmin > 0) {
+        await PartnershipConfig.findOneAndUpdate(
+          { key: 'default' },
+          {
+            $inc: {
+              adminPoolBalance: netAdmin,
+              adminPoolTotalEarned: netAdmin,
+              adminSubscriptionEarned: netAdmin,
+            },
+          },
+          { upsert: true }
+        );
+        payment.splitApplied = true;
+        payment.adminShare = netAdmin;
+        payment.partnerCommission = legacyCommission;
+        await payment.save();
+      }
+    } catch (err) {
+      logger.error(`Failed to credit Admin Wallet on activatePlan: ${err.message}`);
     }
   }
 

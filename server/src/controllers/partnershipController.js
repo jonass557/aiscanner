@@ -398,6 +398,24 @@ export const completePartnershipRegistration = asyncHandler(async (req, res) => 
   payment.customerName = String(fullName).trim();
   payment.customerPhone = cleanPhone;
   payment.customerEmail = cleanEmail;
+
+  // Credit Unified Admin Wallet with the partnership membership fee (if not already credited)
+  if (payment.amount > 0 && !payment.splitApplied) {
+    await PartnershipConfig.findOneAndUpdate(
+      { key: 'default' },
+      {
+        $inc: {
+          adminPoolBalance: payment.amount,
+          adminPoolTotalEarned: payment.amount,
+          adminPartnershipFeeEarned: payment.amount,
+        },
+      },
+      { upsert: true }
+    );
+    payment.splitApplied = true;
+    payment.adminShare = payment.amount;
+  }
+
   await payment.save();
 
   await logAuth('partnership_joined', {
@@ -866,6 +884,8 @@ export const adminGetPartnershipOverview = asyncHandler(async (req, res) => {
         poolBalance: cfg.adminPoolBalance || 0,
         totalAdminShareEarned: cfg.adminPoolTotalEarned || 0,
         totalAdminWithdrawn: cfg.adminPoolTotalWithdrawn || 0,
+        adminSubscriptionEarned: cfg.adminSubscriptionEarned || 0,
+        adminPartnershipFeeEarned: cfg.adminPartnershipFeeEarned || 0,
         partnershipSalesTotal: membershipPayments[0]?.totalSales || 0,
         partnershipSalesCount: membershipPayments[0]?.count || 0,
       },

@@ -34,16 +34,44 @@ export default function AdminPlans() {
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [featuresText, setFeaturesText] = useState('');
+  const [freeTrialEnabled, setFreeTrialEnabled] = useState(true);
+  const [togglingTrial, setTogglingTrial] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await adminApi.plans();
+      const [{ data }, settingsRes] = await Promise.all([
+        adminApi.plans(),
+        adminApi.settings().catch(() => null),
+      ]);
       setPlans(data.data.plans || []);
+      const settingsList = settingsRes?.data?.data?.settings || [];
+      const ft = settingsList.find((s) => s.key === 'features.freeTrialEnabled');
+      if (ft !== undefined) {
+        setFreeTrialEnabled(ft.value !== false && ft.value !== 'false');
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleGlobalFreeTrial = async () => {
+    setTogglingTrial(true);
+    try {
+      const next = !freeTrialEnabled;
+      await adminApi.updateSettings([{ key: 'features.freeTrialEnabled', value: next }]);
+      setFreeTrialEnabled(next);
+      toast.success(
+        next
+          ? 'Free Trial global activé : les nouveaux utilisateurs bénéficient de la période d’essai.'
+          : 'Free Trial global désactivé : tous les utilisateurs non-payants doivent payer un abonnement.'
+      );
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setTogglingTrial(false);
     }
   };
 
@@ -107,7 +135,13 @@ export default function AdminPlans() {
 
   const toggle = async (plan) => {
     try {
-      await adminApi.togglePlan(plan.id);
+      const { data } = await adminApi.togglePlan(plan.id);
+      const nowActive = data?.data?.plan?.isActive;
+      toast.success(
+        nowActive
+          ? `Plan "${plan.name}" activé.`
+          : `Plan "${plan.name}" désactivé.`
+      );
       await load();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -141,6 +175,44 @@ export default function AdminPlans() {
         <Button onClick={openNew}>
           <Plus className="h-4 w-4" /> Nouveau plan
         </Button>
+      </div>
+
+      {/* Global Free Trial Switch */}
+      <div className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 ${
+        freeTrialEnabled
+          ? 'border-emerald-500/30 bg-emerald-950/20'
+          : 'border-rose-500/40 bg-rose-950/25'
+      }`}>
+        <div>
+          <p className="text-sm font-bold text-white flex items-center gap-2">
+            Essai Gratuit Global (Free Trial) :{' '}
+            <span className={freeTrialEnabled ? 'text-emerald-400' : 'text-rose-400'}>
+              {freeTrialEnabled ? 'ACTIF' : 'DÉSACTIVÉ'}
+            </span>
+          </p>
+          <p className="mt-0.5 text-xs text-slate-300">
+            {freeTrialEnabled
+              ? 'Les utilisateurs peuvent tester la plateforme gratuitement pendant la période d’essai.'
+              : 'Mode Paywall Strict : tous les utilisateurs sans abonnement payant actif doivent payer avant de continuer à utiliser la plateforme.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleGlobalFreeTrial}
+          disabled={togglingTrial}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+            freeTrialEnabled
+              ? 'bg-rose-600 text-white hover:bg-rose-500'
+              : 'bg-emerald-600 text-white hover:bg-emerald-500'
+          }`}
+        >
+          <Power className="h-3.5 w-3.5" />
+          {togglingTrial
+            ? 'Mise à jour...'
+            : freeTrialEnabled
+            ? 'Désactiver le Free Trial'
+            : 'Activer le Free Trial'}
+        </button>
       </div>
 
       {loading ? (

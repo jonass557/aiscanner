@@ -188,6 +188,7 @@ const config = {
     // email provider. Togglable at runtime from the admin dashboard
     // (features.requireEmailVerification setting), which overrides this env.
     requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
+    freeTrialEnabled: process.env.FREE_TRIAL_ENABLED !== 'false',
   },
 };
 

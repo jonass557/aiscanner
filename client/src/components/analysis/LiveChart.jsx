@@ -78,7 +78,7 @@ export default function LiveChart({
   decision,
   strategy,
   analysis,
-  singleSignalMode = false,
+  singleSignalMode = true,
 }) {
   // Normalize symbol: clean slashes, default to EUR/USD if Unknown
   const normalizedInitialSymbol = useMemo(() => {
@@ -371,9 +371,22 @@ export default function LiveChart({
             lineWidth: 2,
             lineStyle: LineStyle.Solid,
             axisLabelVisible: true,
-            title: getLineTitle('TAKE PROFIT', `TAKE PROFIT (${tpVal})`),
+            title: getLineTitle('TAKE PROFIT 1', `TAKE PROFIT 1 (${tpVal})`),
           });
           linesRef.current.push(lineTp);
+        }
+
+        const tp2Val = Number(tradePlan?.takeProfit2 || strategicOverlay.tp2);
+        if (tp2Val && !isNaN(tp2Val) && tp2Val !== tpVal) {
+          const lineTp2 = seriesRef.current.createPriceLine({
+            price: tp2Val,
+            color: '#059669',
+            lineWidth: 1.5,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: getLineTitle('TAKE PROFIT 2', `TAKE PROFIT 2 (${tp2Val})`),
+          });
+          linesRef.current.push(lineTp2);
         }
 
         // Nettoyer les zones de supply/demand pour ne pas encombrer le signal

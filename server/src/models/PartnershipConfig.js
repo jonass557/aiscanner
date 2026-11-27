@@ -53,6 +53,8 @@ const partnershipConfigSchema = new mongoose.Schema(
     adminPoolBalance: { type: Number, default: 0 },
     adminPoolTotalEarned: { type: Number, default: 0 },
     adminPoolTotalWithdrawn: { type: Number, default: 0 },
+    adminSubscriptionEarned: { type: Number, default: 0 },
+    adminPartnershipFeeEarned: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

@@ -50,8 +50,12 @@ const summarizeCandles = (candles = []) => {
 // Map a strategy key + user preferences into an explicit instruction line.
 const strategyInstruction = (strategy, preferences = {}) => {
   const eff = strategy || preferences.favoriteStrategy || 'smc';
-  if (eff === 'custom' && preferences.customStrategy) {
-    return `Analyze STRICTLY according to the user's personal strategy, described in their own words:\n"""${preferences.customStrategy}"""`;
+  if ((eff === 'custom' || preferences.customStrategy || preferences.customTradingPlan) && (preferences.customStrategy || preferences.customTradingPlan)) {
+    const rules = [preferences.customStrategy, preferences.customTradingPlan].filter(Boolean).join('\n\n');
+    return `MANDATORY USER STRATEGY — APPLY STRICTLY TO THE LETTER:
+You MUST follow the user's exact saved trading strategy, indicators, entry rules, SL/TP rules, and risk parameters described below without deviating:
+"""${rules}"""
+If the current price does NOT satisfy ALL mandatory conditions of the user's strategy, return WAIT and explain exactly which rule of their strategy is not yet met.`;
   }
   const map = {
     smc: 'Analyze primarily through Smart Money Concepts (market structure, BOS/CHoCH/MSS, order blocks, FVGs, liquidity, premium/discount).',

@@ -274,12 +274,12 @@ export default function AdminPartnership() {
         </div>
 
         <div className="rounded-2xl border-2 border-emerald-500/40 bg-emerald-950/20 p-5">
-          <span className="text-xs font-bold text-emerald-300">Solde Admin Retirable ({100 - (cfg.commissionRate || 30)}%)</span>
+          <span className="text-xs font-bold text-emerald-300">Portefeuille Administrateur (Retirable)</span>
           <p className="mt-2 text-2xl font-black text-white">
             {Number(adminRev.poolBalance || 0).toLocaleString('fr-FR')} {currency}
           </p>
           <p className="mt-1 text-xs text-emerald-300/80">
-            Total cumulé : {Number(adminRev.totalAdminShareEarned || 0).toLocaleString('fr-FR')} {currency}
+            Abos: {Number(adminRev.adminSubscriptionEarned || 0).toLocaleString('fr-FR')} · Partenaires: {Number(adminRev.adminPartnershipFeeEarned || 0).toLocaleString('fr-FR')} {currency}
           </p>
         </div>
       </div>
@@ -289,7 +289,7 @@ export default function AdminPartnership() {
         {[
           { id: 'partners', label: `Partenaires & Formulaires (${partners.length})`, icon: Users },
           { id: 'config', label: 'Configuration, Prix & Conditions', icon: Settings },
-          { id: 'revenue', label: `Revenus Admin (${100 - (cfg.commissionRate || 30)}%) & Retraits`, icon: Wallet },
+          { id: 'revenue', label: `Portefeuille Admin & Retraits`, icon: Wallet },
         ].map((item) => (
           <button
             key={item.id}
@@ -597,14 +597,30 @@ export default function AdminPartnership() {
         <div className="grid gap-6 lg:grid-cols-2">
           <form onSubmit={handleAdminWithdraw} className="rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4">
             <h2 className="text-lg font-black text-white flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-emerald-400" /> Retirer la Part Admin ({100 - (cfg.commissionRate || 30)}%) via iKeePay H2H
+              <Wallet className="h-5 w-5 text-emerald-400" /> Portefeuille Administrateur — Retrait iKeePay H2H
             </h2>
 
-            <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/30 p-4 flex items-center justify-between">
-              <span className="text-xs text-emerald-300 font-semibold">Solde Admin disponible :</span>
-              <span className="text-xl font-black text-white">
-                {Number(adminRev.poolBalance || 0).toLocaleString('fr-FR')} {currency}
-              </span>
+            <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/30 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-emerald-300 font-semibold">Solde Admin disponible (Abonnements + Partenaires) :</span>
+                <span className="text-xl font-black text-white">
+                  {Number(adminRev.poolBalance || 0).toLocaleString('fr-FR')} {currency}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-500/20 text-[11px] text-slate-300">
+                <div>
+                  <span className="text-slate-400 block">Abonnements</span>
+                  <strong className="text-white">{Number(adminRev.adminSubscriptionEarned || 0).toLocaleString('fr-FR')} {currency}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 block">Partenaires</span>
+                  <strong className="text-cyan-300">{Number(adminRev.adminPartnershipFeeEarned || 0).toLocaleString('fr-FR')} {currency}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 block">Déjà retiré</span>
+                  <strong className="text-amber-300">{Number(adminRev.totalAdminWithdrawn || 0).toLocaleString('fr-FR')} {currency}</strong>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

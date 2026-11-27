@@ -43,10 +43,15 @@ export const scanChart = asyncHandler(async (req, res) => {
   // 1. Upload image
   const { url, publicId } = await uploadImage(req.file.buffer, user._id.toString());
 
-  // Extract strategy from request body or fall back to user's saved strategy
+  // Extract strategy from request body or fall back to user's saved strategy & trading plan
   const reqStrategy = req.body.strategy || '';
   const saveStrategy = req.body.saveStrategy === true || req.body.saveStrategy === 'true';
-  const effectiveStrategy = reqStrategy.trim() || (user.preferences?.customStrategy || '');
+  const savedStrategyParts = [
+    user.preferences?.customStrategyName ? `Nom de la stratégie : ${user.preferences.customStrategyName}` : '',
+    user.preferences?.customStrategy || '',
+    user.preferences?.customTradingPlan ? `Plan de trading : ${user.preferences.customTradingPlan}` : '',
+  ].filter(Boolean);
+  const effectiveStrategy = reqStrategy.trim() || savedStrategyParts.join('\n');
 
   // If requested, persist strategy to user's profile preferences
   if (saveStrategy && reqStrategy.trim()) {

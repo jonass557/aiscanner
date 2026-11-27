@@ -14,6 +14,8 @@ export const AuthProvider = ({ children }) => {
   // Effective runtime flag from the backend: when false, verification gates
   // are hidden everywhere (admin can toggle it on from the dashboard).
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
+  const [freeTrialEnabled, setFreeTrialEnabled] = useState(true);
+  const [canScan, setCanScan] = useState(true);
 
   const loadUser = useCallback(async () => {
     if (!tokenStore.getAccess()) {
@@ -24,6 +26,8 @@ export const AuthProvider = ({ children }) => {
       const { data } = await authApi.me();
       setUser(data.data.user);
       setRequireEmailVerification(Boolean(data.data.requireEmailVerification));
+      setFreeTrialEnabled(data.data.freeTrialEnabled !== false);
+      setCanScan(data.data.canScan !== false);
     } catch {
       tokenStore.clear();
     } finally {
@@ -40,6 +44,8 @@ export const AuthProvider = ({ children }) => {
     tokenStore.set(data.data.accessToken, data.data.refreshToken);
     setUser(data.data.user);
     setRequireEmailVerification(Boolean(data.data.requireEmailVerification));
+    setFreeTrialEnabled(data.data.freeTrialEnabled !== false);
+    setCanScan(data.data.canScan !== false);
     return data.data.user;
   };
 
@@ -77,6 +83,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     refreshUser,
     requireEmailVerification,
+    freeTrialEnabled,
+    canScan,
     isAuthenticated: Boolean(user),
     isAdmin: user?.role === 'admin',
   };

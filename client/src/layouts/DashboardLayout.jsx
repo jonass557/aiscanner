@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ScanLine, History, CreditCard, User, Settings,
   Menu, X, LogOut, Moon, Sun, ShieldCheck, Layers, Radar, GraduationCap,
   CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe, Eye, Calculator, Cpu,
-  ArrowLeft, Share2, Crown,
+  ArrowLeft, Share2, Crown, Clock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -36,11 +36,53 @@ const NAV_ITEMS = [
 
 /** Authenticated dashboard shell: responsive sidebar + top bar + outlet. */
 export default function DashboardLayout() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, freeTrialEnabled, canScan } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t, lang, toggleLanguage } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isLifetime =
+    isAdmin ||
+    (user?.partnership?.isActive && user?.partnership?.status === 'active' && user?.partnership?.lifetimeAccess) ||
+    user?.subscription?.plan === 'partner_lifetime';
+
+  const targetEndDate = user?.subscription?.endDate || (user?.trial?.isActive ? user?.trial?.endsAt : null);
+  const diffMs = targetEndDate ? new Date(targetEndDate).getTime() - nowMs : 0;
+
+  let countdownText = '';
+  let isExpiredCountdown = false;
+  if (isLifetime) {
+    countdownText = lang === 'fr' ? 'Accès à Vie ∞' : 'Lifetime ∞';
+  } else if (!targetEndDate || diffMs <= 0 || !canScan) {
+    isExpiredCountdown = true;
+    countdownText = lang === 'fr' ? 'Expiré' : 'Expired';
+  } else {
+    const days = Math.floor(diffMs / 86400000);
+    const hours = Math.floor((diffMs % 86400000) / 3600000);
+    const mins = Math.floor((diffMs % 3600000) / 60000);
+    const secs = Math.floor((diffMs % 60000) / 1000);
+    const dUnit = lang === 'fr' ? 'j' : 'd';
+    countdownText = `${days}${dUnit} ${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  const isSubscriptionAllowedRoute =
+    location.pathname.startsWith('/dashboard/subscription') ||
+    location.pathname.startsWith('/dashboard/profile');
+  const requiresSubscription = Boolean(user && !isLifetime && !canScan);
+
+  useEffect(() => {
+    if (requiresSubscription && !isSubscriptionAllowedRoute) {
+      navigate('/dashboard/subscription', { replace: true });
+    }
+  }, [requiresSubscription, isSubscriptionAllowedRoute, navigate]);
 
   const handleLogout = () => {
     logout();
@@ -141,12 +183,25 @@ export default function DashboardLayout() {
       </nav>
 
       <div className="border-t border-gray-200 p-4 dark:border-gray-800">
-        <div className="mb-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+        <div className="mb-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500">Scans</span>
             <Badge tone="purple">{remaining}</Badge>
           </div>
-          <p className="mt-1 text-xs font-medium capitalize">{user?.subscription?.plan} plan</p>
+          <p className="text-xs font-medium capitalize">{user?.subscription?.plan || 'free'} plan</p>
+          <div className={`flex items-center justify-between rounded-lg px-2 py-1 text-[11px] font-bold ${
+            isExpiredCountdown
+              ? 'bg-rose-500/15 text-rose-500'
+              : isLifetime
+              ? 'bg-amber-500/15 text-amber-500'
+              : 'bg-emerald-500/15 text-emerald-500'
+          }`}>
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {lang === 'fr' ? 'Expiration' : 'Expires'}
+            </span>
+            <span className="font-mono tabular-nums">{countdownText}</span>
+          </div>
         </div>
         <button
           onClick={handleLogout}
@@ -159,7 +214,6 @@ export default function DashboardLayout() {
     </div>
   );
 
-  const location = useLocation();
   const isBacktesting = location.pathname.startsWith('/dashboard/backtesting');
 
   return (
@@ -229,6 +283,22 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Live Subscription Countdown Pill */}
+            <Link
+              to="/dashboard/subscription"
+              title={lang === 'fr' ? 'Temps restant avant expiration de votre abonnement' : 'Remaining time before subscription expiration'}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition shadow-sm ${
+                isExpiredCountdown
+                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400 animate-pulse'
+                  : isLifetime
+                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                  : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-mono tabular-nums">{countdownText}</span>
+            </Link>
+
             {/* Language Switcher Button */}
             <button
               onClick={toggleLanguage}
@@ -255,6 +325,17 @@ export default function DashboardLayout() {
         </header>
 
         <main className={`flex-1 w-full max-w-full ${isBacktesting ? 'p-0 overflow-hidden' : 'p-3 sm:p-5 lg:p-6'}`}>
+          {requiresSubscription && (
+            <div className="mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-600 dark:text-rose-300">
+              {!freeTrialEnabled
+                ? (lang === 'fr'
+                    ? 'L’essai gratuit est actuellement désactivé. Veuillez souscrire à un abonnement pour accéder aux fonctionnalités de la plateforme.'
+                    : 'Free trial is currently disabled. Please subscribe to a plan to access the platform features.')
+                : (lang === 'fr'
+                    ? 'Votre abonnement ou période d’essai est expiré. Veuillez renouveler votre abonnement pour continuer.'
+                    : 'Your subscription or free trial has expired. Please renew your subscription to continue.')}
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

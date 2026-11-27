@@ -261,14 +261,21 @@ export const sendMessage = asyncHandler(async (req, res) => {
     dataSource = snapshot.source;
     isRealData = snapshot.isRealData;
 
+    const savedStratParts = [
+      user.preferences?.customStrategyName ? `Nom de stratégie: ${user.preferences.customStrategyName}` : '',
+      user.preferences?.customStrategy ? `Règles de stratégie enregistrées:\n${user.preferences.customStrategy}` : '',
+      user.preferences?.customTradingPlan ? `Plan de trading enregistré:\n${user.preferences.customTradingPlan}` : '',
+      `Demande actuelle de l'utilisateur: ${text}`,
+    ].filter(Boolean);
+
     const { analysis } = await analyzeMarketData({
       snapshot,
       preferences: {
         ...(user.preferences || {}),
         language: lang,
-        customStrategy: text,
+        customStrategy: savedStratParts.join('\n\n'),
       },
-      strategy: ctx.strategy || 'custom',
+      strategy: (user.preferences?.customStrategy || user.preferences?.customTradingPlan) ? 'custom' : (ctx.strategy || 'custom'),
       intentParams: intent.params,
     });
 
@@ -321,13 +328,14 @@ export const sendMessage = asyncHandler(async (req, res) => {
       throw ApiError.forbidden('Plus de crédits de scan ce mois-ci.');
     }
 
+    const userPrefs = user.preferences?.toObject ? user.preferences.toObject() : { ...(user.preferences || {}) };
     const results = [];
     for (const symbol of symbols) {
       const snapshot = await requireSnapshot(symbol, timeframe);
       const { analysis } = await analyzeMarketData({
         snapshot,
-        preferences: { ...(user.preferences || {}), language: lang },
-        strategy: ctx.strategy,
+        preferences: { ...userPrefs, language: lang },
+        strategy: ctx.strategy || userPrefs.customStrategy || '',
         intentParams: intent.params,
       });
       const saved = await Analysis.create({
