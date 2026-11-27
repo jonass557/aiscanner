@@ -23,6 +23,9 @@ import logger from '../../config/logger.js';
 // gemini-3.8-flash: modèle avancé mais plus lourd (10-30s).
 // gemini-flash-latest: fallback de sécurité.
 const FALLBACK_CHAIN = [
+  'gemini-4-hydrogen',
+  'gemini-4-neon',
+  'gemini-4-carbon',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   'gemini-2.0-flash',

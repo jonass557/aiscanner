@@ -18,6 +18,9 @@ import { adminApi } from '../../services/endpoints.js';
  */
 
 const GEMINI_MODELS = [
+  { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogène (Nouvelle Génération — Ultra Rapide)', badge: 'Gen 4' },
+  { id: 'gemini-4-neon', label: 'Gemini 4 Neon (Haute Performance Multimodale)', badge: 'Gen 4' },
+  { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon (Raisonnement Institutionnel Profond)', badge: 'Gen 4 Pro' },
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Recommandé — Rapide, Vision & JSON)', badge: 'Recommandé' },
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Raisonnement Institutionnel Avancé)', badge: 'Plus Puissant' },
   { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (Ultra Rapide & Haute Disponibilité)', badge: 'Ultra Rapide' },
