@@ -82,7 +82,7 @@ const FALLBACK_PLANS = [
  * Subscription Management & iKeePay H2H Direct Checkout + VIP Partnership Access
  */
 export default function Subscription() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, freeTrialEnabled } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialTab = searchParams.get('tab') === 'history' || searchParams.get('tab') === 'invoices' ? 'history' : 'plans';
@@ -148,7 +148,12 @@ export default function Subscription() {
   const isLifetimePartner = Boolean(user?.partnership?.isActive && user?.partnership?.status === 'active' && user?.partnership?.lifetimeAccess);
 
   const choosePlan = async (plan) => {
-    const trialAvailable = plan.trial?.enabled && user?.trial?.appliedFor !== plan.id;
+    const trialAvailable = Boolean(
+      freeTrialEnabled &&
+      plan.trial?.enabled &&
+      !user?.trial?.startedAt &&
+      user?.trial?.appliedFor !== plan.id
+    );
 
     if (plan.price === 0 || trialAvailable) {
       if (plan.id === currentPlan && !trialAvailable) return;
@@ -321,7 +326,12 @@ export default function Subscription() {
             {plans.map((plan) => {
               const isCurrent = plan.id === currentPlan;
               const highlighted = plan.id === '2mois' || plan.id === 'pro';
-              const trialAvailable = plan.trial?.enabled && user?.trial?.appliedFor !== plan.id;
+              const trialAvailable = Boolean(
+                freeTrialEnabled &&
+                plan.trial?.enabled &&
+                !user?.trial?.startedAt &&
+                user?.trial?.appliedFor !== plan.id
+              );
 
               return (
                 <div

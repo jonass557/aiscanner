@@ -18,11 +18,12 @@ import { adminApi } from '../../services/endpoints.js';
  */
 
 const GEMINI_MODELS = [
-  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (Recommandé - Ultra Rapide & Vision 2026)', badge: 'Plus Rapide' },
-  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Haute Confluence & Vitesse)', badge: 'Performant' },
-  { id: 'gemini-flash-latest', label: 'Gemini Flash Latest (Stable général)', badge: 'Stable' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', badge: 'Standard' },
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Raisonnement approfondi)', badge: 'Avancé' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Recommandé — Rapide, Vision & JSON)', badge: 'Recommandé' },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Raisonnement Institutionnel Avancé)', badge: 'Plus Puissant' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (Ultra Rapide & Haute Disponibilité)', badge: 'Ultra Rapide' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Stable Production & Vision)', badge: 'Stable' },
+  { id: 'gemini-flash-latest', label: 'Gemini Flash Latest (Dernière version Flash)', badge: 'Auto' },
+  { id: 'gemini-pro-latest', label: 'Gemini Pro Latest (Dernière version Pro)', badge: 'Pro Auto' },
 ];
 
 const FIELD_META = {

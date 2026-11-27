@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Crown,
@@ -25,9 +26,20 @@ import { H2H_COUNTRIES, OPERATOR_LABELS } from '../../constants/h2hCountries.js'
 import Spinner from '../../components/ui/Spinner.jsx';
 
 export default function AdminPartnership() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('partners'); // 'partners' | 'config' | 'revenue'
+  const initialTab = searchParams.get('tab') === 'revenue' ? 'revenue' : searchParams.get('tab') === 'config' ? 'config' : 'partners';
+  const [tab, setTab] = useState(initialTab); // 'partners' | 'config' | 'revenue'
+
+  useEffect(() => {
+    const qTab = searchParams.get('tab');
+    if (qTab && ['partners', 'config', 'revenue'].includes(qTab)) {
+      setTab(qTab);
+    } else if (!qTab) {
+      setTab('partners');
+    }
+  }, [searchParams]);
   const [viewingContract, setViewingContract] = useState(null);
 
   // Config editor state

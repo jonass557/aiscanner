@@ -23,11 +23,12 @@ import logger from '../../config/logger.js';
 // gemini-3.8-flash: modèle avancé mais plus lourd (10-30s).
 // gemini-flash-latest: fallback de sécurité.
 const FALLBACK_CHAIN = [
-  'gemini-3.5-flash',
-  'gemini-flash-lite-latest',
-  'gemini-3.1-flash-lite',
-  'gemini-3.8-flash',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.5-pro',
   'gemini-flash-latest',
+  'gemini-pro-latest',
 ];
 
 const ATTEMPT_TIMEOUT_MS = 15000; // 15s per model attempt (fails fast to try next)

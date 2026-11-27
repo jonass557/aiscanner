@@ -110,6 +110,19 @@ export default function AdminUsers() {
     }
   };
 
+  const handleDisableSubscription = async (u) => {
+    if (!window.confirm(`Désactiver l'abonnement de ${u.email} ? L'utilisateur devra payer un nouvel abonnement pour accéder à la plateforme.`)) {
+      return;
+    }
+    try {
+      await adminApi.updateUser(u._id, { disableSubscription: true });
+      toast.success(`Abonnement de ${u.email} désactivé.`);
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
   const confirmDelete = async () => {
     try {
       await adminApi.deleteUser(toDelete._id);
@@ -287,6 +300,15 @@ export default function AdminUsers() {
                           >
                             <Sparkles className="h-3 w-3" /> Activer Plan
                           </button>
+                          {u.subscription?.status === 'active' && u.role !== 'admin' && (
+                            <button
+                              onClick={() => handleDisableSubscription(u)}
+                              className="px-2.5 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-[11px] font-bold"
+                              title="Désactiver l'abonnement (oblige à repayer)"
+                            >
+                              Désactiver
+                            </button>
+                          )}
                           <button
                             onClick={() => openEdit(u)}
                             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500"

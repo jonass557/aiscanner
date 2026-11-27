@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, ScrollText, Cpu, Menu, LogOut, ArrowLeft, ShieldCheck, Moon, Sun, CreditCard, Layers, BarChart3, ChevronRight, Activity, MessageSquare, Crown,
+  LayoutDashboard, Users, ScrollText, Cpu, Menu, LogOut, ArrowLeft, ShieldCheck, Moon, Sun, CreditCard, Layers, BarChart3, ChevronRight, Activity, MessageSquare, Crown, Wallet,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -12,6 +12,7 @@ const NAV = [
   { to: '/admin/users', label: 'Utilisateurs & Essais', icon: Users },
   { to: '/admin/strategies', label: 'Stratégies & Moteur', icon: Layers },
   { to: '/admin/plans', label: 'Plans & Promotions', icon: CreditCard },
+  { to: '/admin/partnership?tab=revenue', label: 'Portefeuille Admin', icon: Wallet },
   { to: '/admin/partnership', label: 'Partenariat & Revenus', icon: Crown },
   { to: '/admin/reviews', label: 'Avis Clients', icon: MessageSquare },
   { to: '/admin/ai-config', label: 'IA & Paiements', icon: Cpu },
@@ -26,7 +27,14 @@ export default function AdminLayout() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
-  const activeItem = NAV.find((n) => n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)) || NAV[0];
+  const activeItem =
+    NAV.find((n) => {
+      if (n.to.includes('?')) {
+        const [p, q] = n.to.split('?');
+        return location.pathname === p && location.search.includes(q);
+      }
+      return n.end ? location.pathname === n.to : location.pathname.startsWith(n.to) && !location.search.includes('tab=revenue');
+    }) || NAV[0];
 
   const SidebarInner = () => (
     <div className="flex h-full flex-col bg-slate-950 text-slate-200">
@@ -53,27 +61,36 @@ export default function AdminLayout() {
         </span>
       </div>
       <nav className="flex-1 space-y-1 px-3 overflow-y-auto">
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={() => setOpen(false)}
-            className={({ isActive }) =>
-              `group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? 'bg-slate-800/90 text-white font-semibold shadow-sm shadow-black/20 border-l-4 border-brand-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-              }`
-            }
-          >
-            <div className="flex items-center gap-3">
-              <item.icon className="h-4 w-4 shrink-0 transition group-hover:scale-105" />
-              <span>{item.label}</span>
-            </div>
-            <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-60 transition" />
-          </NavLink>
-        ))}
+        {NAV.map((item) => {
+          const isWalletLink = item.to.includes('tab=revenue');
+          const isItemActive = isWalletLink
+            ? location.pathname === '/admin/partnership' && location.search.includes('tab=revenue')
+            : item.end
+            ? location.pathname === item.to
+            : location.pathname.startsWith(item.to) && !(item.to === '/admin/partnership' && location.search.includes('tab=revenue'));
+
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              onClick={() => setOpen(false)}
+              className={() =>
+                `group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150 ${
+                  isItemActive
+                    ? 'bg-slate-800/90 text-white font-semibold shadow-sm shadow-black/20 border-l-4 border-brand-500'
+                    : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                }`
+              }
+            >
+              <div className="flex items-center gap-3">
+                <item.icon className="h-4 w-4 shrink-0 transition group-hover:scale-105" />
+                <span>{item.label}</span>
+              </div>
+              <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-60 transition" />
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Admin User Footer Widget */}

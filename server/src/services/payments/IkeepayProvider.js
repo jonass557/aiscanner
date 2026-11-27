@@ -150,13 +150,20 @@ export class IkeepayProvider extends BasePaymentProvider {
     const inner = data?.data && typeof data.data === 'object' ? data.data : data;
     const providerRef = inner.provider_reference || data.provider_reference || null;
     const paymentLink = inner.payment_link || data.payment_link || inner.checkout_url || data.checkout_url || '';
-    const rawStatus = inner.status || (data.status === 'success' ? 'pending' : data.status) || 'pending';
+    const rawStatus = inner.status || data.status || 'pending';
+    const normalized = this.normalizeStatus(rawStatus);
+
+    // IMPORTANT: POST /h2h-payin is only the initiation request!
+    // Even if iKeePay returns status: "success" on the API call itself, the user
+    // has NOT yet confirmed the USSD/OTP Mobile Money debit on their phone.
+    // Therefore initiation MUST stay 'pending' until verified via /h2h-verify or webhook.
+    const initialStatus = normalized === 'rejected' ? 'rejected' : 'pending';
 
     return {
       providerRef,
       externalRef: payload.external_reference,
       paymentLink,
-      status: this.normalizeStatus(rawStatus),
+      status: initialStatus,
       rawStatus,
       raw: data,
     };

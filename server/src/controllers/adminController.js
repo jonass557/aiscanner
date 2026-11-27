@@ -142,7 +142,23 @@ export const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw ApiError.notFound('User not found.');
 
-  const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate, referralEnabled, commissionRate } = req.body;
+  const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate, referralEnabled, commissionRate, disableSubscription } = req.body;
+
+  if (disableSubscription) {
+    user.subscription = user.subscription || {};
+    user.subscription.plan = 'free';
+    user.subscription.status = 'expired';
+    user.subscription.endDate = null;
+    user.subscription.scansPerMonth = 0;
+    user.trial = user.trial || {};
+    user.trial.isActive = false;
+    user.trial.endsAt = null;
+    if (user.partnership?.isActive) {
+      user.partnership.isActive = false;
+      user.partnership.status = 'suspended';
+      user.partnership.lifetimeAccess = false;
+    }
+  }
 
   if (plan) {
     if (plan === 'partner_lifetime') {

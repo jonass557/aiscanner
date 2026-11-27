@@ -2,6 +2,7 @@ import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/response.js';
 import { getPublicPlans, getPlanById } from '../services/planService.js';
 import { logAuth } from '../services/logService.js';
+import config from '../config/index.js';
 
 /**
  * GET /users/plans  (public)
@@ -53,8 +54,15 @@ export const changeSubscription = asyncHandler(async (req, res) => {
 
   const user = req.user;
 
-  // Paid plans must go through payment unless it's a free plan or an offered trial.
-  const trialAvailable = planDef.trial?.enabled && user.trial?.appliedFor !== plan;
+  // Paid plans must go through Mobile Money payment unless global free trial is enabled
+  // AND the user has not already used a free trial.
+  const freeTrialGloballyEnabled = config.features?.freeTrialEnabled !== false;
+  const trialAvailable = Boolean(
+    freeTrialGloballyEnabled &&
+    planDef.trial?.enabled &&
+    !user.trial?.startedAt &&
+    user.trial?.appliedFor !== plan
+  );
   if (planDef.price > 0 && !trialAvailable) {
     throw ApiError.badRequest('Ce plan est payant. Utilisez le paiement Mobile Money pour y souscrire.');
   }

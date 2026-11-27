@@ -261,22 +261,19 @@ export const initiateIkeepay = asyncHandler(async (req, res) => {
     paymentLink: h2hRes.paymentLink || '',
     checkoutUrl: h2hRes.paymentLink || '',
     method: 'h2h_payin',
-    status: h2hRes.status === 'approved' ? 'approved' : h2hRes.status === 'rejected' ? 'rejected' : 'pending',
+    status: h2hRes.status === 'rejected' ? 'rejected' : 'pending',
     rawResponse: h2hRes.raw,
   });
 
-  if (payment.status === 'approved') {
-    await activatePlan(req.user, plan, payment);
+  if (payment.status === 'rejected') {
+    throw ApiError.badRequest('Paiement refusé par iKeePay. Veuillez vérifier votre numéro et votre solde Mobile Money.');
   }
 
   return sendSuccess(res, {
     statusCode: 201,
-    message:
-      payment.status === 'approved'
-        ? 'Paiement confirmé ! Votre abonnement est actif.'
-        : h2hRes.paymentLink
-        ? 'Lien de redirection généré pour finaliser votre paiement iKeePay.'
-        : 'Paiement H2H initié. Confirmez la demande sur votre téléphone.',
+    message: h2hRes.paymentLink
+      ? 'Lien de redirection généré pour finaliser votre paiement iKeePay.'
+      : 'Paiement H2H initié. Confirmez la demande sur votre téléphone Mobile Money.',
     data: {
       paymentId: payment._id,
       orderId,
@@ -495,15 +492,17 @@ export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
     checkoutUrl: h2hRes.paymentLink || '',
     referralCodeUsed: String(referralCode || '').trim().toUpperCase(),
     method: 'h2h_payin',
-    status: h2hRes.status === 'approved' ? 'approved' : h2hRes.status === 'rejected' ? 'rejected' : 'pending',
+    status: h2hRes.status === 'rejected' ? 'rejected' : 'pending',
     rawResponse: h2hRes.raw,
   });
 
+  if (payment.status === 'rejected') {
+    throw ApiError.badRequest('Paiement refusé par iKeePay. Veuillez vérifier votre numéro et votre solde Mobile Money.');
+  }
+
   return sendSuccess(res, {
     statusCode: 201,
-    message: payment.status === 'approved'
-      ? 'Paiement validé avec succès !'
-      : h2hRes.paymentLink
+    message: h2hRes.paymentLink
       ? 'Lien de paiement généré. Complétez votre paiement pour activer votre accès.'
       : 'Paiement initié. Confirmez la transaction sur votre téléphone.',
     data: {
