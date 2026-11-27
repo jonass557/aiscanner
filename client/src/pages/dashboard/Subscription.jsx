@@ -110,7 +110,7 @@ export default function Subscription() {
   const loadData = () => {
     userApi.plans()
       .then(({ data }) => {
-        if (Array.isArray(data?.data?.plans) && data.data.plans.length > 0) {
+        if (Array.isArray(data?.data?.plans)) {
           setPlans(data.data.plans);
         }
       })

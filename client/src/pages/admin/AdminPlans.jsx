@@ -45,8 +45,11 @@ export default function AdminPlans() {
         adminApi.settings().catch(() => null),
       ]);
       setPlans(data.data.plans || []);
-      const settingsList = settingsRes?.data?.data?.settings || [];
-      const ft = settingsList.find((s) => s.key === 'features.freeTrialEnabled');
+      const rawSettings = settingsRes?.data?.data?.settings;
+      const settingsList = Array.isArray(rawSettings)
+        ? rawSettings
+        : Object.values(rawSettings || {}).flat();
+      const ft = settingsList.find((s) => s?.key === 'features.freeTrialEnabled');
       if (ft !== undefined) {
         setFreeTrialEnabled(ft.value !== false && ft.value !== 'false');
       }
@@ -136,7 +139,10 @@ export default function AdminPlans() {
   const toggle = async (plan) => {
     try {
       const { data } = await adminApi.togglePlan(plan.id);
-      const nowActive = data?.data?.plan?.isActive;
+      const nowActive = data?.data?.plan?.isActive ?? !plan.isActive;
+      setPlans((prev) =>
+        prev.map((p) => (p.id === plan.id ? { ...p, isActive: nowActive } : p))
+      );
       toast.success(
         nowActive
           ? `Plan "${plan.name}" activé.`
