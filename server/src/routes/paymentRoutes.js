@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as paymentController from '../controllers/paymentController.js';
 import { protect } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
@@ -11,9 +12,9 @@ router.post('/webhook/sebpay', paymentController.webhook);
 // Public or auth: payment configuration (active provider, public keys, options)
 router.get('/config', paymentController.getPaymentConfig);
 
-// Public iKeePay checkout flow for new users paying before registering
-router.post('/ikeepay/initiate-public', paymentController.initiatePublicIkeepay);
-router.post('/ikeepay/verify-public', paymentController.verifyPublicIkeepay);
+// Public checkout flow for new users paying before registering
+router.post('/ikeepay/initiate-public', authLimiter, paymentController.initiatePublicIkeepay);
+router.post('/ikeepay/verify-public', authLimiter, paymentController.verifyPublicIkeepay);
 
 // Authenticated routes
 router.use(protect);

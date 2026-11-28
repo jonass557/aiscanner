@@ -215,7 +215,7 @@ export default function Subscription() {
             <CreditCard className="h-6 w-6 text-cyan-400" /> Abonnements &amp; Partenariat VIP
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Gérez votre forfait, souscrivez via iKeePay Mobile Money H2H ou devenez Partenaire VIP à vie.
+            Gérez votre forfait, souscrivez via Mobile Money sécurisé ou devenez Partenaire VIP à vie.
           </p>
         </div>
 
@@ -412,7 +412,7 @@ export default function Subscription() {
                     ) : trialAvailable ? (
                       <><Gift className="h-4 w-4" /> Démarrer l'essai gratuit</>
                     ) : plan.price > 0 ? (
-                      <><CreditCard className="h-4 w-4" /> Payer via iKeePay H2H</>
+                      <><CreditCard className="h-4 w-4" /> Payer via Mobile Money</>
                     ) : (
                       <><Zap className="h-4 w-4" /> Choisir {plan.name}</>
                     )}
@@ -429,7 +429,7 @@ export default function Subscription() {
                 <ShieldCheck className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Paiement Direct Sécurisé via iKeePay H2H</p>
+                <p className="text-sm font-bold text-white">Paiement Direct Sécurisé Mobile Money</p>
                 <p className="text-xs text-slate-400">
                   Mobile Money (Orange, MTN, Wave, Moov, Mobicash, Airtel, Vodacom). Activation instantanée dès validation.
                 </p>

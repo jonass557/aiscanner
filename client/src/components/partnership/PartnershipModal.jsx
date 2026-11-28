@@ -159,7 +159,7 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
       } else {
         setStep('pending');
         if (d.paymentLink) {
-          toast.success('Lien de paiement iKeePay prêt ! Finalisez pour continuer.');
+          toast.success('Lien de paiement sécurisé prêt ! Finalisez pour continuer.');
         } else {
           toast.success('Demande Mobile Money envoyée sur votre téléphone.');
         }
@@ -567,7 +567,7 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-black text-slate-950 shadow-lg hover:brightness-110 transition disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                  <span>{loading ? 'Initialisation iKeePay...' : `Payer ${priceDisplay} maintenant`}</span>
+                  <span>{loading ? 'Initialisation Mobile Money...' : `Payer ${priceDisplay} maintenant`}</span>
                 </button>
               </div>
             </form>
@@ -596,7 +596,7 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
                     rel="noreferrer"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 hover:bg-amber-400"
                   >
-                    <span>Payer sur iKeePay</span>
+                    <span>Finaliser le paiement Mobile Money</span>
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>

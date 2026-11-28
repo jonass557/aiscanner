@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import * as partnershipController from '../controllers/partnershipController.js';
 import { protect, optionalAuth, authorize } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
 // Public & optional-auth endpoints (supports both visitors and already-logged-in users)
 router.get('/config', partnershipController.getPublicPartnershipConfig);
-router.post('/pay', optionalAuth, partnershipController.initiatePartnershipPayment);
-router.post('/verify-payment', optionalAuth, partnershipController.verifyPartnershipPayment);
-router.post('/complete-registration', optionalAuth, partnershipController.completePartnershipRegistration);
+router.post('/pay', authLimiter, optionalAuth, partnershipController.initiatePartnershipPayment);
+router.post('/verify-payment', authLimiter, optionalAuth, partnershipController.verifyPartnershipPayment);
+router.post('/complete-registration', authLimiter, optionalAuth, partnershipController.completePartnershipRegistration);
 
 // Partner Dashboard endpoints (auth required)
 router.get('/my-dashboard', protect, partnershipController.getMyPartnerDashboard);

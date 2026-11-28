@@ -271,13 +271,13 @@ export const initiateIkeepay = asyncHandler(async (req, res) => {
   });
 
   if (payment.status === 'rejected') {
-    throw ApiError.badRequest('Paiement refusé par iKeePay. Veuillez vérifier votre numéro et votre solde Mobile Money.');
+    throw ApiError.badRequest('Paiement refusé par l’opérateur. Veuillez vérifier votre numéro et votre solde Mobile Money.');
   }
 
   return sendSuccess(res, {
     statusCode: 201,
     message: h2hRes.paymentLink
-      ? 'Lien de redirection généré pour finaliser votre paiement iKeePay.'
+      ? 'Lien de redirection généré pour finaliser votre paiement Mobile Money.'
       : 'Paiement H2H initié. Confirmez la demande sur votre téléphone Mobile Money.',
     data: {
       paymentId: payment._id,
@@ -341,7 +341,7 @@ export const verifyIkeepay = asyncHandler(async (req, res) => {
     }
 
     return sendSuccess(res, {
-      message: 'Paiement iKeePay H2H validé ! Votre abonnement est maintenant actif.',
+      message: 'Paiement Mobile Money validé ! Votre abonnement est maintenant actif.',
       data: { status: 'approved', paymentId: payment._id, providerRef: payment.providerRef },
     });
   }
@@ -505,7 +505,7 @@ export const initiatePublicIkeepay = asyncHandler(async (req, res) => {
   });
 
   if (payment.status === 'rejected') {
-    throw ApiError.badRequest('Paiement refusé par iKeePay. Veuillez vérifier votre numéro et votre solde Mobile Money.');
+    throw ApiError.badRequest('Paiement refusé par l’opérateur. Veuillez vérifier votre numéro et votre solde Mobile Money.');
   }
 
   return sendSuccess(res, {

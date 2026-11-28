@@ -95,7 +95,7 @@ export default function PartnerDashboard() {
         operator: wOperator,
         phoneNumber: wPhone.trim(),
       });
-      toast.success(res.data?.message || 'Retrait iKeePay H2H initié !');
+      toast.success(res.data?.message || 'Retrait Mobile Money initié !');
       setWithdrawOpen(false);
       setWAmount('');
       await loadAll();
@@ -436,7 +436,7 @@ export default function PartnerDashboard() {
       <div className="rounded-2xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden">
         <div className="border-b border-slate-800 px-5 py-4 flex items-center justify-between">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-emerald-400" /> Historique de vos Retraits (iKeePay H2H Payout)
+            <Wallet className="h-5 w-5 text-emerald-400" /> Historique de vos Retraits (Mobile Money)
           </h2>
         </div>
 
@@ -575,7 +575,7 @@ export default function PartnerDashboard() {
 
             {(p.balance || 0) < 200 && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-[11px] text-amber-300">
-                Le montant minimum pour effectuer un retrait Mobile Money iKeePay H2H est de <strong>200 {currency}</strong>. Partagez votre lien de parrainage pour cumuler des commissions !
+                Le montant minimum pour effectuer un retrait Mobile Money est de <strong>200 {currency}</strong>. Partagez votre lien de parrainage pour cumuler des commissions !
               </div>
             )}
 
@@ -638,7 +638,7 @@ export default function PartnerDashboard() {
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 py-3 text-sm font-black text-slate-950 hover:brightness-110 disabled:opacity-50"
               >
                 {withdrawing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-                <span>Confirmer le Retrait iKeePay H2H</span>
+                <span>Confirmer le Retrait Mobile Money</span>
               </button>
             </form>
           </div>

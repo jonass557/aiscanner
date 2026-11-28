@@ -137,7 +137,7 @@ export default function H2HPlanCheckoutModal({
 
       setStep('pending');
       if (d.paymentLink) {
-        toast.success('Lien de paiement iKeePay généré ! Finalisez le règlement.');
+        toast.success('Lien de paiement sécurisé généré ! Finalisez le règlement.');
       } else {
         toast.success('Demande envoyée sur votre téléphone Mobile Money !');
       }
@@ -159,7 +159,7 @@ export default function H2HPlanCheckoutModal({
 
       const status = res.data?.data?.status;
       if (status === 'approved') {
-        toast.success('Paiement iKeePay H2H validé !');
+        toast.success('Paiement Mobile Money validé !');
         setStep('success');
         onApproved?.({ orderId: oid, email: email.trim(), fullName: fullName.trim(), plan });
       } else if (status === 'rejected') {
@@ -330,12 +330,12 @@ export default function H2HPlanCheckoutModal({
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Connexion iKeePay H2H...</span>
+                      <span>Connexion Mobile Money...</span>
                     </>
                   ) : (
                     <>
                       <Lock className="h-4 w-4" />
-                      <span>Payer {effectivePrice.toLocaleString('fr-FR')} {plan.currency || 'XOF'} via iKeePay</span>
+                      <span>Payer {effectivePrice.toLocaleString('fr-FR')} {plan.currency || 'XOF'} via Mobile Money</span>
                     </>
                   )}
                 </button>

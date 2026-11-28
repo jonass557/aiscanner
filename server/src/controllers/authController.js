@@ -3,7 +3,9 @@ import { sendSuccess } from '../utils/response.js';
 import User from '../models/User.js';
 import Plan from '../models/Plan.js';
 import Payment from '../models/Payment.js';
+import PartnershipConfig from '../models/PartnershipConfig.js';
 import config from '../config/index.js';
+import logger from '../config/logger.js';
 import { getPlan } from '../config/plans.js';
 import {
   generateAccessToken,
@@ -20,6 +22,7 @@ import {
 } from '../services/emailService.js';
 import { logAuth } from '../services/logService.js';
 import { processPartnerCommissionSplit } from '../services/partnershipService.js';
+import { getPlanById } from '../services/planService.js';
 
 /**
  * POST /auth/register
@@ -50,6 +53,18 @@ export const register = asyncHandler(async (req, res) => {
   if (orderId) {
     paidOrder = await Payment.findOne({ externalRef: orderId });
   }
+  if (!paidOrder && normalizedEmail) {
+    paidOrder = await Payment.findOne({
+      customerEmail: normalizedEmail,
+      purpose: 'subscription',
+      status: 'approved',
+      user: null,
+    }).sort({ createdAt: -1 });
+  }
+
+  if (paidOrder && paidOrder.user) {
+    throw ApiError.conflict('Ce paiement a déjà été utilisé pour activer un compte.');
+  }
 
   // Check referral code (from body OR stored on public paid order)
   let referredByUser = null;
@@ -58,7 +73,7 @@ export const register = asyncHandler(async (req, res) => {
     referredByUser = await User.findOne({ referralCode: refCodeToFind });
   }
 
-  const isPaidSubscriber = Boolean(paidOrder && (paidOrder.status === 'approved' || paidOrder.amount > 0));
+  const isPaidSubscriber = Boolean(paidOrder && paidOrder.status === 'approved');
 
   const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || '').split(',')[0].trim();
   const deviceFingerprint = (rawFp || '').trim();
@@ -171,15 +186,17 @@ export const register = asyncHandler(async (req, res) => {
     await referredByUser.save().catch(() => {});
   }
 
-  if (paidOrder) {
+  if (paidOrder && isPaidSubscriber) {
     paidOrder.user = user._id;
-    if (paidOrder.status !== 'approved') paidOrder.status = 'approved';
     await paidOrder.save();
+
+    const paidAmount = paidOrder.amount ?? targetPlan?.effectivePrice ?? targetPlan?.price ?? 7000;
+    let handledByPartner = false;
+    let legacyCommission = 0;
 
     if (referredByUser) {
       try {
-        const paidAmount = paidOrder.amount ?? targetPlan?.effectivePrice ?? targetPlan?.price ?? 7000;
-        const handledByPartner = await processPartnerCommissionSplit({
+        handledByPartner = await processPartnerCommissionSplit({
           subscriber: user,
           payment: paidOrder,
           plan: targetPlan,
@@ -191,22 +208,50 @@ export const register = asyncHandler(async (req, res) => {
           const rate = (referredByUser.referral.commissionRate || 20) / 100;
           const commission = Math.round(paidAmount * rate);
           if (commission > 0) {
+            legacyCommission = commission;
             referredByUser.referral.balance = (referredByUser.referral.balance || 0) + commission;
             referredByUser.referral.totalEarned = (referredByUser.referral.totalEarned || 0) + commission;
             await referredByUser.save();
           }
         }
       } catch (err) {
-        console.error('Failed to credit referral/partner commission on register:', err);
+        logger.error(`Failed to credit referral/partner commission on register: ${err.message}`);
+      }
+    }
+
+    if (!handledByPartner && !paidOrder.splitApplied) {
+      try {
+        const netAdmin = Math.max(0, Math.round(paidAmount - legacyCommission));
+        if (netAdmin > 0) {
+          await PartnershipConfig.findOneAndUpdate(
+            { key: 'default' },
+            {
+              $inc: {
+                adminPoolBalance: netAdmin,
+                adminPoolTotalEarned: netAdmin,
+                adminSubscriptionEarned: netAdmin,
+              },
+            },
+            { upsert: true }
+          );
+          paidOrder.splitApplied = true;
+          paidOrder.adminShare = netAdmin;
+          paidOrder.partnerCommission = legacyCommission;
+          await paidOrder.save();
+        }
+      } catch (err) {
+        logger.error(`Failed to credit Admin Wallet on register: ${err.message}`);
       }
     }
   }
 
   // Envoi automatique de l'OTP de vérification par mail
-  sendVerificationEmail(user, code).catch(() => {});
+  sendVerificationEmail(user, code).catch((err) => {
+    logger.error(`Failed to send verification OTP email to ${user.email}: ${err.message}`);
+  });
   await logAuth('register', {
     message: isPaidSubscriber
-      ? `Nouveau compte créé suite au paiement iKeePay (${targetPlan?.name})`
+      ? `Nouveau compte créé suite au paiement Mobile Money (${targetPlan?.name || targetSlug})`
       : 'Nouveau compte créé avec essai gratuit',
     userId: user._id,
     ip: clientIp,
@@ -223,6 +268,8 @@ export const register = asyncHandler(async (req, res) => {
       accessToken,
       refreshToken,
       requireEmailVerification: true,
+      freeTrialEnabled: globalFreeTrialEnabled,
+      canScan: user.canScan(),
     },
   });
 });
@@ -248,6 +295,9 @@ export const login = asyncHandler(async (req, res) => {
     }
     await user.save();
   }
+
+  await claimUnclaimedApprovedPayment(user);
+  await user.save();
 
   await logAuth('login', { message: 'User logged in', userId: user._id, ip: req.ip });
 
@@ -384,11 +434,93 @@ export const resetPassword = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Auto-claim any approved subscription payment matching user.email that has not yet been linked to a user
+ * (e.g. user paid on public pricing page before creating/logging into their account).
+ */
+const claimUnclaimedApprovedPayment = async (user) => {
+  if (!user?.email) return;
+  const unclaimed = await Payment.findOne({
+    customerEmail: user.email.toLowerCase().trim(),
+    purpose: 'subscription',
+    status: 'approved',
+    user: null,
+  }).sort({ createdAt: -1 });
+  if (!unclaimed) return;
+
+  const plan = await getPlanById(unclaimed.planId);
+  let subMonths = 1;
+  if (plan?.id === '2mois') subMonths = 2;
+  else if (plan?.id === '1an') subMonths = 12;
+  else if (plan?.id === '6mois') subMonths = 6;
+  else if (plan?.promo?.enabled && plan.promo.durationMonths > 0) subMonths = plan.promo.durationMonths;
+
+  const end = new Date();
+  end.setMonth(end.getMonth() + subMonths);
+
+  user.subscription = user.subscription || {};
+  user.subscription.plan = plan?.id || unclaimed.planId || '1mois';
+  user.subscription.status = 'active';
+  user.subscription.scansPerMonth = -1;
+  user.subscription.startDate = new Date();
+  user.subscription.endDate = end;
+  if (user.trial) user.trial.isActive = false;
+
+  if (!user.referredBy && unclaimed.referralCodeUsed) {
+    const refUser = await User.findOne({ referralCode: unclaimed.referralCodeUsed.toUpperCase() });
+    if (refUser && String(refUser._id) !== String(user._id)) {
+      user.referredBy = refUser._id;
+    }
+  }
+
+  unclaimed.user = user._id;
+  await unclaimed.save();
+
+  const paidAmount = unclaimed.amount ?? plan?.price ?? 7000;
+  let handledByPartner = false;
+  let legacyCommission = 0;
+
+  if (user.referredBy) {
+    try {
+      handledByPartner = await processPartnerCommissionSplit({ subscriber: user, payment: unclaimed, plan, paidAmount });
+      if (!handledByPartner) {
+        const ref = await User.findById(user.referredBy);
+        if (ref && ref.referral?.enabled) {
+          legacyCommission = Math.round(paidAmount * ((ref.referral.commissionRate || 20) / 100));
+          if (legacyCommission > 0) {
+            ref.referral.balance = (ref.referral.balance || 0) + legacyCommission;
+            ref.referral.totalEarned = (ref.referral.totalEarned || 0) + legacyCommission;
+            await ref.save();
+          }
+        }
+      }
+    } catch (err) {
+      logger.error(`claimUnclaimedApprovedPayment referral error: ${err.message}`);
+    }
+  }
+
+  if (!handledByPartner && !unclaimed.splitApplied) {
+    const netAdmin = Math.max(0, Math.round(paidAmount - legacyCommission));
+    if (netAdmin > 0) {
+      await PartnershipConfig.findOneAndUpdate(
+        { key: 'default' },
+        { $inc: { adminPoolBalance: netAdmin, adminPoolTotalEarned: netAdmin, adminSubscriptionEarned: netAdmin } },
+        { upsert: true }
+      );
+      unclaimed.splitApplied = true;
+      unclaimed.adminShare = netAdmin;
+      unclaimed.partnerCommission = legacyCommission;
+      await unclaimed.save();
+    }
+  }
+};
+
+/**
  * GET /auth/me
  */
 export const getMe = asyncHandler(async (req, res) => {
   // Re-fetch to trigger monthly reset check and return fresh data.
   const user = await User.findById(req.user._id);
+  await claimUnclaimedApprovedPayment(user);
   user.checkAndResetMonthlyScans();
   await user.save();
 

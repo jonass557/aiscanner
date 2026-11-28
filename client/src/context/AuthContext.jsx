@@ -54,7 +54,12 @@ export const AuthProvider = ({ children }) => {
     tokenStore.set(data.data.accessToken, data.data.refreshToken);
     setUser(data.data.user);
     setRequireEmailVerification(Boolean(data.data.requireEmailVerification));
-    return data.data.user;
+    setFreeTrialEnabled(data.data.freeTrialEnabled !== false);
+    setCanScan(data.data.canScan !== false);
+    return {
+      ...data.data.user,
+      requireEmailVerification: Boolean(data.data.requireEmailVerification),
+    };
   };
 
   const logout = () => {
