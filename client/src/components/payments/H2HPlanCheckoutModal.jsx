@@ -403,9 +403,9 @@ export default function H2HPlanCheckoutModal({
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                 <CheckCircle2 className="h-10 w-10" />
               </div>
-              <h3 className="text-2xl font-black text-white">Paiement Validé !</h3>
+              <h3 className="text-2xl font-black text-white">Paiement effectué avec succès !</h3>
               <p className="text-sm text-slate-300">
-                Votre transaction iKeePay H2H est approuvée.
+                Votre abonnement est désormais actif. Redirection vers votre Dashboard...
               </p>
             </div>
           )}

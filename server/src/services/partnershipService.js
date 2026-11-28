@@ -201,6 +201,7 @@ export const processPartnerCommissionSplit = async ({ subscriber, payment, plan,
 
     cfg.adminPoolBalance = (cfg.adminPoolBalance || 0) + adminAmount;
     cfg.adminPoolTotalEarned = (cfg.adminPoolTotalEarned || 0) + adminAmount;
+    cfg.adminSubscriptionEarned = (cfg.adminSubscriptionEarned || 0) + adminAmount;
     await cfg.save();
   }
 
@@ -234,4 +235,29 @@ export const isPartnerInactiveMonthly = async (partnerDoc) => {
     createdAt: { $gte: windowStart },
   });
   return recentAffiliates === 0;
+};
+
+/**
+ * Idempotently credit the Unified Admin Wallet with a confirmed partnership membership payment.
+ */
+export const creditAdminWalletForPartnership = async (payment) => {
+  if (!payment || payment.purpose !== 'partnership' || !(Number(payment.amount) > 0) || payment.splitApplied) {
+    return false;
+  }
+  const amount = Number(payment.amount);
+  await PartnershipConfig.findOneAndUpdate(
+    { key: 'default' },
+    {
+      $inc: {
+        adminPoolBalance: amount,
+        adminPoolTotalEarned: amount,
+        adminPartnershipFeeEarned: amount,
+      },
+    },
+    { upsert: true }
+  );
+  payment.splitApplied = true;
+  payment.adminShare = amount;
+  await payment.save();
+  return true;
 };

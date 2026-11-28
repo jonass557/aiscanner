@@ -39,16 +39,16 @@ const PartnerDashboard = lazy(() => import('./pages/dashboard/PartnerDashboard.j
 const Profile = lazy(() => import('./pages/dashboard/Profile.jsx'));
 const Settings = lazy(() => import('./pages/dashboard/Settings.jsx'));
 
-const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'));
-const AdminOverview = lazy(() => import('./pages/admin/AdminOverview.jsx'));
-const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics.jsx'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
-const AdminStrategies = lazy(() => import('./pages/admin/AdminStrategies.jsx'));
-const AdminPlans = lazy(() => import('./pages/admin/AdminPlans.jsx'));
-const AdminPartnership = lazy(() => import('./pages/admin/AdminPartnership.jsx'));
-const AdminReviews = lazy(() => import('./pages/admin/AdminReviews.jsx'));
-const AdminLogs = lazy(() => import('./pages/admin/AdminLogs.jsx'));
-const AdminAIConfig = lazy(() => import('./pages/admin/AdminAIConfig.jsx'));
+import AdminLayout from './layouts/AdminLayout.jsx';
+import AdminOverview from './pages/admin/AdminOverview.jsx';
+import AdminAnalytics from './pages/admin/AdminAnalytics.jsx';
+import AdminUsers from './pages/admin/AdminUsers.jsx';
+import AdminStrategies from './pages/admin/AdminStrategies.jsx';
+import AdminPlans from './pages/admin/AdminPlans.jsx';
+import AdminPartnership from './pages/admin/AdminPartnership.jsx';
+import AdminReviews from './pages/admin/AdminReviews.jsx';
+import AdminLogs from './pages/admin/AdminLogs.jsx';
+import AdminAIConfig from './pages/admin/AdminAIConfig.jsx';
 
 const ToolsPage = lazy(() => import('./pages/ToolsPage.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));

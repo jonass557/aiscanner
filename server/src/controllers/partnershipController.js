@@ -19,6 +19,7 @@ import {
   activatePartnershipForUser,
   releaseDueScheduledCommissions,
   isPartnerInactiveMonthly,
+  creditAdminWalletForPartnership,
 } from '../services/partnershipService.js';
 
 /**
@@ -181,7 +182,7 @@ export const initiatePartnershipPayment = asyncHandler(async (req, res) => {
     paymentLink: h2hRes.paymentLink || '',
     checkoutUrl: h2hRes.paymentLink || '',
     method: 'h2h_payin',
-    status: h2hRes.status === 'approved' ? 'approved' : h2hRes.status === 'rejected' ? 'rejected' : 'pending',
+    status: h2hRes.status === 'rejected' ? 'rejected' : 'pending',
     rawResponse: h2hRes.raw,
   });
 
@@ -223,6 +224,7 @@ export const verifyPartnershipPayment = asyncHandler(async (req, res) => {
   if (!payment) throw ApiError.notFound('Transaction partenariat introuvable.');
 
   if (payment.status === 'approved') {
+    await creditAdminWalletForPartnership(payment);
     return sendSuccess(res, {
       message: 'Paiement confirmé ! Complétez le formulaire pour activer votre espace Partenaire.',
       data: {
@@ -236,7 +238,10 @@ export const verifyPartnershipPayment = asyncHandler(async (req, res) => {
 
   const provider = getConfiguredIkeepayProvider();
   const checkRef = payment.externalRef || payment.providerRef;
-  const verification = await provider.verifyTransaction(checkRef);
+  let verification = await provider.verifyTransaction(checkRef);
+  if (!verification.valid && verification.status !== 'approved' && payment.providerRef && payment.providerRef !== checkRef) {
+    verification = await provider.verifyTransaction(payment.providerRef);
+  }
 
   if (verification.providerRef && !payment.providerRef) {
     payment.providerRef = verification.providerRef;
@@ -245,6 +250,7 @@ export const verifyPartnershipPayment = asyncHandler(async (req, res) => {
   if (verification.valid || verification.status === 'approved') {
     payment.status = 'approved';
     await payment.save();
+    await creditAdminWalletForPartnership(payment);
   } else if (verification.status === 'rejected') {
     payment.status = 'rejected';
     await payment.save();
@@ -400,21 +406,7 @@ export const completePartnershipRegistration = asyncHandler(async (req, res) => 
   payment.customerEmail = cleanEmail;
 
   // Credit Unified Admin Wallet with the partnership membership fee (if not already credited)
-  if (payment.amount > 0 && !payment.splitApplied) {
-    await PartnershipConfig.findOneAndUpdate(
-      { key: 'default' },
-      {
-        $inc: {
-          adminPoolBalance: payment.amount,
-          adminPoolTotalEarned: payment.amount,
-          adminPartnershipFeeEarned: payment.amount,
-        },
-      },
-      { upsert: true }
-    );
-    payment.splitApplied = true;
-    payment.adminShare = payment.amount;
-  }
+  await creditAdminWalletForPartnership(payment);
 
   await payment.save();
 

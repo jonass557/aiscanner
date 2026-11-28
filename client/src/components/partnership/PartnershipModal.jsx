@@ -96,7 +96,17 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
       setPaymentLink('');
       setOtp('');
     }
-  }, [isOpen, user]);
+  }, [isOpen]);
+
+  // Auto-redirect to Dashboard once partnership registration succeeds
+  useEffect(() => {
+    if (!isOpen || step !== 'success' || needsLoginRedirect) return undefined;
+    const t = setTimeout(() => {
+      onClose?.();
+      navigate('/dashboard');
+    }, 1800);
+    return () => clearTimeout(t);
+  }, [isOpen, step, needsLoginRedirect, navigate, onClose]);
 
   useEffect(() => {
     if (!selectedCountryObj.operators.includes(operator)) {
@@ -711,9 +721,10 @@ export default function PartnershipModal({ isOpen, config, onClose, onCompleted 
               </div>
 
               <div>
-                <h3 className="text-2xl font-black text-white">Bienvenue parmi nos Partenaires VIP !</h3>
+                <h3 className="text-2xl font-black text-white">Paiement effectué avec succès !</h3>
                 <p className="mt-2 text-sm text-slate-300 max-w-md mx-auto">
-                  Votre formulaire a bien été transmis à l'administrateur. Votre accès à vie est actif dès maintenant et vous percevez {config.commissionRate || 30}% de commission chaque mois sur vos filleuls.
+                  Votre statut Partenaire VIP est actif à vie ({config.commissionRate || 30}% de commission chaque mois).{' '}
+                  {needsLoginRedirect ? 'Connectez-vous pour accéder à votre espace.' : 'Redirection vers votre Dashboard...'}
                 </p>
               </div>
 

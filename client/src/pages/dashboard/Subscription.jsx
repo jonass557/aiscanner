@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Check, Zap, Smartphone, Gift, CreditCard, ShieldCheck,
@@ -83,6 +83,7 @@ const FALLBACK_PLANS = [
  */
 export default function Subscription() {
   const { user, refreshUser, freeTrialEnabled } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialTab = searchParams.get('tab') === 'history' || searchParams.get('tab') === 'invoices' ? 'history' : 'plans';
@@ -522,8 +523,9 @@ export default function Subscription() {
           await refreshUser();
           setTimeout(() => {
             setH2hCheckoutPlan(null);
-            toast.success('Votre abonnement est désormais actif !');
-          }, 1000);
+            toast.success('Paiement effectué avec succès !');
+            navigate('/dashboard');
+          }, 1500);
         }}
       />
 

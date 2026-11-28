@@ -20,6 +20,7 @@ import {
   getConfiguredIkeepayProvider,
   processPartnerCommissionSplit,
   resolvePlanDurationMonths,
+  creditAdminWalletForPartnership,
 } from '../services/partnershipService.js';
 
 const OPERATORS = ['mtn', 'moov', 'orange', 'wave', 'mobicash', 'airtel', 'vodacom', 'standard', 'card'];
@@ -317,7 +318,10 @@ export const verifyIkeepay = asyncHandler(async (req, res) => {
 
   const provider = getConfiguredIkeepayProvider();
   const checkRef = payment.externalRef || payment.providerRef;
-  const verification = await provider.verifyTransaction(checkRef);
+  let verification = await provider.verifyTransaction(checkRef);
+  if (!verification.valid && verification.status !== 'approved' && payment.providerRef && payment.providerRef !== checkRef) {
+    verification = await provider.verifyTransaction(payment.providerRef);
+  }
 
   if (verification.providerRef && !payment.providerRef) {
     payment.providerRef = verification.providerRef;
@@ -702,7 +706,9 @@ export const ikeepayWebhook = asyncHandler(async (req, res) => {
     payment.status = 'approved';
     await payment.save();
 
-    if (payment.purpose !== 'partnership') {
+    if (payment.purpose === 'partnership') {
+      await creditAdminWalletForPartnership(payment);
+    } else {
       const plan = await getPlanById(payment.planId);
       if (plan && payment.user) {
         const user = await User.findById(payment.user);
