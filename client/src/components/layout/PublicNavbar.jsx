@@ -4,12 +4,14 @@ import { motion } from 'framer-motion';
 import { Menu, X, ScanLine, Globe } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 /** Navigation bar for public landing page. */
 export default function PublicNavbar() {
   const [open, setOpen] = useState(false);
   const { isAuthenticated } = useAuth();
   const { t, lang, toggleLanguage } = useLanguage();
+  const { branding } = useTheme();
 
   const navLinks = [
     { label: t('landingNavTools'), href: '#tools' },
@@ -23,9 +25,13 @@ export default function PublicNavbar() {
     <header className="fixed top-0 left-0 right-0 w-full z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
       <nav className="w-full flex items-center justify-between px-6 py-3.5">
         <Link to="/" className="flex items-center gap-2 font-bold">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-600 text-white">
-            <ScanLine className="h-5 w-5" />
-          </span>
+          {branding?.logoUrl ? (
+            <img src={branding.logoUrl} alt="Logo" className="h-9 w-9 rounded-xl object-cover shadow-sm" />
+          ) : (
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-600 text-white">
+              <ScanLine className="h-5 w-5" />
+            </span>
+          )}
           <span className="text-lg">AI Chart Scanner</span>
         </Link>
 

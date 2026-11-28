@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Users, ScrollText, Cpu, Menu, LogOut, ArrowLeft, ShieldCheck, CreditCard, Layers, BarChart3, ChevronRight, Activity, MessageSquare, Crown, Wallet,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 const NAV = [
   { to: '/admin', label: 'Vue Globale', icon: LayoutDashboard, end: true },
@@ -21,6 +22,7 @@ const NAV = [
 /** Admin executive layout with professional dark theme and high contrast navigation. */
 export default function AdminLayout() {
   const { user, logout } = useAuth();
+  const { branding } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -38,9 +40,13 @@ export default function AdminLayout() {
     <div className="flex h-full flex-col bg-slate-950 text-slate-200">
       {/* Brand Header */}
       <div className="flex items-center gap-3 border-b border-slate-800/80 px-6 py-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 to-cyan-500 shadow-lg shadow-brand-500/20 text-white font-black">
-          <ShieldCheck className="h-5 w-5" />
-        </div>
+        {branding?.logoUrl ? (
+          <img src={branding.logoUrl} alt="Logo" className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-lg shadow-brand-500/20" />
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 to-cyan-500 shadow-lg shadow-brand-500/20 text-white font-black">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+        )}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="font-bold text-white text-base tracking-tight">AI Scanner</span>

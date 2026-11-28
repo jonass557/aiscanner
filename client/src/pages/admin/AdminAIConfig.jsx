@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   Cpu, CheckCircle2, XCircle, Info, Save, PlugZap, Eye, Sparkles,
-  CreditCard, Smartphone, Copy, Check, Zap, Layers,
+  CreditCard, Smartphone, Copy, Check, Zap, Layers, Image as ImageIcon, MessageCircle,
 } from 'lucide-react';
 import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
 import { adminApi } from '../../services/endpoints.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 /**
  * Configuration IA avancée, Passerelles de Paiement iKeePay & Modèles Gemini.
@@ -65,6 +66,14 @@ const FIELD_META = {
     label: 'Lien du Support WhatsApp (Bouton flottant)',
     hint: 'Lien WhatsApp affiché sur le bouton flottant (ex: https://wa.me/22900000000 ou lien de groupe).',
   },
+  'branding.logoUrl': {
+    label: 'Logo de la Navbar (URL ou image importée)',
+    hint: 'Remplace le logo dans la barre de navigation publique, utilisateur et admin.',
+  },
+  'branding.faviconUrl': {
+    label: 'Favicon du site (URL ou icône importée)',
+    hint: 'Icône affichée dans l’onglet / barre de navigation du navigateur.',
+  },
 };
 
 const CATEGORY_TITLES = {
@@ -77,6 +86,7 @@ const CATEGORY_TITLES = {
 const TESTABLE = ['gemini', 'openai', 'claude', 'nvidia', 'ikeepay'];
 
 export default function AdminAIConfig() {
+  const { refreshBranding } = useTheme();
   const [aiConfig, setAiConfig] = useState(null);
   const [groups, setGroups] = useState({});
   const [values, setValues] = useState({});
@@ -124,6 +134,7 @@ export default function AdminAIConfig() {
 
     try {
       await adminApi.updateSettings(payload);
+      await refreshBranding();
       setFlash({ tone: 'green', text: 'Paramètres enregistrés avec succès ! Clés et configurations mises à jour.' });
       await load();
     } catch (err) {
@@ -184,6 +195,17 @@ export default function AdminAIConfig() {
     navigator.clipboard.writeText(webhookUrl);
     setCopiedWebhook(true);
     setTimeout(() => setCopiedWebhook(false), 2000);
+  };
+
+  const handleImageFile = (key, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        onChange(key, reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   if (loading) return <Spinner label="Chargement de la configuration…" />;
@@ -517,6 +539,109 @@ export default function AdminAIConfig() {
             </div>
           );
         })}
+      </div>
+
+      {/* Identité Visuelle (Logo Navbar, Favicon) & Lien WhatsApp */}
+      <div className="rounded-2xl p-6 border border-indigo-500/30 bg-slate-900/90 shadow-xl space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <ImageIcon className="h-5 w-5 text-cyan-400" /> Identité Visuelle (Logo, Favicon) &amp; Support WhatsApp
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Modifiez le logo de la barre de navigation, le favicon du navigateur et le lien WhatsApp de la page d&apos;accueil.
+            </p>
+          </div>
+          <Button
+            loading={saving}
+            onClick={() =>
+              save([
+                { key: 'branding.logoUrl', value: values['branding.logoUrl'] ?? '' },
+                { key: 'branding.faviconUrl', value: values['branding.faviconUrl'] ?? '' },
+                { key: 'contact.whatsappUrl', value: values['contact.whatsappUrl'] ?? '' },
+              ])
+            }
+          >
+            <Save className="h-4 w-4" /> Enregistrer Logo, Favicon &amp; WhatsApp
+          </Button>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-3">
+          {/* Logo Navbar */}
+          <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+              Logo Navbar
+            </label>
+            <div className="flex items-center gap-3">
+              {values['branding.logoUrl'] ? (
+                <img src={values['branding.logoUrl']} alt="Aperçu logo" className="h-10 w-10 rounded-xl object-cover border border-slate-700" />
+              ) : (
+                <div className="h-10 w-10 rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-[10px] text-slate-500">
+                  Défaut
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageFile('branding.logoUrl', e.target.files?.[0])}
+                className="text-xs text-slate-300 file:mr-2 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-2.5 file:py-1 file:text-xs file:font-bold file:text-white hover:file:bg-indigo-500"
+              />
+            </div>
+            <input
+              type="text"
+              value={values['branding.logoUrl'] ?? ''}
+              onChange={(e) => onChange('branding.logoUrl', e.target.value)}
+              placeholder="Ou collez l'URL du logo (https://...)"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Favicon */}
+          <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+              Favicon (Barre de navigation)
+            </label>
+            <div className="flex items-center gap-3">
+              {values['branding.faviconUrl'] ? (
+                <img src={values['branding.faviconUrl']} alt="Aperçu favicon" className="h-10 w-10 rounded-xl object-contain border border-slate-700 bg-slate-900 p-1" />
+              ) : (
+                <div className="h-10 w-10 rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-[10px] text-slate-500">
+                  Défaut
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*,.ico"
+                onChange={(e) => handleImageFile('branding.faviconUrl', e.target.files?.[0])}
+                className="text-xs text-slate-300 file:mr-2 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-2.5 file:py-1 file:text-xs file:font-bold file:text-white hover:file:bg-indigo-500"
+              />
+            </div>
+            <input
+              type="text"
+              value={values['branding.faviconUrl'] ?? ''}
+              onChange={(e) => onChange('branding.faviconUrl', e.target.value)}
+              placeholder="Ou collez l'URL du favicon (https://...)"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          {/* WhatsApp URL */}
+          <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-400">
+              <MessageCircle className="h-3.5 w-3.5" /> Lien WhatsApp Accueil
+            </label>
+            <p className="text-[11px] text-slate-400">
+              Redirige le bouton WhatsApp flottant de la page d&apos;accueil vers ce lien.
+            </p>
+            <input
+              type="url"
+              value={values['contact.whatsappUrl'] ?? ''}
+              onChange={(e) => onChange('contact.whatsappUrl', e.target.value)}
+              placeholder="https://wa.me/22900000000"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Paramètres éditables groupés */}

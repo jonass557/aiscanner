@@ -252,10 +252,9 @@ export default function PartnerDashboard() {
               setWPhone(p.phone || '');
               setWithdrawOpen(true);
             }}
-            disabled={(p.balance || 0) < 200}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg hover:brightness-110 disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg hover:brightness-110 transition"
           >
-            <Wallet className="h-4 w-4" /> Retirer mes gains
+            <Wallet className="h-4 w-4" /> Mon Portefeuille / Retirer
           </button>
         </div>
       </div>
@@ -339,7 +338,17 @@ export default function PartnerDashboard() {
           <p className="mt-1 text-xs text-slate-400">Total retiré : {Number(p.totalWithdrawn || 0).toLocaleString('fr-FR')} {currency}</p>
         </div>
 
-        <div className="rounded-2xl border-2 border-emerald-500/40 bg-emerald-950/20 p-5 shadow-lg">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setWAmount(String(Math.max(200, Math.floor(p.balance || 0))));
+            setWPhone(p.phone || '');
+            setWithdrawOpen(true);
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && setWithdrawOpen(true)}
+          className="cursor-pointer rounded-2xl border-2 border-emerald-500/40 bg-emerald-950/20 p-5 shadow-lg hover:border-emerald-400 transition"
+        >
           <div className="flex items-center justify-between text-xs text-emerald-300 font-bold">
             <span>Solde Disponible Retirable</span>
             <Wallet className="h-4 w-4 text-emerald-400" />
@@ -347,7 +356,7 @@ export default function PartnerDashboard() {
           <p className="mt-2 text-3xl font-black text-white">
             {Number(p.balance || 0).toLocaleString('fr-FR')} <span className="text-sm text-emerald-400">{currency}</span>
           </p>
-          <p className="mt-1 text-xs text-emerald-300/80">Retrait instantané via iKeePay H2H</p>
+          <p className="mt-1 text-xs text-emerald-300/80">Cliquez pour ouvrir votre portefeuille &amp; retirer (H2H)</p>
         </div>
       </div>
 
@@ -553,10 +562,22 @@ export default function PartnerDashboard() {
               </button>
             </div>
 
-            <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/30 p-3 flex justify-between text-xs">
-              <span className="text-emerald-300">Solde disponible :</span>
-              <span className="font-black text-white">{Number(p.balance || 0).toLocaleString('fr-FR')} {currency}</span>
+            <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/30 p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-emerald-300">Solde disponible :</span>
+                <span className="font-black text-white">{Number(p.balance || 0).toLocaleString('fr-FR')} {currency}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-400">
+                <span>Total gagné : {Number(p.totalEarned || 0).toLocaleString('fr-FR')} {currency}</span>
+                <span>Déjà retiré : {Number(p.totalWithdrawn || 0).toLocaleString('fr-FR')} {currency}</span>
+              </div>
             </div>
+
+            {(p.balance || 0) < 200 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-[11px] text-amber-300">
+                Le montant minimum pour effectuer un retrait Mobile Money iKeePay H2H est de <strong>200 {currency}</strong>. Partagez votre lien de parrainage pour cumuler des commissions !
+              </div>
+            )}
 
             <form onSubmit={handleWithdraw} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -613,7 +634,7 @@ export default function PartnerDashboard() {
 
               <button
                 type="submit"
-                disabled={withdrawing}
+                disabled={withdrawing || (p.balance || 0) < 200}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 py-3 text-sm font-black text-slate-950 hover:brightness-110 disabled:opacity-50"
               >
                 {withdrawing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}

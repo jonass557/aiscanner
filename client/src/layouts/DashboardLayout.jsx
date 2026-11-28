@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import VoiceAssistantButton from '../components/voice/VoiceAssistantButton.jsx';
 
@@ -37,6 +38,7 @@ const NAV_ITEMS = [
 export default function DashboardLayout() {
   const { user, logout, isAdmin, freeTrialEnabled, canScan } = useAuth();
   const { t, lang, toggleLanguage } = useLanguage();
+  const { branding } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -97,9 +99,13 @@ export default function DashboardLayout() {
   const SidebarInner = () => (
     <div className="flex h-full flex-col overflow-hidden bg-[#0B1124] text-slate-200">
       <Link to="/dashboard" onClick={() => setOpen(false)} className="flex shrink-0 items-center gap-3 px-5 py-5 border-b border-[#1E2B4E]/80">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-cyan-500 to-emerald-400 text-white shadow-lg shadow-cyan-500/20">
-          <ScanLine className="h-5 w-5" />
-        </span>
+        {branding?.logoUrl ? (
+          <img src={branding.logoUrl} alt="Logo" className="h-10 w-10 rounded-xl object-cover shadow-lg shadow-cyan-500/20" />
+        ) : (
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-cyan-500 to-emerald-400 text-white shadow-lg shadow-cyan-500/20">
+            <ScanLine className="h-5 w-5" />
+          </span>
+        )}
         <div>
           <div className="text-lg font-black tracking-tight leading-none">
             <span className="text-white">AI</span>

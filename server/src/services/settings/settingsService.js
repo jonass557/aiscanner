@@ -66,6 +66,10 @@ export const SETTING_DEFS = [
 
   // --- Contact & Support ----------------------------------------------------
   { key: 'contact.whatsappUrl', path: 'contact.whatsappUrl', category: 'features', secret: false },
+
+  // --- Branding (Logo Navbar & Favicon) -------------------------------------
+  { key: 'branding.logoUrl', path: 'branding.logoUrl', category: 'features', secret: false },
+  { key: 'branding.faviconUrl', path: 'branding.faviconUrl', category: 'features', secret: false },
 ];
 
 const DEF_BY_KEY = new Map(SETTING_DEFS.map((d) => [d.key, d]));

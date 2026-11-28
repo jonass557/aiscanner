@@ -171,6 +171,10 @@ export const getPaymentConfig = asyncHandler(async (req, res) => {
         configured: Boolean(settingsService.getValue('payments.sebpay.secretKey') || config.payments.sebpay?.secretKey),
       },
       whatsappUrl: settingsService.getValue('contact.whatsappUrl') || config.contact?.whatsappUrl || 'https://wa.me/22900000000',
+      branding: {
+        logoUrl: settingsService.getValue('branding.logoUrl') || config.branding?.logoUrl || '',
+        faviconUrl: settingsService.getValue('branding.faviconUrl') || config.branding?.faviconUrl || '',
+      },
     },
   });
 });

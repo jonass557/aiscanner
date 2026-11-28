@@ -181,6 +181,11 @@ const config = {
     whatsappUrl: process.env.WHATSAPP_SUPPORT_URL || 'https://wa.me/22900000000',
   },
 
+  branding: {
+    logoUrl: process.env.BRAND_LOGO_URL || '',
+    faviconUrl: process.env.BRAND_FAVICON_URL || '',
+  },
+
   // Feature flags — toggle product behaviors without code changes.
   features: {
     // Gate sensitive actions (scan, multi-timeframe, trade validator) behind a
