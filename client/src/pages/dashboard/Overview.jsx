@@ -5,7 +5,7 @@ import {
   Radar, Cpu, Calculator, ClipboardCheck, GraduationCap, Mic,
   CalendarClock, History as HistoryIcon, CreditCard, Receipt, User as UserIcon,
   Settings as SettingsIcon, ShieldCheck, Search, Sparkles, BarChart2,
-  LayoutGrid, ArrowRight, TrendingUp, Target, Gauge,
+  LayoutGrid, ArrowRight, TrendingUp, Target, Gauge, Crown,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -204,6 +204,15 @@ export default function Overview() {
           shadow: 'shadow-orange-500/25',
         },
         {
+          id: 'partner_space',
+          labelFr: user?.partnership?.isActive ? 'Espace Partenaire VIP' : 'Devenir Partenaire',
+          labelEn: user?.partnership?.isActive ? 'VIP Partner Space' : 'Become Partner',
+          to: '/dashboard/partner',
+          icon: Crown,
+          bg: 'bg-gradient-to-br from-amber-500 to-yellow-600',
+          shadow: 'shadow-amber-500/25',
+        },
+        {
           id: 'news',
           labelFr: 'Actualités & News',
           labelEn: 'Economic News',
@@ -317,7 +326,36 @@ export default function Overview() {
           </p>
         </div>
 
-        {/* View Switcher: Hub vs Analytics */}
+      {/* VIP Partner Quick Access Banner */}
+      {user?.partnership?.isActive && (
+        <div className="rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-950/60 via-slate-900 to-orange-950/40 p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 shadow-md">
+              <Crown className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-amber-300">
+                {lang === 'fr' ? 'Compte Partenaire VIP Actif' : 'Active VIP Partner Account'}
+              </h2>
+              <p className="text-xs text-slate-300">
+                {lang === 'fr'
+                  ? 'Consultez votre lien de parrainage, vos gains, vos utilisateurs parrainés (payés / non payés) et leurs détails.'
+                  : 'View your referral link, earnings, referred users (paid / unpaid), and their details.'}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/dashboard/partner"
+            className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2.5 text-xs sm:text-sm font-black text-slate-950 shadow-md hover:brightness-110 transition"
+          >
+            <Crown className="h-4 w-4" />
+            <span>{lang === 'fr' ? 'Mon Espace Partenaire' : 'My Partner Space'}</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
+
+      {/* View Switcher: Hub vs Analytics */}
         <div className="flex items-center gap-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 self-start sm:self-auto">
           <button
             onClick={() => setActiveView('launcher')}

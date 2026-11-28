@@ -297,11 +297,11 @@ export default function PartnerDashboard() {
         </div>
       </div>
 
-      {/* 4 KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 5 KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg">
           <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-            <span>Utilisateurs Inscrits</span>
+            <span>Utilisateurs Parrainés</span>
             <Users className="h-4 w-4 text-cyan-400" />
           </div>
           <p className="mt-2 text-3xl font-black text-white">{stats.totalInvited || 0}</p>
@@ -310,11 +310,22 @@ export default function PartnerDashboard() {
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg">
           <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-            <span>Utilisateurs Ayant Payé</span>
+            <span>Ayant Payé</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           </div>
           <p className="mt-2 text-3xl font-black text-emerald-400">{stats.payingUsersCount || 0}</p>
           <p className="mt-1 text-xs text-slate-400">Filleuls convertis en abonnés</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
+            <span>N&apos;ayant Pas Payé</span>
+            <Clock className="h-4 w-4 text-rose-400" />
+          </div>
+          <p className="mt-2 text-3xl font-black text-rose-400">
+            {stats.unpaidUsersCount ?? Math.max(0, (stats.totalInvited || 0) - (stats.payingUsersCount || 0))}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">Inscrits en attente de paiement</p>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg">
@@ -372,6 +383,9 @@ export default function PartnerDashboard() {
                     <td className="px-5 py-3.5">
                       <div className="font-bold text-white">{ru.name}</div>
                       <div className="text-xs text-slate-400">{ru.email}</div>
+                      {ru.phone && (
+                        <div className="text-[11px] text-cyan-400 font-mono">{ru.phone}</div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-slate-300">
                       {new Date(ru.registeredAt).toLocaleDateString('fr-FR')}

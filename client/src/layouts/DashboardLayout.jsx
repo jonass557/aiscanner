@@ -97,15 +97,15 @@ export default function DashboardLayout() {
       : Math.max(0, (user?.subscription?.scansPerMonth || 0) - (user?.subscription?.scansUsed || 0));
 
   const SidebarInner = () => (
-    <div className="flex h-full flex-col">
-      <Link to="/" className="flex items-center gap-2 px-6 py-5 font-bold">
+    <div className="flex h-full flex-col overflow-hidden">
+      <Link to="/" className="flex shrink-0 items-center gap-2 px-6 py-5 font-bold">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-600 text-white">
           <ScanLine className="h-5 w-5" />
         </span>
         <span>AI Scanner</span>
       </Link>
 
-      <nav className="flex-1 space-y-1 px-3 overflow-y-auto">
+      <nav className="flex-1 min-h-0 space-y-1 px-3 pb-4 overflow-y-auto overscroll-contain">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}

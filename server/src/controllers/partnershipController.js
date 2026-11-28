@@ -482,7 +482,7 @@ export const getMyPartnerDashboard = asyncHandler(async (req, res) => {
 
   // All users who registered with this partner's referral link
   const referredUsers = await User.find({ referredBy: user._id })
-    .select('firstName lastName email subscription createdAt trial')
+    .select('firstName lastName email phone subscription createdAt trial')
     .sort({ createdAt: -1 })
     .lean();
 
@@ -539,6 +539,7 @@ export const getMyPartnerDashboard = asyncHandler(async (req, res) => {
       _id: ru._id,
       name: `${ru.firstName || ''} ${ru.lastName || ''}`.trim() || ru.email,
       email: ru.email,
+      phone: ru.phone || '',
       registeredAt: ru.createdAt,
       subscriptionPlan: ru.subscription?.plan || 'free',
       subscriptionStatus: ru.subscription?.status || 'inactive',
@@ -585,6 +586,7 @@ export const getMyPartnerDashboard = asyncHandler(async (req, res) => {
       stats: {
         totalInvited: referredUsers.length,
         payingUsersCount: payingUserIds.size,
+        unpaidUsersCount: Math.max(0, referredUsers.length - payingUserIds.size),
         monthlyInvitedCount,
         monthlyInactiveWarning,
       },
