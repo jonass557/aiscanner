@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ScanLine, History, CreditCard, User, Settings,
-  Menu, X, LogOut, Moon, Sun, ShieldCheck, Layers, Radar, GraduationCap,
+  Menu, X, LogOut, ShieldCheck, Layers, Radar, GraduationCap,
   CalendarClock, Mic, ClipboardCheck, Bot, BookOpen, Zap, Globe, Eye, Calculator, Cpu,
   ArrowLeft, Share2, Crown, Clock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useTheme } from '../context/ThemeContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import VoiceAssistantButton from '../components/voice/VoiceAssistantButton.jsx';
@@ -37,7 +36,6 @@ const NAV_ITEMS = [
 /** Authenticated dashboard shell: responsive sidebar + top bar + outlet. */
 export default function DashboardLayout() {
   const { user, logout, isAdmin, freeTrialEnabled, canScan } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const { t, lang, toggleLanguage } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -97,15 +95,21 @@ export default function DashboardLayout() {
       : Math.max(0, (user?.subscription?.scansPerMonth || 0) - (user?.subscription?.scansUsed || 0));
 
   const SidebarInner = () => (
-    <div className="flex h-full flex-col overflow-hidden">
-      <Link to="/" className="flex shrink-0 items-center gap-2 px-6 py-5 font-bold">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-600 text-white">
+    <div className="flex h-full flex-col overflow-hidden bg-[#0B1124] text-slate-200">
+      <Link to="/dashboard" onClick={() => setOpen(false)} className="flex shrink-0 items-center gap-3 px-5 py-5 border-b border-[#1E2B4E]/80">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-cyan-500 to-emerald-400 text-white shadow-lg shadow-cyan-500/20">
           <ScanLine className="h-5 w-5" />
         </span>
-        <span>AI Scanner</span>
+        <div>
+          <div className="text-lg font-black tracking-tight leading-none">
+            <span className="text-white">AI</span>
+            <span className="text-emerald-400">Scanner</span>
+          </div>
+          <p className="text-[10px] text-slate-400 tracking-wide mt-0.5">Scan · Analyse · Trade</p>
+        </div>
       </Link>
 
-      <nav className="flex-1 min-h-0 space-y-1 px-3 pb-4 overflow-y-auto overscroll-contain">
+      <nav className="flex-1 min-h-0 space-y-1 px-3 py-3 pb-4 overflow-y-auto overscroll-contain">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -113,15 +117,20 @@ export default function DashboardLayout() {
             end={item.end}
             onClick={() => setOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+              `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
                 isActive
-                  ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/25'
+                  : 'text-slate-400 hover:bg-[#131C3A] hover:text-white'
               }`
             }
           >
-            <item.icon className="h-4 w-4" />
-            {t(item.key)}
+            <item.icon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t(item.key)}</span>
+            {item.key === 'aiAssistant' && (
+              <span className="ml-auto rounded-md bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-400">
+                NEW
+              </span>
+            )}
           </NavLink>
         ))}
         <NavLink
@@ -182,19 +191,44 @@ export default function DashboardLayout() {
         )}
       </nav>
 
-      <div className="border-t border-gray-200 p-4 dark:border-gray-800">
-        <div className="mb-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">Scans</span>
-            <Badge tone="purple">{remaining}</Badge>
+      <div className="shrink-0 border-t border-[#1E2B4E] p-3.5 space-y-2.5 bg-[#080D1D]">
+        {!isLifetime && (
+          <div className="rounded-xl border border-indigo-500/30 bg-gradient-to-br from-[#121C3D] to-[#0D142B] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-white leading-tight">Trade Smarter with AI</span>
+              <Badge tone="purple">{remaining}</Badge>
+            </div>
+            <Link
+              to="/dashboard/subscription"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-green-400 px-3 py-2 text-xs font-black text-slate-950 shadow-md shadow-emerald-500/20 hover:brightness-110 transition"
+            >
+              <Crown className="h-3.5 w-3.5" />
+              <span>{lang === 'fr' ? 'Passer Premium' : 'Upgrade Now'}</span>
+            </Link>
           </div>
-          <p className="text-xs font-medium capitalize">{user?.subscription?.plan || 'free'} plan</p>
+        )}
+
+        <div className="rounded-xl border border-[#1E2B4E] bg-[#0D142B] p-2.5 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 text-xs font-black text-white">
+              {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold text-white">
+                {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email?.split('@')[0]}
+              </p>
+              <p className="text-[10px] font-semibold capitalize text-amber-400">
+                {user?.subscription?.plan || 'free'} plan
+              </p>
+            </div>
+          </div>
           <div className={`flex items-center justify-between rounded-lg px-2 py-1 text-[11px] font-bold ${
             isExpiredCountdown
-              ? 'bg-rose-500/15 text-rose-500'
+              ? 'bg-rose-500/15 text-rose-400'
               : isLifetime
-              ? 'bg-amber-500/15 text-amber-500'
-              : 'bg-emerald-500/15 text-emerald-500'
+              ? 'bg-amber-500/15 text-amber-400'
+              : 'bg-emerald-500/15 text-emerald-400'
           }`}>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
@@ -203,9 +237,10 @@ export default function DashboardLayout() {
             <span className="font-mono tabular-nums">{countdownText}</span>
           </div>
         </div>
+
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 hover:bg-[#131C3A] hover:text-white transition"
         >
           <LogOut className="h-4 w-4" />
           {t('logout')}
@@ -217,22 +252,25 @@ export default function DashboardLayout() {
   const isBacktesting = location.pathname.startsWith('/dashboard/backtesting');
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Sliding Drawer Menu (unfolds when toggled, rolls up automatically on navigation click) */}
+    <div className="flex min-h-screen bg-[#070B1A] text-slate-100">
+      {/* Persistent Desktop Left Sidebar */}
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col border-r border-[#1E2B4E] bg-[#0B1124]">
+        <SidebarInner />
+      </aside>
+
+      {/* Mobile Sliding Drawer Menu */}
       {open && (
-        <div className="fixed inset-0 z-50 transition-opacity animate-fadeIn">
-          {/* Backdrop overlay */}
+        <div className="fixed inset-0 z-50 lg:hidden transition-opacity animate-fadeIn">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
             onClick={() => setOpen(false)}
             aria-label="Fermer le menu"
           />
-          {/* Sidebar Drawer */}
-          <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-gray-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900">
+          <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-[#1E2B4E] bg-[#0B1124] shadow-2xl">
             <div className="relative h-full">
               <button
                 onClick={() => setOpen(false)}
-                className="absolute right-4 top-5 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+                className="absolute right-4 top-5 z-10 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
                 title={t('close')}
                 aria-label="Fermer"
               >
@@ -244,42 +282,40 @@ export default function DashboardLayout() {
         </div>
       )}
 
-      {/* Main Container - Takes 100% full screen width */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white/90 px-4 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 lg:px-6">
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Bouton Retour Universel - Visible sur toutes les sous-pages */}
+      {/* Main Container */}
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#1E2B4E] bg-[#0B1124]/95 px-4 py-2.5 backdrop-blur-md lg:px-6">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setOpen(!open)}
+              className="lg:hidden flex items-center gap-1.5 rounded-xl border border-[#1E2B4E] bg-[#101730] px-2.5 py-1.5 text-xs font-bold text-slate-200 hover:bg-[#182246]"
+              title={t('featuresMenu')}
+            >
+              <Menu className="h-4 w-4 text-emerald-400" />
+            </button>
+
             {location.pathname !== '/dashboard' && (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 text-brand-700 dark:text-brand-300 px-3 py-1.5 text-xs font-bold transition shadow-sm border border-brand-200 dark:border-brand-800"
-                title={lang === 'fr' ? 'Retourner au menu principal des fonctionnalités' : 'Return to main features menu'}
+                className="flex items-center gap-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 px-3 py-1.5 text-xs font-bold transition border border-indigo-500/30"
               >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">{lang === 'fr' ? 'Menu Principal' : 'Main Menu'}</span>
-                <span className="sm:hidden">{lang === 'fr' ? 'Retour' : 'Back'}</span>
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{lang === 'fr' ? 'Dashboard' : 'Dashboard'}</span>
               </button>
             )}
 
-            {/* Menu Déroulant Button (Works on Desktop & Mobile, auto-rolls up when item clicked) */}
-            <button
-              onClick={() => setOpen(!open)}
-              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-              title={t('featuresMenu')}
-            >
-              <Menu className="h-4 w-4 text-brand-500" />
-              <span className="hidden sm:inline">{t('featuresMenu')}</span>
-            </button>
-
-            {/* Quick logo badge - hidden on backtesting view to maximize space */}
-            {!isBacktesting && (
-              <Link to="/" className="flex items-center gap-2 font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-accent-600 text-white">
-                  <ScanLine className="h-4 w-4" />
-                </span>
-                <span className="hidden md:inline font-black tracking-tight">AI Scanner</span>
-              </Link>
-            )}
+            {/* Market Live Ticker Bar (matching screenshot) */}
+            <div className="hidden xl:flex items-center gap-4 text-xs">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-bold text-emerald-400">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                Market Live
+              </span>
+              <span className="text-slate-300 font-mono">EURUSD <strong className="text-white">1.0874</strong> <span className="text-emerald-400">+0.24%</span></span>
+              <span className="text-slate-300 font-mono">GBPUSD <strong className="text-white">1.2698</strong> <span className="text-emerald-400">+0.18%</span></span>
+              <span className="text-slate-300 font-mono">USDJPY <strong className="text-white">154.32</strong> <span className="text-rose-400">-0.12%</span></span>
+              <span className="text-slate-300 font-mono">XAUUSD <strong className="text-white">2,658.50</strong> <span className="text-emerald-400">+0.36%</span></span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -302,22 +338,18 @@ export default function DashboardLayout() {
             {/* Language Switcher Button */}
             <button
               onClick={toggleLanguage}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2.5 py-1 text-xs font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm"
+              className="flex items-center gap-1.5 rounded-lg border border-[#1E2B4E] bg-[#101730] px-2.5 py-1 text-xs font-bold text-slate-200 hover:bg-[#182246] transition shadow-sm"
               title="Changer de langue / Switch language"
             >
-              <Globe className="h-3.5 w-3.5 text-brand-500" />
+              <Globe className="h-3.5 w-3.5 text-cyan-400" />
               <span>{lang === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}</span>
             </button>
 
-            <button onClick={toggleTheme} className="btn-ghost !px-2.5" aria-label="Toggle theme">
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
-
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white shadow-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 text-sm font-bold text-white shadow-sm">
                 {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
               </div>
-              <span className="hidden text-sm font-semibold sm:block text-gray-800 dark:text-gray-200">
+              <span className="hidden text-sm font-semibold sm:block text-slate-200">
                 {user?.firstName || user?.email?.split('@')[0]}
               </span>
             </div>

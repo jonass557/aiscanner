@@ -121,8 +121,8 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   const globalFreeTrialEnabled = config.features?.freeTrialEnabled !== false;
-  const trialEnabled = Boolean(globalFreeTrialEnabled && targetPlan?.trial?.enabled && !isPaidSubscriber);
-  const trialDays = targetPlan?.trial?.days || 7;
+  const trialEnabled = Boolean(globalFreeTrialEnabled && (targetPlan?.trial?.enabled || targetPlan?.id === '1mois' || !targetPlan) && !isPaidSubscriber);
+  const trialDays = Math.max(1, Number(config.features?.freeTrialDays || targetPlan?.trial?.days || 7));
   const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
   // Durée de l'abonnement selon le plan (1 mois, 2 mois, 1 an / 6 mois)

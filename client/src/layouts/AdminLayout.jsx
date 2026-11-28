@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, ScrollText, Cpu, Menu, LogOut, ArrowLeft, ShieldCheck, Moon, Sun, CreditCard, Layers, BarChart3, ChevronRight, Activity, MessageSquare, Crown, Wallet,
+  LayoutDashboard, Users, ScrollText, Cpu, Menu, LogOut, ArrowLeft, ShieldCheck, CreditCard, Layers, BarChart3, ChevronRight, Activity, MessageSquare, Crown, Wallet,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useTheme } from '../context/ThemeContext.jsx';
 
 const NAV = [
   { to: '/admin', label: 'Vue Globale', icon: LayoutDashboard, end: true },
@@ -22,7 +21,6 @@ const NAV = [
 /** Admin executive layout with professional dark theme and high contrast navigation. */
 export default function AdminLayout() {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -165,17 +163,10 @@ export default function AdminLayout() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
               <Activity className="h-3 w-3 animate-pulse" />
               <span>Système Opérationnel</span>
             </div>
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
           </div>
         </header>
 

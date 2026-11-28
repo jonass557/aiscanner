@@ -53,6 +53,41 @@ export default function AdminPartnership() {
   const [wAmount, setWAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
 
+  // Promote user to VIP Partner state
+  const [promoteEmail, setPromoteEmail] = useState('');
+  const [promoting, setPromoting] = useState(false);
+  const [togglingProgram, setTogglingProgram] = useState(false);
+
+  const togglePartnerProgram = async () => {
+    setTogglingProgram(true);
+    try {
+      const next = !Boolean(data?.config?.isEnabled);
+      await partnershipApi.adminUpdateConfig({ isEnabled: next, isDeleted: false });
+      toast.success(next ? 'Plan Partenaires activé sur la plateforme.' : 'Plan Partenaires désactivé.');
+      await loadOverview();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setTogglingProgram(false);
+    }
+  };
+
+  const handlePromotePartner = async (e) => {
+    e.preventDefault();
+    if (!promoteEmail.trim()) return;
+    setPromoting(true);
+    try {
+      const res = await partnershipApi.adminPromote({ email: promoteEmail.trim() });
+      toast.success(res.data?.message || 'Compte Partenaire VIP activé.');
+      setPromoteEmail('');
+      await loadOverview();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setPromoting(false);
+    }
+  };
+
   const loadOverview = async () => {
     setLoading(true);
     try {
@@ -234,14 +269,64 @@ export default function AdminPartnership() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={loadOverview}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800"
-        >
-          <RefreshCw className="h-3.5 w-3.5" /> Actualiser
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={togglingProgram}
+            onClick={togglePartnerProgram}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+              cfg.isEnabled && !cfg.isDeleted
+                ? 'bg-rose-600 text-white hover:bg-rose-500'
+                : 'bg-emerald-600 text-white hover:bg-emerald-500'
+            }`}
+          >
+            <Power className="h-3.5 w-3.5" />
+            {togglingProgram
+              ? 'Mise à jour...'
+              : cfg.isEnabled && !cfg.isDeleted
+              ? 'Désactiver le Plan Partenaires'
+              : 'Activer le Plan Partenaires'}
+          </button>
+
+          <button
+            type="button"
+            onClick={loadOverview}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Actualiser
+          </button>
+        </div>
       </div>
+
+      {/* Promote / Activate Any User as VIP Partner */}
+      <form onSubmit={handlePromotePartner} className="rounded-2xl border border-amber-500/30 bg-amber-950/15 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+            <Crown className="h-4 w-4" /> Activer le compte Partenaire VIP d&apos;un utilisateur
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Saisissez l&apos;adresse email d&apos;un utilisateur inscrit pour lui attribuer ou activer le statut Partenaire VIP.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <input
+            type="email"
+            required
+            value={promoteEmail}
+            onChange={(e) => setPromoteEmail(e.target.value)}
+            placeholder="email@utilisateur.com"
+            className="w-full sm:w-64 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-amber-400 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={promoting}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-slate-950 hover:bg-amber-400 transition disabled:opacity-50"
+          >
+            {promoting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+            <span>Activer Partenaire</span>
+          </button>
+        </div>
+      </form>
 
       {/* Program Deleted Alert */}
       {cfg.isDeleted && (

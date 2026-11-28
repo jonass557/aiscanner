@@ -142,7 +142,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw ApiError.notFound('User not found.');
 
-  const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate, referralEnabled, commissionRate, disableSubscription } = req.body;
+  const { plan, status, role, scansPerMonth, addCredits, isVerified, trialDays, extendTrialDays, subscriptionEndDate, referralEnabled, commissionRate, disableSubscription, reactivateSubscription } = req.body;
 
   if (disableSubscription) {
     user.subscription = user.subscription || {};
@@ -158,6 +158,22 @@ export const updateUser = asyncHandler(async (req, res) => {
       user.partnership.status = 'suspended';
       user.partnership.lifetimeAccess = false;
     }
+  }
+
+  if (reactivateSubscription) {
+    user.subscription = user.subscription || {};
+    const targetPlanId = (plan && plan !== 'free') ? plan : (user.subscription.plan && user.subscription.plan !== 'free' ? user.subscription.plan : '1mois');
+    user.subscription.plan = targetPlanId;
+    user.subscription.status = 'active';
+    user.subscription.scansPerMonth = -1;
+    user.subscription.startDate = new Date();
+    const end = new Date();
+    if (targetPlanId === '1an') end.setMonth(end.getMonth() + 12);
+    else if (targetPlanId === '6mois') end.setMonth(end.getMonth() + 6);
+    else if (targetPlanId === '2mois') end.setMonth(end.getMonth() + 2);
+    else end.setMonth(end.getMonth() + 1);
+    user.subscription.endDate = end;
+    if (user.trial) user.trial.isActive = false;
   }
 
   if (plan) {

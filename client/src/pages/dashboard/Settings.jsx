@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Moon, Sun, Bell, Shield, Palette, TrendingUp, Loader2 } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext.jsx';
+import { Bell, Shield, TrendingUp, Loader2 } from 'lucide-react';
 import { userApi } from '../../services/endpoints.js';
 import { getErrorMessage } from '../../services/api.js';
 import Button from '../../components/ui/Button.jsx';
@@ -31,7 +30,6 @@ const TIMEFRAME_OPTIONS = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1'];
 
 /** User preferences: theme, notifications, and trading preferences (persisted). */
 export default function Settings() {
-  const { theme, toggleTheme } = useTheme();
   const [notifs, setNotifs] = useState(() => ({
     emailAlerts: localStorage.getItem('acs_notif_email') === 'true',
     scanComplete: localStorage.getItem('acs_notif_scan') !== 'false',
@@ -112,17 +110,6 @@ export default function Settings() {
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="mt-1 text-sm text-gray-500">Customize your experience.</p>
-      </div>
-
-      <div className="card p-6">
-        <h3 className="mb-2 flex items-center gap-2 font-semibold">
-          <Palette className="h-4 w-4" /> Appearance
-        </h3>
-        <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          <Row icon={theme === 'dark' ? Moon : Sun} title="Theme" desc="Switch between light and dark mode">
-            <Toggle on={theme === 'dark'} onClick={toggleTheme} />
-          </Row>
-        </div>
       </div>
 
       {/* Trading preferences — drives the AI Trading Assistant */}

@@ -1,5 +1,6 @@
 import Plan from '../models/Plan.js';
 import { PLANS } from '../config/plans.js';
+import config from '../config/index.js';
 import logger from '../config/logger.js';
 
 /**
@@ -122,15 +123,30 @@ const fromConfig = (id) => {
  * Public plan catalog — active plans only, ordered. Falls back to config.
  */
 export const getPublicPlans = async () => {
+  const freeTrialEnabled = config.features?.freeTrialEnabled !== false;
+  const freeTrialDays = Math.max(1, Number(config.features?.freeTrialDays || 7));
+
+  const applyTrialOverride = (plans) =>
+    plans.map((p) => {
+      if (!freeTrialEnabled) {
+        return { ...p, trial: { enabled: false, days: 0 } };
+      }
+      if (p.id === '1mois' || p.trial?.enabled) {
+        return { ...p, trial: { enabled: true, days: freeTrialDays } };
+      }
+      return p;
+    });
+
   try {
     const totalCount = await Plan.countDocuments();
     if (totalCount > 0) {
-      return await Plan.find({ isActive: true }).sort({ order: 1, price: 1 }).lean();
+      const dbPlans = await Plan.find({ isActive: true }).sort({ order: 1, price: 1 }).lean();
+      return applyTrialOverride(dbPlans);
     }
   } catch (err) {
     logger.warn(`getPublicPlans DB read failed: ${err.message}`);
   }
-  return DEFAULT_PLANS;
+  return applyTrialOverride(DEFAULT_PLANS);
 };
 
 /**

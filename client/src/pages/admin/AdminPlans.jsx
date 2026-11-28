@@ -35,6 +35,7 @@ export default function AdminPlans() {
   const [saving, setSaving] = useState(false);
   const [featuresText, setFeaturesText] = useState('');
   const [freeTrialEnabled, setFreeTrialEnabled] = useState(true);
+  const [freeTrialDays, setFreeTrialDays] = useState(7);
   const [togglingTrial, setTogglingTrial] = useState(false);
 
   const load = async () => {
@@ -53,6 +54,10 @@ export default function AdminPlans() {
       if (ft !== undefined) {
         setFreeTrialEnabled(ft.value !== false && ft.value !== 'false');
       }
+      const ftd = settingsList.find((s) => s?.key === 'features.freeTrialDays');
+      if (ftd !== undefined && Number(ftd.value) > 0) {
+        setFreeTrialDays(Number(ftd.value));
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -60,17 +65,23 @@ export default function AdminPlans() {
     }
   };
 
-  const toggleGlobalFreeTrial = async () => {
+  const toggleGlobalFreeTrial = async (overrideNext = null) => {
     setTogglingTrial(true);
     try {
-      const next = !freeTrialEnabled;
-      await adminApi.updateSettings([{ key: 'features.freeTrialEnabled', value: next }]);
+      const next = typeof overrideNext === 'boolean' ? overrideNext : !freeTrialEnabled;
+      const days = Math.max(1, Number(freeTrialDays) || 7);
+      await adminApi.updateSettings([
+        { key: 'features.freeTrialEnabled', value: next },
+        { key: 'features.freeTrialDays', value: days },
+      ]);
       setFreeTrialEnabled(next);
+      setFreeTrialDays(days);
       toast.success(
         next
-          ? 'Free Trial global activé : les nouveaux utilisateurs bénéficient de la période d’essai.'
+          ? `Free Trial activé (${days} jour${days > 1 ? 's' : ''}) : visible sur les plans et compte à rebours actif.`
           : 'Free Trial global désactivé : tous les utilisateurs non-payants doivent payer un abonnement.'
       );
+      await load();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -202,23 +213,45 @@ export default function AdminPlans() {
               : 'Mode Paywall Strict : tous les utilisateurs sans abonnement payant actif doivent payer avant de continuer à utiliser la plateforme.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={toggleGlobalFreeTrial}
-          disabled={togglingTrial}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-            freeTrialEnabled
-              ? 'bg-rose-600 text-white hover:bg-rose-500'
-              : 'bg-emerald-600 text-white hover:bg-emerald-500'
-          }`}
-        >
-          <Power className="h-3.5 w-3.5" />
-          {togglingTrial
-            ? 'Mise à jour...'
-            : freeTrialEnabled
-            ? 'Désactiver le Free Trial'
-            : 'Activer le Free Trial'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5">
+            <span className="text-xs font-semibold text-slate-400">Durée :</span>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={freeTrialDays}
+              onChange={(e) => setFreeTrialDays(e.target.value)}
+              className="w-14 bg-transparent text-center text-xs font-bold text-white focus:outline-none"
+            />
+            <span className="text-xs text-slate-400">jours</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleGlobalFreeTrial(freeTrialEnabled)}
+            disabled={togglingTrial}
+            className="rounded-xl border border-cyan-500/40 bg-cyan-500/15 px-3 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25 transition"
+          >
+            Appliquer jours
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleGlobalFreeTrial(!freeTrialEnabled)}
+            disabled={togglingTrial}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+              freeTrialEnabled
+                ? 'bg-rose-600 text-white hover:bg-rose-500'
+                : 'bg-emerald-600 text-white hover:bg-emerald-500'
+            }`}
+          >
+            <Power className="h-3.5 w-3.5" />
+            {togglingTrial
+              ? 'Mise à jour...'
+              : freeTrialEnabled
+              ? 'Désactiver le Free Trial'
+              : 'Activer le Free Trial'}
+          </button>
+        </div>
       </div>
 
       {loading ? (

@@ -123,6 +123,16 @@ export default function AdminUsers() {
     }
   };
 
+  const handleReactivateSubscription = async (u) => {
+    try {
+      await adminApi.updateUser(u._id, { reactivateSubscription: true });
+      toast.success(`Abonnement de ${u.email} réactivé.`);
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
   const confirmDelete = async () => {
     try {
       await adminApi.deleteUser(toDelete._id);
@@ -300,14 +310,24 @@ export default function AdminUsers() {
                           >
                             <Sparkles className="h-3 w-3" /> Activer Plan
                           </button>
-                          {u.subscription?.status === 'active' && u.role !== 'admin' && (
-                            <button
-                              onClick={() => handleDisableSubscription(u)}
-                              className="px-2.5 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-[11px] font-bold"
-                              title="Désactiver l'abonnement (oblige à repayer)"
-                            >
-                              Désactiver
-                            </button>
+                          {u.role !== 'admin' && (
+                            u.subscription?.status === 'active' ? (
+                              <button
+                                onClick={() => handleDisableSubscription(u)}
+                                className="px-2.5 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-[11px] font-bold"
+                                title="Désactiver l'abonnement (oblige à repayer)"
+                              >
+                                Désactiver
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleReactivateSubscription(u)}
+                                className="px-2.5 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 text-[11px] font-bold"
+                                title="Réactiver le plan de cet utilisateur"
+                              >
+                                Réactiver
+                              </button>
+                            )
                           )}
                           <button
                             onClick={() => openEdit(u)}

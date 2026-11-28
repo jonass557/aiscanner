@@ -3,15 +3,18 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 html {
   scroll-behavior: smooth;
+  background-color: #070B1A;
 }
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
+  background-color: #070B1A;
+  color: #F1F5F9;
+  -webkit-font-smoothing: antialiased;
   font-family: 'Inter', system-ui, sans-serif;
 }
 
@@ -44,10 +47,10 @@ body {
     @apply btn text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800;
   }
   .card {
-    @apply rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900;
+    @apply rounded-2xl border border-[#1E2B4E] bg-[#0D142B] shadow-lg shadow-black/20;
   }
   .input {
-    @apply w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100;
+    @apply w-full rounded-xl border border-[#1E2B4E] bg-[#080E20] px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30;
   }
   .label {
     @apply mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300;

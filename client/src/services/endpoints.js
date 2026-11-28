@@ -249,6 +249,7 @@ export const partnershipApi = {
   adminUpdateConfig: (payload) => api.put('/partnership/admin/config', payload),
   adminDeleteProgram: () => api.delete('/partnership/admin/config'),
   adminUpdatePartnerStatus: (userId, payload) => api.patch(`/partnership/admin/partners/${userId}/status`, payload),
+  adminPromote: (payload) => api.post('/partnership/admin/promote', payload),
   adminReleaseCommissions: () => api.post('/partnership/admin/release-commissions'),
   adminWithdraw: (payload) => api.post('/partnership/admin/withdraw', payload),
   adminVerifyPayout: (payload) => api.post('/partnership/admin/payout/verify', payload),

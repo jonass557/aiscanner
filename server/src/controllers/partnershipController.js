@@ -957,6 +957,40 @@ export const adminDeletePartnershipProgram = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/v1/partnership/admin/promote  (ADMIN)
+ * Allows Admin to promote any existing user (by email) to an active VIP Partner immediately.
+ */
+export const adminPromotePartner = asyncHandler(async (req, res) => {
+  const cleanEmail = String(req.body?.email || '').toLowerCase().trim();
+  if (!cleanEmail) throw ApiError.badRequest('Adresse email requise.');
+
+  const targetUser = await User.findOne({ email: cleanEmail });
+  if (!targetUser) throw ApiError.notFound(`Aucun utilisateur trouvé avec l'email ${cleanEmail}.`);
+
+  const cfg = await getOrCreatePartnershipConfig();
+  await activatePartnershipForUser(targetUser, {
+    fullName: `${targetUser.firstName || ''} ${targetUser.lastName || ''}`.trim() || targetUser.email,
+    email: targetUser.email,
+    phone: targetUser.phone || '',
+    paymentRef: `ADMIN_GRANT_${Date.now()}`,
+    paidAmount: 0,
+    signatureName: 'Attribution Administrateur',
+    signedTermsSnapshot: cfg.termsAndConditions || '',
+  });
+
+  await logAdmin('admin_promote_partner', {
+    message: `Admin promoted ${targetUser.email} to VIP Partner`,
+    userId: req.user._id,
+    metadata: { targetUserId: targetUser._id, email: targetUser.email },
+  });
+
+  return sendSuccess(res, {
+    message: `${targetUser.email} est désormais Partenaire VIP actif.`,
+    data: { user: targetUser },
+  });
+});
+
+/**
  * PATCH /api/v1/admin/partnership/partners/:userId/status  (ADMIN)
  * Allows Admin to exclude, deactivate, re-activate, or remove a partner.
  */

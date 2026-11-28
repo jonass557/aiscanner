@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Menu, X, Moon, Sun, ScanLine, Globe } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext.jsx';
+import { Menu, X, ScanLine, Globe } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
 /** Navigation bar for public landing page. */
 export default function PublicNavbar() {
   const [open, setOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
   const { isAuthenticated } = useAuth();
   const { t, lang, toggleLanguage } = useLanguage();
 
@@ -50,9 +48,6 @@ export default function PublicNavbar() {
             <span>{lang === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}</span>
           </button>
 
-          <button onClick={toggleTheme} className="btn-ghost !px-2.5" aria-label="Toggle theme">
-            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </button>
           {isAuthenticated ? (
             <Link to="/dashboard" className="btn-primary">{t('dashboard')}</Link>
           ) : (

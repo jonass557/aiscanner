@@ -62,6 +62,7 @@ export const SETTING_DEFS = [
   // --- Features: behavioral toggles -----------------------------------------
   { key: 'features.requireEmailVerification', path: 'features.requireEmailVerification', category: 'features', secret: false, type: 'boolean' },
   { key: 'features.freeTrialEnabled', path: 'features.freeTrialEnabled', category: 'features', secret: false, type: 'boolean' },
+  { key: 'features.freeTrialDays', path: 'features.freeTrialDays', category: 'features', secret: false, type: 'number' },
 
   // --- Contact & Support ----------------------------------------------------
   { key: 'contact.whatsappUrl', path: 'contact.whatsappUrl', category: 'features', secret: false },

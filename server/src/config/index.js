@@ -189,6 +189,7 @@ const config = {
     // (features.requireEmailVerification setting), which overrides this env.
     requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
     freeTrialEnabled: process.env.FREE_TRIAL_ENABLED !== 'false',
+    freeTrialDays: Math.max(1, parseInt(process.env.FREE_TRIAL_DAYS, 10) || 7),
   },
 };
 

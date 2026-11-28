@@ -311,24 +311,55 @@ export default function Overview() {
   const decisionData = Object.entries(stats?.byDecision || {}).map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      {/* Top Welcome Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-4 sm:p-5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
-            {lang === 'fr' ? 'Bienvenue' : 'Welcome back'}
-            {user?.firstName ? `, ${user.firstName}` : ''} 👋
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {lang === 'fr'
-              ? 'Choisissez une fonctionnalité pour commencer votre session'
-              : 'Select a feature below to begin your trading session'}
-          </p>
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+      {/* Cyber-Trading Hero Banner (matching reference design) */}
+      <div className="relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-[#0B1437] via-[#0F1F4E] to-[#08223A] p-5 sm:p-6 shadow-2xl">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-emerald-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-10 -bottom-10 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl" />
+
+        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-bold text-emerald-400">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>{lang === 'fr' ? `Bienvenue, ${user?.firstName || user?.email?.split('@')[0] || 'Trader'}` : `Welcome, ${user?.firstName || user?.email?.split('@')[0] || 'Trader'}`}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+              <span className="text-white">AI</span>
+              <span className="text-emerald-400">Scanner</span>{' '}
+              <span className="text-slate-200 text-lg sm:text-xl font-bold block sm:inline">
+                — {lang === 'fr' ? 'Votre Assistant Trading IA Intelligent' : 'Your Smart AI Trading Assistant'}
+              </span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-300">
+              {lang === 'fr'
+                ? 'Analysez les graphiques · Obtenez des signaux · Tradez avec confiance'
+                : 'Analyze charts · Get signals · Trade with confidence'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-5 gap-y-2 text-xs text-slate-200">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> {lang === 'fr' ? 'Analyse IA Avancée' : 'AI-Powered Analysis'}</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> {lang === 'fr' ? 'Signaux Haute Précision' : 'High-Accuracy Signals'}</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> {lang === 'fr' ? 'Multi-Marchés' : 'Multiple Markets'}</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> {lang === 'fr' ? 'Alertes Temps Réel' : 'Real-Time Alerts'}</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link
+              to="/dashboard/scanner"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-green-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 transition"
+            >
+              <Zap className="h-4 w-4" />
+              <span>{lang === 'fr' ? 'Démarrer un Scan' : 'Start Scanning'}</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
+      </div>
 
       {/* VIP Partner Quick Access Banner */}
       {user?.partnership?.isActive && (
-        <div className="rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-950/60 via-slate-900 to-orange-950/40 p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-950/60 via-[#0D142B] to-orange-950/40 p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 shadow-md">
               <Crown className="h-6 w-6" />
@@ -355,14 +386,23 @@ export default function Overview() {
         </div>
       )}
 
-      {/* View Switcher: Hub vs Analytics */}
-        <div className="flex items-center gap-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 self-start sm:self-auto">
+      {/* Terminal Action Bar + View Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[#1E2B4E] bg-[#0D142B] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+          <span className="font-bold text-white">{lang === 'fr' ? 'Terminal de Trading IA' : 'AI Trading Terminal'}</span>
+          <span className="text-slate-500">·</span>
+          <span>{stats?.total ?? 0} {lang === 'fr' ? 'scans réalisés' : 'total scans'}</span>
+          <span className="text-slate-500">·</span>
+          <span className="text-emerald-400 font-semibold">{stats?.avgConfidence ?? 0}% {lang === 'fr' ? 'confiance moy.' : 'avg confidence'}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 rounded-xl bg-[#080E20] border border-[#1E2B4E] p-1 self-start sm:self-auto">
           <button
             onClick={() => setActiveView('launcher')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
               activeView === 'launcher'
-                ? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <LayoutGrid className="h-3.5 w-3.5" />
@@ -372,8 +412,8 @@ export default function Overview() {
             onClick={() => setActiveView('analytics')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
               activeView === 'analytics'
-                ? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <BarChart2 className="h-3.5 w-3.5" />

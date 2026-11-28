@@ -20,6 +20,7 @@ router.get('/admin/overview', protect, authorize('admin'), partnershipController
 router.put('/admin/config', protect, authorize('admin'), partnershipController.adminUpdatePartnershipConfig);
 router.delete('/admin/config', protect, authorize('admin'), partnershipController.adminDeletePartnershipProgram);
 router.patch('/admin/partners/:userId/status', protect, authorize('admin'), partnershipController.adminUpdatePartnerStatus);
+router.post('/admin/promote', protect, authorize('admin'), partnershipController.adminPromotePartner);
 router.post('/admin/release-commissions', protect, authorize('admin'), partnershipController.adminReleaseDueCommissions);
 router.post('/admin/withdraw', protect, authorize('admin'), partnershipController.adminWithdrawRevenuePool);
 router.post('/admin/payout/verify', protect, authorize('admin'), partnershipController.adminVerifyPayout);
